@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Doctor {
+  id             String         @id @default(uuid()) @db.Uuid
+  name           String
+  room_number    String
+  specialty      String?
+  opd_status     String         @default("available")
+  created_at     DateTime       @default(now()) @db.Timestamptz(6)
+  patient_visits PatientVisit[]
+
+  @@map("doctors")
+}
+
+model PatientVisit {
+  id            String    @id @default(uuid()) @db.Uuid
+  token_number  Int
+  patient_name  String
+  doctor_id     String    @db.Uuid
+  room_number   String
+  status        String    @default("registered")
+  lab_eta       DateTime? @db.Timestamptz(6)
+  radio_eta     DateTime? @db.Timestamptz(6)
+  registered_at DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  doctors       Doctor    @relation(fields: [doctor_id], references: [id], onDelete: Restrict)
+
+  @@index([status])
+  @@index([doctor_id])
+  @@index([registered_at(sort: Desc)])
+  @@map("patient_visits")
+}
+
+model DailyToken {
+  visit_date DateTime @id @db.Date
+  last_token Int      @default(0)
+
+  @@map("daily_tokens")
+}
