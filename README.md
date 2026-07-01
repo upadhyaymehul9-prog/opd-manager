@@ -121,8 +121,10 @@ Track inventory by batch and expiry. Stock deducts automatically when medicines 
 npm run db:push    # after pull — adds stock_batches table
 ```
 
-**Stock** tab → view levels · **admin/manager** can add stock batches  
+**Stock** tab → view levels · **admin/manager/pharmacy** can add new medicines · batch no & expiry **required** when receiving stock  
 Dispense is **blocked** if quantity is not available in stock.
+
+Seed ~140 common generics: `npm run db:seed-medicines` (add more anytime from **Stock → Add new medicine**).
 
 ## Customize doctors
 

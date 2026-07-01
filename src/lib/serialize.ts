@@ -72,6 +72,7 @@ export function serializeVisit(visit: VisitWithDoctor): PatientVisit {
 export function serializeMedicine(m: {
   id: string;
   name: string;
+  brand: string | null;
   form: string | null;
   strength: string | null;
   is_active: boolean;
@@ -79,6 +80,7 @@ export function serializeMedicine(m: {
   return {
     id: m.id,
     name: m.name,
+    brand: m.brand,
     form: m.form,
     strength: m.strength,
     is_active: m.is_active,

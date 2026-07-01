@@ -159,7 +159,11 @@ export function canAccessApi(
   }
 
   if (pathname === "/api/medicines" && method === "POST") {
-    return session.role === "admin" || session.role === "manager";
+    return (
+      session.role === "pharmacy" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
   }
 
   if (pathname === "/api/medicines" && method === "GET") {

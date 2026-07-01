@@ -7,6 +7,7 @@ import type {
   PrescriptionItemInput,
 } from "@/lib/prescription-types";
 import { ActionButton } from "./PatientCard";
+import { formatMedicineLabel } from "@/lib/medicine";
 
 const FREQUENCIES = ["OD", "BD", "TDS", "QID", "SOS", "HS"];
 
@@ -101,10 +102,9 @@ export function PrescriptionForm({
   }
 
   function pickMedicine(lineKey: string, medicine: Medicine) {
-    const label = [medicine.name, medicine.strength].filter(Boolean).join(" ");
     updateLine(lineKey, {
       medicine_id: medicine.id,
-      medicine_name: label,
+      medicine_name: formatMedicineLabel(medicine),
     });
     setQuery("");
     setSuggestions([]);
@@ -227,7 +227,7 @@ export function PrescriptionForm({
                   setQuery(e.target.value);
                   setActiveLine(line.key);
                 }}
-                placeholder="Medicine name"
+                placeholder="Generic / salt name (search or type)"
                 className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
               />
               {activeLine === line.key && suggestions.length > 0 && (
@@ -239,9 +239,7 @@ export function PrescriptionForm({
                         className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
                         onClick={() => pickMedicine(line.key, med)}
                       >
-                        {med.name}
-                        {med.strength ? ` ${med.strength}` : ""}
-                        {med.form ? ` (${med.form})` : ""}
+                        {formatMedicineLabel(med)}
                       </button>
                     </li>
                   ))}

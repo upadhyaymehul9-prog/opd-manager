@@ -29,7 +29,7 @@ export async function GET(request: Request) {
         batches: med.stock_batches.map((b) => ({
           id: b.id,
           batch_no: b.batch_no,
-          expiry_date: b.expiry_date?.toISOString().slice(0, 10) ?? null,
+          expiry_date: b.expiry_date.toISOString().slice(0, 10),
           quantity: b.quantity,
           mrp: b.mrp,
         })),
@@ -53,9 +53,32 @@ export async function POST(request: Request) {
     const medicine_id = String(body.medicine_id ?? "").trim();
     const quantity = Number(body.quantity);
 
+    const batch_no = String(body.batch_no ?? "").trim();
+    const expiryRaw = String(body.expiry_date ?? "").trim();
+
     if (!medicine_id || !Number.isFinite(quantity) || quantity <= 0) {
       return NextResponse.json(
         { error: "medicine_id and positive quantity are required" },
+        { status: 400 },
+      );
+    }
+    if (!batch_no) {
+      return NextResponse.json(
+        { error: "Batch number is required" },
+        { status: 400 },
+      );
+    }
+    if (!expiryRaw) {
+      return NextResponse.json(
+        { error: "Expiry date is required" },
+        { status: 400 },
+      );
+    }
+
+    const expiry_date = new Date(expiryRaw);
+    if (Number.isNaN(expiry_date.getTime())) {
+      return NextResponse.json(
+        { error: "Invalid expiry date" },
         { status: 400 },
       );
     }
@@ -71,8 +94,8 @@ export async function POST(request: Request) {
       data: {
         medicine_id,
         quantity: Math.round(quantity),
-        batch_no: body.batch_no?.trim() || null,
-        expiry_date: body.expiry_date ? new Date(body.expiry_date) : null,
+        batch_no,
+        expiry_date,
         mrp: body.mrp != null && body.mrp !== "" ? Number(body.mrp) : null,
       },
     });

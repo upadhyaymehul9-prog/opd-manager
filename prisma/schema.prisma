@@ -75,6 +75,7 @@ model DailyToken {
 model Medicine {
   id                 String             @id @default(uuid()) @db.Uuid
   name               String
+  brand              String?
   form               String?
   strength           String?
   is_active          Boolean            @default(true)
@@ -83,18 +84,19 @@ model Medicine {
   stock_batches      StockBatch[]
 
   @@index([name])
+  @@index([brand])
   @@map("medicines")
 }
 
 model StockBatch {
-  id          String    @id @default(uuid()) @db.Uuid
-  medicine_id String    @db.Uuid
-  batch_no    String?
-  expiry_date DateTime? @db.Date
+  id          String   @id @default(uuid()) @db.Uuid
+  medicine_id String   @db.Uuid
+  batch_no    String
+  expiry_date DateTime @db.Date
   quantity    Int
   mrp         Float?
-  created_at  DateTime  @default(now()) @db.Timestamptz(6)
-  medicine    Medicine  @relation(fields: [medicine_id], references: [id], onDelete: Cascade)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  medicine    Medicine @relation(fields: [medicine_id], references: [id], onDelete: Cascade)
 
   @@index([medicine_id])
   @@index([expiry_date])

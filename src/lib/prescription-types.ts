@@ -7,6 +7,7 @@ export type PrescriptionStatus =
 export type Medicine = {
   id: string;
   name: string;
+  brand: string | null;
   form: string | null;
   strength: string | null;
   is_active: boolean;

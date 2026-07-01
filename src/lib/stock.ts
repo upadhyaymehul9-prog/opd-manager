@@ -70,6 +70,7 @@ export async function restoreToStock(
       medicine_id: medicineId,
       quantity: qty,
       batch_no: "RETURN",
+      expiry_date: new Date("2099-12-31"),
     },
   });
 }

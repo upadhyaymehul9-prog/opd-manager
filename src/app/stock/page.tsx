@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ConsoleShell } from "@/components/ConsoleShell";
+import { formatMedicineLabel } from "@/lib/medicine";
 import type { Medicine } from "@/lib/prescription-types";
 
 type StockRow = {
@@ -12,8 +13,8 @@ type StockRow = {
   out_of_stock: boolean;
   batches: {
     id: string;
-    batch_no: string | null;
-    expiry_date: string | null;
+    batch_no: string;
+    expiry_date: string;
     quantity: number;
     mrp: number | null;
   }[];
@@ -21,29 +22,41 @@ type StockRow = {
 
 export default function StockPage() {
   const [rows, setRows] = useState<StockRow[]>([]);
-  const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showLowOnly, setShowLowOnly] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [medQuery, setMedQuery] = useState("");
+  const [medSuggestions, setMedSuggestions] = useState<Medicine[]>([]);
+  const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(
+    null,
+  );
+
   const [form, setForm] = useState({
-    medicine_id: "",
     quantity: "",
     batch_no: "",
     expiry_date: "",
     mrp: "",
   });
-  const [saving, setSaving] = useState(false);
+
+  const [showAddMed, setShowAddMed] = useState(false);
+  const [newMed, setNewMed] = useState({
+    name: "",
+    brand: "",
+    form: "",
+    strength: "",
+  });
+  const [addingMed, setAddingMed] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [stockRes, medRes] = await Promise.all([
-        fetch(`/api/stock${showLowOnly ? "?low=true" : ""}`),
-        fetch("/api/medicines?q="),
-      ]);
+      const stockRes = await fetch(
+        `/api/stock${showLowOnly ? "?low=true" : ""}`,
+      );
       if (!stockRes.ok) throw new Error("Failed to load stock");
       setRows(await stockRes.json());
-      if (medRes.ok) setMedicines(await medRes.json());
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
@@ -56,8 +69,55 @@ export default function StockPage() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (!medQuery.trim()) {
+      setMedSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const res = await fetch(
+        `/api/medicines?q=${encodeURIComponent(medQuery)}&limit=30`,
+      );
+      if (res.ok) setMedSuggestions(await res.json());
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [medQuery]);
+
+  async function addMedicine(e: React.FormEvent) {
+    e.preventDefault();
+    setAddingMed(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/medicines", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newMed.name.trim(),
+          brand: newMed.brand.trim() || null,
+          form: newMed.form.trim() || null,
+          strength: newMed.strength.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not add medicine");
+      setSelectedMedicine(data);
+      setMedQuery(formatMedicineLabel(data));
+      setMedSuggestions([]);
+      setNewMed({ name: "", brand: "", form: "", strength: "" });
+      setShowAddMed(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not add medicine");
+    } finally {
+      setAddingMed(false);
+    }
+  }
+
   async function addStock(e: React.FormEvent) {
     e.preventDefault();
+    if (!selectedMedicine) {
+      setError("Select or add a medicine first");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -65,22 +125,18 @@ export default function StockPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          medicine_id: form.medicine_id,
+          medicine_id: selectedMedicine.id,
           quantity: Number(form.quantity),
-          batch_no: form.batch_no || null,
-          expiry_date: form.expiry_date || null,
+          batch_no: form.batch_no.trim(),
+          expiry_date: form.expiry_date,
           mrp: form.mrp || null,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Add stock failed");
-      setForm({
-        medicine_id: "",
-        quantity: "",
-        batch_no: "",
-        expiry_date: "",
-        mrp: "",
-      });
+      setForm({ quantity: "", batch_no: "", expiry_date: "", mrp: "" });
+      setSelectedMedicine(null);
+      setMedQuery("");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Add stock failed");
@@ -92,7 +148,7 @@ export default function StockPage() {
   return (
     <ConsoleShell
       title="Pharmacy Stock"
-      subtitle="Track batches, expiry, and quantity on hand"
+      subtitle="Generic names · batch & expiry required · search or add medicines"
       current="/stock"
     >
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -109,44 +165,118 @@ export default function StockPage() {
         </Link>
       </div>
 
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setShowAddMed((v) => !v)}
+          className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-900"
+        >
+          {showAddMed ? "Hide add medicine" : "+ Add new medicine to catalog"}
+        </button>
+      </div>
+
+      {showAddMed && (
+        <form
+          onSubmit={addMedicine}
+          className="mb-6 grid gap-3 rounded-xl border border-amber-200 bg-amber-50/50 p-4 sm:grid-cols-2 lg:grid-cols-5"
+        >
+          <h2 className="sm:col-span-2 lg:col-span-5 font-semibold text-slate-900">
+            New medicine (generic name)
+          </h2>
+          <input
+            required
+            placeholder="Generic name * e.g. Paracetamol"
+            value={newMed.name}
+            onChange={(e) => setNewMed((m) => ({ ...m, name: e.target.value }))}
+            className="rounded border border-slate-300 px-3 py-2 text-sm lg:col-span-2"
+          />
+          <input
+            placeholder="Brand (optional)"
+            value={newMed.brand}
+            onChange={(e) => setNewMed((m) => ({ ...m, brand: e.target.value }))}
+            className="rounded border border-slate-300 px-3 py-2 text-sm"
+          />
+          <input
+            placeholder="Form e.g. tablet"
+            value={newMed.form}
+            onChange={(e) => setNewMed((m) => ({ ...m, form: e.target.value }))}
+            className="rounded border border-slate-300 px-3 py-2 text-sm"
+          />
+          <input
+            placeholder="Strength e.g. 500mg"
+            value={newMed.strength}
+            onChange={(e) =>
+              setNewMed((m) => ({ ...m, strength: e.target.value }))
+            }
+            className="rounded border border-slate-300 px-3 py-2 text-sm"
+          />
+          <button
+            type="submit"
+            disabled={addingMed}
+            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 lg:col-span-5 lg:max-w-xs"
+          >
+            {addingMed ? "Saving…" : "Save medicine"}
+          </button>
+        </form>
+      )}
+
       <form
         onSubmit={addStock}
         className="mb-8 grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-6"
       >
         <h2 className="sm:col-span-2 lg:col-span-6 font-semibold text-slate-900">
-          Add stock (admin / manager)
+          Receive stock (batch & expiry required)
         </h2>
-        <select
-          required
-          value={form.medicine_id}
-          onChange={(e) => setForm((f) => ({ ...f, medicine_id: e.target.value }))}
-          className="rounded border border-slate-300 px-3 py-2 text-sm lg:col-span-2"
-        >
-          <option value="">Select medicine</option>
-          {medicines.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-              {m.strength ? ` ${m.strength}` : ""}
-            </option>
-          ))}
-        </select>
+        <div className="relative lg:col-span-2">
+          <input
+            required
+            value={medQuery}
+            onChange={(e) => {
+              setMedQuery(e.target.value);
+              setSelectedMedicine(null);
+            }}
+            placeholder="Search generic name *"
+            className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+          />
+          {medSuggestions.length > 0 && !selectedMedicine && (
+            <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded border border-slate-200 bg-white shadow-lg">
+              {medSuggestions.map((m) => (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                    onClick={() => {
+                      setSelectedMedicine(m);
+                      setMedQuery(formatMedicineLabel(m));
+                      setMedSuggestions([]);
+                    }}
+                  >
+                    {formatMedicineLabel(m)}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <input
           type="number"
           min={1}
           required
-          placeholder="Quantity"
+          placeholder="Quantity *"
           value={form.quantity}
           onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
           className="rounded border border-slate-300 px-3 py-2 text-sm"
         />
         <input
-          placeholder="Batch no (optional)"
+          required
+          placeholder="Batch no *"
           value={form.batch_no}
           onChange={(e) => setForm((f) => ({ ...f, batch_no: e.target.value }))}
           className="rounded border border-slate-300 px-3 py-2 text-sm"
         />
         <input
           type="date"
+          required
           value={form.expiry_date}
           onChange={(e) =>
             setForm((f) => ({ ...f, expiry_date: e.target.value }))
@@ -173,8 +303,7 @@ export default function StockPage() {
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-semibold text-slate-900">
-                {row.medicine.name}
-                {row.medicine.strength ? ` ${row.medicine.strength}` : ""}
+                {formatMedicineLabel(row.medicine)}
               </p>
               <span
                 className={
@@ -194,8 +323,7 @@ export default function StockPage() {
               <ul className="mt-2 space-y-1 text-xs text-slate-600">
                 {row.batches.map((b) => (
                   <li key={b.id}>
-                    Batch {b.batch_no ?? "—"} · Qty {b.quantity}
-                    {b.expiry_date ? ` · Exp ${b.expiry_date}` : ""}
+                    Batch {b.batch_no} · Qty {b.quantity} · Exp {b.expiry_date}
                     {b.mrp != null ? ` · MRP ₹${b.mrp}` : ""}
                   </li>
                 ))}
@@ -204,7 +332,9 @@ export default function StockPage() {
           </div>
         ))}
         {rows.length === 0 && !loading && (
-          <p className="text-center text-slate-500">No stock records yet.</p>
+          <p className="text-center text-slate-500">
+            No stock yet — search a medicine above and receive a batch.
+          </p>
         )}
       </div>
     </ConsoleShell>
