@@ -30,11 +30,23 @@ export type AnalyticsDoctorRow = {
   avgTurnaroundMinutes: number | null;
 };
 
+export type AnalyticsDeptReport = {
+  tokenNumber: number;
+  patientName: string;
+  tatMinutes: number;
+};
+
 export type AnalyticsDept = {
   totalReferred: number;
   pending: number;
   ready: number;
   completedPath: number;
+  avgTatMinutes: number | null;
+  medianTatMinutes: number | null;
+  fastestTatMinutes: number | null;
+  slowestTatMinutes: number | null;
+  reportsWithTat: number;
+  recentReports: AnalyticsDeptReport[];
 };
 
 export type AnalyticsHourly = {
@@ -67,6 +79,7 @@ export type AnalyticsPayload = {
 
 export type VisitForAnalytics = {
   id: string;
+  token_number: number;
   patient_name: string;
   doctor_id: string;
   status: string;
@@ -74,6 +87,10 @@ export type VisitForAnalytics = {
   age: number | null;
   lab_referred: boolean;
   radio_referred: boolean;
+  lab_started_at: Date | null;
+  lab_ready_at: Date | null;
+  radio_started_at: Date | null;
+  radio_ready_at: Date | null;
   registered_at: Date;
   completed_at: Date | null;
   doctors: { name: string };

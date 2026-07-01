@@ -108,11 +108,11 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <Panel title="Laboratory">
-              <DeptGrid dept={data.lab} />
+            <Panel title="Laboratory & Lab TAT">
+              <DeptGrid dept={data.lab} deptLabel="Lab" />
             </Panel>
-            <Panel title="Radiology">
-              <DeptGrid dept={data.radiology} />
+            <Panel title="Radiology & Radiology TAT">
+              <DeptGrid dept={data.radiology} deptLabel="Radiology" />
             </Panel>
           </div>
 
@@ -163,12 +163,24 @@ export default function AnalyticsPage() {
               value={formatMinutes(data.summary.slowestMinutes)}
             />
             <StatCard
-              label="Lab referrals"
-              value={data.lab.totalReferred}
+              label="Lab avg TAT"
+              value={formatMinutes(data.lab.avgTatMinutes)}
+              sub={
+                data.lab.reportsWithTat > 0
+                  ? `${data.lab.reportsWithTat} report(s) tracked`
+                  : "Mark report ready in lab console"
+              }
+              accent="border-purple-200"
             />
             <StatCard
-              label="Radiology referrals"
-              value={data.radiology.totalReferred}
+              label="Radiology avg TAT"
+              value={formatMinutes(data.radiology.avgTatMinutes)}
+              sub={
+                data.radiology.reportsWithTat > 0
+                  ? `${data.radiology.reportsWithTat} report(s) tracked`
+                  : "Mark report ready in radiology console"
+              }
+              accent="border-indigo-200"
             />
           </section>
         </div>
@@ -194,20 +206,94 @@ function Panel({
 
 function DeptGrid({
   dept,
+  deptLabel,
 }: {
   dept: {
     totalReferred: number;
     pending: number;
     ready: number;
     completedPath: number;
+    avgTatMinutes: number | null;
+    medianTatMinutes: number | null;
+    fastestTatMinutes: number | null;
+    slowestTatMinutes: number | null;
+    reportsWithTat: number;
+    recentReports: {
+      tokenNumber: number;
+      patientName: string;
+      tatMinutes: number;
+    }[];
   };
+  deptLabel: string;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <StatCard label="Total referred" value={dept.totalReferred} />
-      <StatCard label="Pending" value={dept.pending} accent="border-amber-200" />
-      <StatCard label="Report ready" value={dept.ready} accent="border-green-200" />
-      <StatCard label="Completed OPD" value={dept.completedPath} />
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard label="Total referred" value={dept.totalReferred} />
+        <StatCard label="Pending" value={dept.pending} accent="border-amber-200" />
+        <StatCard label="Report ready" value={dept.ready} accent="border-green-200" />
+        <StatCard label="Completed OPD" value={dept.completedPath} />
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+        <h3 className="text-sm font-bold uppercase tracking-wide text-slate-600">
+          {deptLabel} TAT (arrival → report ready)
+        </h3>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div>
+            <p className="text-xs text-slate-500">Average</p>
+            <p className="text-lg font-bold text-slate-900">
+              {formatMinutes(dept.avgTatMinutes)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500">Median</p>
+            <p className="text-lg font-bold text-slate-900">
+              {formatMinutes(dept.medianTatMinutes)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500">Fastest</p>
+            <p className="text-lg font-bold text-green-700">
+              {formatMinutes(dept.fastestTatMinutes)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500">Slowest</p>
+            <p className="text-lg font-bold text-red-700">
+              {formatMinutes(dept.slowestTatMinutes)}
+            </p>
+          </div>
+        </div>
+        {dept.reportsWithTat === 0 && (
+          <p className="mt-3 text-sm text-slate-500">
+            TAT appears after lab marks patient arrived and report ready.
+          </p>
+        )}
+      </div>
+
+      {dept.recentReports.length > 0 && (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-slate-700">
+            Recent {deptLabel.toLowerCase()} TAT
+          </h3>
+          <ul className="space-y-1 text-sm">
+            {dept.recentReports.map((r) => (
+              <li
+                key={r.tokenNumber}
+                className="flex justify-between rounded bg-white px-3 py-2 border border-slate-100"
+              >
+                <span>
+                  #{r.tokenNumber} {r.patientName}
+                </span>
+                <span className="font-semibold text-slate-800">
+                  {formatMinutes(r.tatMinutes)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

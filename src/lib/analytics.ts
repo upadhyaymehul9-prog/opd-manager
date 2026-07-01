@@ -170,13 +170,41 @@ function buildDeptStats(
   const statusSet = dept === "lab" ? LAB_STATUSES : RADIO_STATUSES;
   const pendingSet = dept === "lab" ? LAB_PENDING : RADIO_PENDING;
   const readyStatus = dept === "lab" ? "lab_ready" : "radio_ready";
+  const startedKey = dept === "lab" ? "lab_started_at" : "radio_started_at";
+  const readyKey = dept === "lab" ? "lab_ready_at" : "radio_ready_at";
 
   const referred = visits.filter((v) => v[referredFlag] || statusSet.has(v.status));
+
+  const tatValues = referred
+    .filter((v) => v[startedKey] && v[readyKey])
+    .map((v) =>
+      Math.max(0, differenceInMinutes(v[readyKey]!, v[startedKey]!)),
+    );
+
+  const recentReports = referred
+    .filter((v) => v[startedKey] && v[readyKey])
+    .map((v) => ({
+      tokenNumber: v.token_number,
+      patientName: v.patient_name,
+      tatMinutes: Math.max(
+        0,
+        differenceInMinutes(v[readyKey]!, v[startedKey]!),
+      ),
+    }))
+    .sort((a, b) => b.tatMinutes - a.tatMinutes)
+    .slice(0, 10);
+
   return {
     totalReferred: referred.length,
     pending: visits.filter((v) => pendingSet.has(v.status)).length,
     ready: visits.filter((v) => v.status === readyStatus).length,
     completedPath: referred.filter((v) => v.status === "completed").length,
+    avgTatMinutes: avg(tatValues),
+    medianTatMinutes: median(tatValues),
+    fastestTatMinutes: tatValues.length ? Math.min(...tatValues) : null,
+    slowestTatMinutes: tatValues.length ? Math.max(...tatValues) : null,
+    reportsWithTat: tatValues.length,
+    recentReports,
   };
 }
 
@@ -284,14 +312,22 @@ function buildInsights(
   }
 
   if (lab.totalReferred > 0) {
+    const tat =
+      lab.avgTatMinutes != null
+        ? ` Avg lab TAT: ${lab.avgTatMinutes} min.`
+        : "";
     insights.push(
-      `${lab.totalReferred} patient(s) sent to lab; ${lab.pending} pending, ${lab.ready} ready.`,
+      `${lab.totalReferred} patient(s) sent to lab; ${lab.pending} pending, ${lab.ready} ready.${tat}`,
     );
   }
 
   if (radio.totalReferred > 0) {
+    const tat =
+      radio.avgTatMinutes != null
+        ? ` Avg radiology TAT: ${radio.avgTatMinutes} min.`
+        : "";
     insights.push(
-      `${radio.totalReferred} patient(s) sent to radiology; ${radio.pending} pending, ${radio.ready} ready.`,
+      `${radio.totalReferred} patient(s) sent to radiology; ${radio.pending} pending, ${radio.ready} ready.${tat}`,
     );
   }
 
