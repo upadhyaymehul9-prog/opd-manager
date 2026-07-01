@@ -1,6 +1,7 @@
 "use client";
 
 import { ConsoleShell } from "@/components/ConsoleShell";
+import { StockAlertsPanel } from "@/components/StockAlertsPanel";
 import {
   BarChart,
   BusynessBadge,
@@ -81,6 +82,16 @@ export default function AnalyticsPage() {
               </ul>
             </section>
           )}
+
+          <section className="rounded-xl border border-amber-200 bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-900">Pharmacy stock</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Low stock, depleted items, and expiry reminders
+            </p>
+            <div className="mt-4">
+              <StockAlertsPanel showStockLink showEmpty />
+            </div>
+          </section>
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Panel title="Age distribution">

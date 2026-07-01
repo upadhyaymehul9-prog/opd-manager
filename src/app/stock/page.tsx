@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ConsoleShell } from "@/components/ConsoleShell";
+import { StockAlertsPanel } from "@/components/StockAlertsPanel";
 import { formatMedicineLabel } from "@/lib/medicine";
 import { MIN_SHELF_LIFE_MONTHS, minAllowedExpiryDateStr } from "@/lib/stock";
 import type { Medicine } from "@/lib/prescription-types";
@@ -30,30 +31,8 @@ type StockRow = {
   batches: StockBatch[];
 };
 
-type StockAlerts = {
-  counts: {
-    expiring_soon: number;
-    expired: number;
-    total: number;
-  };
-  expiring_soon: {
-    medicine: string;
-    batch_no: string;
-    expiry_date: string;
-    quantity: number;
-    days_until_expiry: number;
-  }[];
-  expired: {
-    medicine: string;
-    batch_no: string;
-    expiry_date: string;
-    quantity: number;
-  }[];
-};
-
 export default function StockPage() {
   const [rows, setRows] = useState<StockRow[]>([]);
-  const [alerts, setAlerts] = useState<StockAlerts | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showLowOnly, setShowLowOnly] = useState(false);
@@ -89,13 +68,11 @@ export default function StockPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [stockRes, alertsRes] = await Promise.all([
-        fetch(`/api/stock${showLowOnly ? "?low=true" : "?stocked=true"}`),
-        fetch("/api/stock/alerts"),
-      ]);
+      const stockRes = await fetch(
+        `/api/stock${showLowOnly ? "?low=true" : "?stocked=true"}`,
+      );
       if (!stockRes.ok) throw new Error("Failed to load stock");
       setRows(await stockRes.json());
-      if (alertsRes.ok) setAlerts(await alertsRes.json());
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
@@ -204,26 +181,9 @@ export default function StockPage() {
         </Link>
       </div>
 
-      {alerts && alerts.counts.total > 0 && (
-        <div className="mb-6 rounded-xl border border-orange-300 bg-orange-50 p-4 text-orange-950">
-          <p className="font-semibold">Expiry reminders</p>
-          {alerts.expiring_soon.length > 0 && (
-            <ul className="mt-2 space-y-1 text-sm">
-              {alerts.expiring_soon.slice(0, 5).map((b, i) => (
-                <li key={`exp-${i}`}>
-                  {b.medicine} · batch {b.batch_no} · expires {b.expiry_date} (
-                  {b.days_until_expiry} days) · qty {b.quantity}
-                </li>
-              ))}
-            </ul>
-          )}
-          {alerts.expired.length > 0 && (
-            <p className="mt-2 text-sm font-medium text-red-800">
-              {alerts.expired.length} expired batch(es) on hand — remove or write off
-            </p>
-          )}
-        </div>
-      )}
+      <div className="mb-6">
+        <StockAlertsPanel />
+      </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
         <button

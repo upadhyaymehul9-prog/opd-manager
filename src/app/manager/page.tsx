@@ -1,8 +1,6 @@
 "use client";
 
 import { format } from "date-fns";
-import Link from "next/link";
-import { useEffect, useState } from "react";
 import { ConsoleShell } from "@/components/ConsoleShell";
 import { StatusBadge } from "@/components/PatientCard";
 import { usePatientVisits } from "@/hooks/usePatientVisits";
@@ -55,23 +53,6 @@ function stageForStatus(status: PatientStatus) {
 
 export default function ManagerPage() {
   const { visits, loading, error } = usePatientVisits(false);
-  const [alerts, setAlerts] = useState<{
-    counts: {
-      low_stock: number;
-      depleted: number;
-      expiring_soon: number;
-      expired: number;
-      total: number;
-    };
-    expiring_soon: { medicine: string; days_until_expiry: number }[];
-  } | null>(null);
-
-  useEffect(() => {
-    fetch("/api/stock/alerts")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => setAlerts(data))
-      .catch(() => setAlerts(null));
-  }, []);
 
   const active = visits.filter((v) => v.status !== "completed");
   const completedToday = visits.filter((v) => v.status === "completed");
@@ -89,47 +70,6 @@ export default function ManagerPage() {
     >
       {loading && <p className="text-slate-600">Loading…</p>}
       {error && <p className="text-red-600">{error}</p>}
-
-      {alerts && alerts.counts.total > 0 && (
-        <div className="mb-6 space-y-3">
-          {(alerts.counts.low_stock > 0 || alerts.counts.depleted > 0) && (
-            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
-              <p className="font-semibold">Pharmacy stock needs attention</p>
-              <ul className="mt-1 list-inside list-disc text-sm">
-                {alerts.counts.low_stock > 0 && (
-                  <li>{alerts.counts.low_stock} medicine(s) running low (≤10 units)</li>
-                )}
-                {alerts.counts.depleted > 0 && (
-                  <li>{alerts.counts.depleted} medicine(s) depleted (was stocked, now zero)</li>
-                )}
-              </ul>
-              <Link href="/stock?low=true" className="mt-2 inline-block text-sm underline">
-                View pharmacy stock →
-              </Link>
-            </div>
-          )}
-          {(alerts.counts.expiring_soon > 0 || alerts.counts.expired > 0) && (
-            <div className="rounded-xl border border-orange-300 bg-orange-50 p-4 text-orange-950">
-              <p className="font-semibold">Expiry reminders</p>
-              <ul className="mt-1 list-inside list-disc text-sm">
-                {alerts.counts.expiring_soon > 0 && (
-                  <li>
-                    {alerts.counts.expiring_soon} batch(es) expiring within 90 days
-                    {alerts.expiring_soon[0] &&
-                      ` — next: ${alerts.expiring_soon[0].medicine} in ${alerts.expiring_soon[0].days_until_expiry} days`}
-                  </li>
-                )}
-                {alerts.counts.expired > 0 && (
-                  <li>{alerts.counts.expired} batch(es) already expired — do not dispense</li>
-                )}
-              </ul>
-              <Link href="/stock" className="mt-2 inline-block text-sm underline">
-                Review batches on stock screen →
-              </Link>
-            </div>
-          )}
-        </div>
-      )}
 
       <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {byStage.map((s) => (
