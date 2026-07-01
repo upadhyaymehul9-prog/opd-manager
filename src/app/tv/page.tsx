@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { differenceInMinutes, format } from "date-fns";
 import { useDoctors } from "@/hooks/useDoctors";
 import { usePatientVisits } from "@/hooks/usePatientVisits";
@@ -44,10 +45,7 @@ export default function TVDisplayPage() {
         <header className="border-b border-slate-300 bg-white px-6 py-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h1 className="text-2xl font-bold">OPD Manager — TV Display</h1>
-            <p className="text-sm text-slate-600">
-              {format(new Date(), "EEEE, d MMM yyyy · h:mm a")} · Press F11 for
-              full screen
-            </p>
+            <LiveClock />
           </div>
         </header>
 
@@ -168,6 +166,24 @@ function DoctorStatusSidebar({
         Updates every few seconds
       </div>
     </aside>
+  );
+}
+
+function LiveClock() {
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setNow(new Date());
+    const timer = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <p className="text-sm text-slate-600">
+      {now
+        ? `${format(now, "EEEE, d MMM yyyy · h:mm a")} · Press F11 for full screen`
+        : "Press F11 for full screen"}
+    </p>
   );
 }
 

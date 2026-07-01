@@ -1,6 +1,7 @@
 import type { DoctorOpdStatus } from "./types";
 
 export const DOCTOR_OPD_STATUS_LABELS: Record<DoctorOpdStatus, string> = {
+  offline: "Not in OPD",
   available: "Available in OPD",
   busy: "Busy",
   on_leave: "On Leave",
@@ -10,6 +11,7 @@ export const DOCTOR_OPD_STATUS_LABELS: Record<DoctorOpdStatus, string> = {
 };
 
 export const DOCTOR_OPD_STATUS_COLORS: Record<DoctorOpdStatus, string> = {
+  offline: "bg-slate-500 text-white",
   available: "bg-green-500 text-white",
   busy: "bg-orange-500 text-white",
   on_leave: "bg-red-500 text-white",
@@ -20,6 +22,7 @@ export const DOCTOR_OPD_STATUS_COLORS: Record<DoctorOpdStatus, string> = {
 
 /** Softer badges for tables */
 export const DOCTOR_OPD_STATUS_TABLE_COLORS: Record<DoctorOpdStatus, string> = {
+  offline: "bg-slate-100 text-slate-700",
   available: "bg-green-100 text-green-900",
   busy: "bg-orange-100 text-orange-900",
   on_leave: "bg-red-100 text-red-900",
@@ -38,10 +41,12 @@ export const DOCTOR_OPD_STATUS_OPTIONS: {
   { value: "on_round", label: "On Round" },
   { value: "in_surgery", label: "In Surgery" },
   { value: "in_dressing", label: "In Dressing" },
+  { value: "offline", label: "Not in OPD (Leave)" },
 ];
 
 export const DOCTOR_OPD_STATUS_SIDEBAR_ACCENT: Record<DoctorOpdStatus, string> =
   {
+    offline: "border-l-slate-400",
     available: "border-l-green-400",
     busy: "border-l-orange-400",
     on_leave: "border-l-red-400",

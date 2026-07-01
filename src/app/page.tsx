@@ -43,6 +43,12 @@ const consoles = [
     desc: "Full clinic overview — every patient from entry to exit",
     color: "border-slate-300 hover:border-slate-500 bg-slate-50",
   },
+  {
+    href: "/analytics",
+    title: "Analytics",
+    desc: "Patients, doctors, lab, radiology, turnaround time & OPD prediction",
+    color: "border-indigo-300 hover:border-indigo-500 bg-indigo-50",
+  },
 ];
 
 export default function Home() {

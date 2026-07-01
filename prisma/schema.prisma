@@ -12,7 +12,7 @@ model Doctor {
   name           String
   room_number    String
   specialty      String?
-  opd_status     String         @default("available")
+  opd_status     String         @default("offline")
   created_at     DateTime       @default(now()) @db.Timestamptz(6)
   patient_visits PatientVisit[]
 
@@ -20,21 +20,28 @@ model Doctor {
 }
 
 model PatientVisit {
-  id            String    @id @default(uuid()) @db.Uuid
-  token_number  Int
-  patient_name  String
-  doctor_id     String    @db.Uuid
-  room_number   String
-  status        String    @default("registered")
-  lab_eta       DateTime? @db.Timestamptz(6)
-  radio_eta     DateTime? @db.Timestamptz(6)
-  registered_at DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
-  doctors       Doctor    @relation(fields: [doctor_id], references: [id], onDelete: Restrict)
+  id              String    @id @default(uuid()) @db.Uuid
+  token_number    Int
+  patient_name    String
+  doctor_id       String    @db.Uuid
+  room_number     String
+  status          String    @default("registered")
+  patient_type    String    @default("new")
+  age             Int?
+  mobile          String?
+  lab_referred    Boolean   @default(false)
+  radio_referred  Boolean   @default(false)
+  lab_eta         DateTime? @db.Timestamptz(6)
+  radio_eta       DateTime? @db.Timestamptz(6)
+  registered_at   DateTime  @default(now()) @db.Timestamptz(6)
+  completed_at    DateTime? @db.Timestamptz(6)
+  updated_at      DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  doctors         Doctor    @relation(fields: [doctor_id], references: [id], onDelete: Restrict)
 
   @@index([status])
   @@index([doctor_id])
   @@index([registered_at(sort: Desc)])
+  @@index([patient_name])
   @@map("patient_visits")
 }
 

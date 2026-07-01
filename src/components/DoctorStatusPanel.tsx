@@ -48,7 +48,8 @@ export function DoctorStatusPanel({ doctorId }: { doctorId: string }) {
         <div>
           <h2 className="text-lg font-semibold text-slate-900">My OPD Status</h2>
           <p className="text-sm text-slate-600">
-            Shown on the TV screen — update from your phone
+            Tap <strong>Available in OPD</strong> when you start clinic — shown
+            on the TV screen
           </p>
         </div>
         <span

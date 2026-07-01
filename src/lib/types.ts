@@ -1,4 +1,7 @@
+export type PatientType = "new" | "old";
+
 export type DoctorOpdStatus =
+  | "offline"
   | "available"
   | "busy"
   | "on_leave"
@@ -39,9 +42,15 @@ export type PatientVisit = {
   doctor_id: string;
   room_number: string;
   status: PatientStatus;
+  patient_type: PatientType;
+  age: number | null;
+  mobile: string | null;
+  lab_referred: boolean;
+  radio_referred: boolean;
   lab_eta: string | null;
   radio_eta: string | null;
   registered_at: string;
+  completed_at: string | null;
   updated_at: string;
   doctors?: Doctor | null;
 };
@@ -49,6 +58,9 @@ export type PatientVisit = {
 export type CreatePatientInput = {
   patient_name: string;
   doctor_id: string;
+  patient_type?: PatientType;
+  age?: number | null;
+  mobile?: string | null;
 };
 
 export type UpdatePatientInput = {

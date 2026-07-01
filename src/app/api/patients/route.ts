@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as CreatePatientInput;
-    const { patient_name, doctor_id } = body;
+    const { patient_name, doctor_id, patient_type, age, mobile } = body;
 
     if (!patient_name?.trim() || !doctor_id) {
       return NextResponse.json(
@@ -44,6 +44,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
     }
 
+
+    if (!patient_type) {
+      const prior = await prisma.patientVisit.findFirst({
+        where: {
+          patient_name: { equals: patient_name.trim(), mode: "insensitive" },
+        },
+        select: { id: true },
+      });
+      if (prior) resolvedType = "old";
+    }
+
     const token_number = await nextTokenNumber();
 
     const visit = await prisma.patientVisit.create({
@@ -53,6 +64,9 @@ export async function POST(request: Request) {
         room_number: doctor.room_number,
         token_number,
         status: "registered",
+        patient_type: resolvedType,
+        age: age != null && age > 0 ? Math.round(age) : null,
+        mobile: mobile?.trim() || null,
       },
       include: visitInclude,
     });

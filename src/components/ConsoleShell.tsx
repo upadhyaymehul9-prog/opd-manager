@@ -9,6 +9,7 @@ const NAV = [
   { href: "/pharmacy", label: "Pharmacy", color: "bg-teal-600" },
   { href: "/tv", label: "TV Display", color: "bg-rose-600" },
   { href: "/manager", label: "OPD Manager", color: "bg-slate-700" },
+  { href: "/analytics", label: "Analytics", color: "bg-indigo-700" },
 ];
 
 export function ConsoleNav({ current }: { current?: string }) {
@@ -53,7 +54,7 @@ export function ConsoleShell({
         <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
         {subtitle && <p className="mt-1 text-slate-600">{subtitle}</p>}
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
     </div>
   );
 }

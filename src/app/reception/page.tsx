@@ -3,12 +3,15 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ConsoleShell, SetupBanner } from "@/components/ConsoleShell";
-import type { Doctor } from "@/lib/types";
+import type { Doctor, PatientType } from "@/lib/types";
 
 export default function ReceptionPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [patientName, setPatientName] = useState("");
   const [doctorId, setDoctorId] = useState("");
+  const [patientType, setPatientType] = useState<PatientType>("new");
+  const [age, setAge] = useState("");
+  const [mobile, setMobile] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [lastRegistered, setLastRegistered] = useState<{
     token: number;
@@ -45,6 +48,9 @@ export default function ReceptionPage() {
         body: JSON.stringify({
           patient_name: patientName,
           doctor_id: doctorId,
+          patient_type: patientType,
+          age: age ? Number(age) : null,
+          mobile: mobile || null,
         }),
       });
       const data = await res.json();
@@ -59,6 +65,9 @@ export default function ReceptionPage() {
         time: format(new Date(data.registered_at), "h:mm:ss a"),
       });
       setPatientName("");
+      setAge("");
+      setMobile("");
+      setPatientType("new");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
@@ -95,6 +104,55 @@ export default function ReceptionPage() {
             autoFocus
             required
           />
+
+          <label className="mt-4 block text-sm font-medium text-slate-700">
+            Patient type
+          </label>
+          <div className="mt-2 flex gap-3">
+            {(["new", "old"] as PatientType[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setPatientType(t)}
+                className={`flex-1 rounded-lg border-2 py-2.5 text-sm font-medium capitalize ${
+                  patientType === t
+                    ? "border-emerald-600 bg-emerald-50 text-emerald-900"
+                    : "border-slate-200 bg-white text-slate-700"
+                }`}
+              >
+                {t === "new" ? "New patient" : "Old / follow-up"}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                Age (optional)
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={120}
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+                placeholder="Years"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                Mobile (optional)
+              </label>
+              <input
+                type="tel"
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value)}
+                placeholder="10-digit"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+          </div>
 
           <label className="mt-4 block text-sm font-medium text-slate-700">
             Consultant (Doctor)

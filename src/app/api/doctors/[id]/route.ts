@@ -4,6 +4,7 @@ import { serializeDoctor } from "@/lib/serialize";
 import type { DoctorOpdStatus, UpdateDoctorInput } from "@/lib/types";
 
 const VALID_STATUSES: DoctorOpdStatus[] = [
+  "offline",
   "available",
   "busy",
   "on_leave",

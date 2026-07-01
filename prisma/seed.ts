@@ -11,9 +11,24 @@ async function main() {
 
   await prisma.doctor.createMany({
     data: [
-      { name: "Dr. Sharma", room_number: "101", specialty: "General Medicine" },
-      { name: "Dr. Patel", room_number: "102", specialty: "Cardiology" },
-      { name: "Dr. Khan", room_number: "103", specialty: "Orthopedics" },
+      {
+        name: "Dr. Sharma",
+        room_number: "101",
+        specialty: "General Medicine",
+        opd_status: "offline",
+      },
+      {
+        name: "Dr. Patel",
+        room_number: "102",
+        specialty: "Cardiology",
+        opd_status: "offline",
+      },
+      {
+        name: "Dr. Khan",
+        room_number: "103",
+        specialty: "Orthopedics",
+        opd_status: "offline",
+      },
     ],
   });
 
