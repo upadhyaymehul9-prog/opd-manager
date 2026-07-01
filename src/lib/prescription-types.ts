@@ -42,6 +42,7 @@ export type Prescription = {
 };
 
 export type PrescriptionItemInput = {
+  id?: string;
   medicine_id?: string | null;
   medicine_name: string;
   dose?: string | null;

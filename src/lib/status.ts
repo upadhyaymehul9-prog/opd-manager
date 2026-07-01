@@ -90,6 +90,8 @@ export const PRESCRIPTION_STATUSES: PatientStatus[] = [
   "in_consultation",
   "return_to_doctor",
   "in_followup",
+  "to_pharmacy",
+  "at_pharmacy",
 ];
 
 export function canWritePrescription(status: PatientStatus) {
@@ -120,6 +122,8 @@ export function getRelevantPatients<T extends { status: PatientStatus; doctor_id
     "in_consultation",
     "return_to_doctor",
     "in_followup",
+    "to_pharmacy",
+    "at_pharmacy",
   ];
 
   return visits.filter((v) => {
