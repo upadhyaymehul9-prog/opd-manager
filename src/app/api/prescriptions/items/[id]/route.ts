@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { computePrescriptionStatus } from "@/lib/prescription-status";
 import { prisma } from "@/lib/prisma";
+import {
+  deductFromStock,
+  getAvailableQuantity,
+  restoreToStock,
+} from "@/lib/stock";
 import { serializePrescriptionItem } from "@/lib/serialize";
 
 export async function PATCH(
@@ -26,7 +31,23 @@ export async function PATCH(
         ? String(body.substituted_note).trim() || null
         : undefined;
 
+    const qty = item.quantity && item.quantity > 0 ? item.quantity : 1;
+
     const updatedItem = await prisma.$transaction(async (tx) => {
+      if (dispensed && !item.dispensed && item.medicine_id) {
+        const available = await getAvailableQuantity(tx, item.medicine_id);
+        if (available < qty) {
+          throw new Error(
+            `Insufficient stock for ${item.medicine_name} — available ${available}, need ${qty}`,
+          );
+        }
+        await deductFromStock(tx, item.medicine_id, qty);
+      }
+
+      if (!dispensed && item.dispensed && item.medicine_id) {
+        await restoreToStock(tx, item.medicine_id, qty);
+      }
+
       const saved = await tx.prescriptionItem.update({
         where: { id },
         data: {

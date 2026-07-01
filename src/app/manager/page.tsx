@@ -1,6 +1,8 @@
 "use client";
 
 import { format } from "date-fns";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ConsoleShell } from "@/components/ConsoleShell";
 import { StatusBadge } from "@/components/PatientCard";
 import { usePatientVisits } from "@/hooks/usePatientVisits";
@@ -53,6 +55,15 @@ function stageForStatus(status: PatientStatus) {
 
 export default function ManagerPage() {
   const { visits, loading, error } = usePatientVisits(false);
+  const [lowStockCount, setLowStockCount] = useState(0);
+
+  useEffect(() => {
+    fetch("/api/stock?low=true")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows) => setLowStockCount(Array.isArray(rows) ? rows.length : 0))
+      .catch(() => setLowStockCount(0));
+  }, []);
+
   const active = visits.filter((v) => v.status !== "completed");
   const completedToday = visits.filter((v) => v.status === "completed");
 
@@ -69,6 +80,17 @@ export default function ManagerPage() {
     >
       {loading && <p className="text-slate-600">Loading…</p>}
       {error && <p className="text-red-600">{error}</p>}
+
+      {lowStockCount > 0 && (
+        <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
+          <p className="font-semibold">
+            {lowStockCount} medicine(s) low or out of stock
+          </p>
+          <Link href="/stock?low=true" className="mt-1 inline-block text-sm underline">
+            View pharmacy stock →
+          </Link>
+        </div>
+      )}
 
       <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {byStage.map((s) => (

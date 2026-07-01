@@ -18,6 +18,9 @@ export function PrescriptionDetail({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [stock, setStock] = useState<
+    Record<string, { available: number; low: boolean; out_of_stock: boolean }>
+  >({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -26,6 +29,16 @@ export function PrescriptionDetail({
       if (!res.ok) throw new Error("Could not load prescription");
       const data = await res.json();
       setPrescription(data);
+
+      const ids = (data?.items ?? [])
+        .map((i: { medicine_id: string | null }) => i.medicine_id)
+        .filter(Boolean);
+      if (ids.length > 0) {
+        const stockRes = await fetch(
+          `/api/stock/availability?ids=${ids.join(",")}`,
+        );
+        if (stockRes.ok) setStock(await stockRes.json());
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
     } finally {
@@ -113,6 +126,7 @@ export function PrescriptionDetail({
               <th className="px-4 py-3">Freq</th>
               <th className="px-4 py-3">Days</th>
               <th className="px-4 py-3">Qty</th>
+              <th className="px-4 py-3">Stock</th>
               <th className="px-4 py-3">Dispensed</th>
             </tr>
           </thead>
@@ -140,6 +154,25 @@ export function PrescriptionDetail({
                 <td className="px-4 py-3">{item.frequency ?? "—"}</td>
                 <td className="px-4 py-3">{item.duration_days ?? "—"}</td>
                 <td className="px-4 py-3">{item.quantity ?? "—"}</td>
+                <td className="px-4 py-3">
+                  {item.medicine_id ? (
+                    <span
+                      className={
+                        stock[item.medicine_id]?.out_of_stock
+                          ? "font-medium text-red-600"
+                          : stock[item.medicine_id]?.low
+                            ? "font-medium text-amber-700"
+                            : "text-green-700"
+                      }
+                    >
+                      {stock[item.medicine_id]?.out_of_stock
+                        ? "Out of stock"
+                        : `${stock[item.medicine_id]?.available ?? 0} in stock`}
+                    </span>
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <label className="flex items-center gap-2">
                     <input

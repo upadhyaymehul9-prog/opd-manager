@@ -113,6 +113,17 @@ npm run db:seed-medicines   # common medicine catalog for autocomplete
 **Doctor:** open patient in consultation → **Write prescription** → **Send to pharmacy**  
 **Pharmacy:** open patient → tick each medicine dispensed → **Complete & exit**
 
+## Pharmacy stock (Phase 2)
+
+Track inventory by batch and expiry. Stock deducts automatically when medicines are dispensed.
+
+```bash
+npm run db:push    # after pull — adds stock_batches table
+```
+
+**Stock** tab → view levels · **admin/manager** can add stock batches  
+Dispense is **blocked** if quantity is not available in stock.
+
 ## Customize doctors
 
 Add doctors via API or Prisma Studio:

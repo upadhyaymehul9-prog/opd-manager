@@ -23,6 +23,7 @@ const PAGE_ACCESS: Record<string, UserRole[]> = {
   "/lab": ["lab", "admin", "manager"],
   "/radiology": ["radiology", "admin", "manager"],
   "/pharmacy": ["pharmacy", "admin", "manager"],
+  "/stock": ["pharmacy", "admin", "manager"],
   "/tv": ["display", "admin", "manager"],
   "/manager": ["manager", "admin"],
   "/analytics": ["manager", "admin"],
@@ -98,6 +99,7 @@ function pageKey(pathname: string) {
   if (pathname === "/doctor" || pathname.startsWith("/doctor/")) return "/doctor";
   if (pathname === "/pharmacy" || pathname.startsWith("/pharmacy/"))
     return "/pharmacy";
+  if (pathname === "/stock" || pathname.startsWith("/stock/")) return "/stock";
   return pathname;
 }
 
@@ -206,6 +208,21 @@ export function canAccessApi(
   }
 
   if (pathname.startsWith("/api/prescriptions/items/") && method === "PATCH") {
+    return (
+      session.role === "pharmacy" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
+  if (pathname === "/api/stock" && method === "POST") {
+    return session.role === "admin" || session.role === "manager";
+  }
+
+  if (
+    pathname === "/api/stock" ||
+    pathname === "/api/stock/availability"
+  ) {
     return (
       session.role === "pharmacy" ||
       session.role === "admin" ||

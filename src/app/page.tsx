@@ -36,6 +36,12 @@ const consoles = [
     color: "border-teal-200 hover:border-teal-400 bg-teal-50",
   },
   {
+    href: "/stock",
+    title: "Pharmacy Stock",
+    desc: "Inventory batches, expiry, low-stock alerts",
+    color: "border-amber-200 hover:border-amber-400 bg-amber-50",
+  },
+  {
     href: "/tv",
     title: "TV Display",
     desc: "Waiting room screen — calls, directions, report ETAs",

@@ -80,9 +80,25 @@ model Medicine {
   is_active          Boolean            @default(true)
   created_at         DateTime           @default(now()) @db.Timestamptz(6)
   prescription_items PrescriptionItem[]
+  stock_batches      StockBatch[]
 
   @@index([name])
   @@map("medicines")
+}
+
+model StockBatch {
+  id          String    @id @default(uuid()) @db.Uuid
+  medicine_id String    @db.Uuid
+  batch_no    String?
+  expiry_date DateTime? @db.Date
+  quantity    Int
+  mrp         Float?
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  medicine    Medicine  @relation(fields: [medicine_id], references: [id], onDelete: Cascade)
+
+  @@index([medicine_id])
+  @@index([expiry_date])
+  @@map("stock_batches")
 }
 
 model Prescription {
