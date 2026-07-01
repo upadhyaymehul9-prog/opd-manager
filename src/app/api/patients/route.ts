@@ -44,6 +44,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
     }
 
+    let resolvedType = patient_type ?? "new";
 
     if (!patient_type) {
       const prior = await prisma.patientVisit.findFirst({
