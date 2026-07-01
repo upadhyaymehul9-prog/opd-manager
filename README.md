@@ -71,6 +71,37 @@ Use your Vercel URL on every clinic PC/tablet/TV:
 - Dr. Sharma tablet → `https://your-app.vercel.app/doctor`
 - Waiting room TV → `https://your-app.vercel.app/tv` (press F11 full screen)
 
+## Staff login (ID + password)
+
+Each hospital gets role-based logins — reception, doctor, lab, etc. cannot open each other's screens.
+
+### Create logins
+
+After `db:push`, run:
+
+```bash
+npm run db:seed-users
+```
+
+Default accounts (change password in production via re-seed or DB update):
+
+| User ID | Role | Opens |
+|---------|------|--------|
+| `admin` | Admin | All consoles |
+| `manager` | Manager | Manager + Analytics |
+| `reception` | Reception | Reception desk |
+| `doctor` | Doctor | Doctor console |
+| `lab` | Lab | Laboratory |
+| `radiology` | Radiology | Radiology |
+| `pharmacy` | Pharmacy | Pharmacy |
+| `tv` | Display | Waiting room TV |
+
+Default password: `Clinic@2026` (override with `SEED_USER_PASSWORD` in `.env.local`).
+
+Add `SESSION_SECRET` to Vercel environment variables (long random string).
+
+Staff sign in at `/login` — bookmarks should point to login, not directly to consoles.
+
 ## Customize doctors
 
 Add doctors via API or Prisma Studio:

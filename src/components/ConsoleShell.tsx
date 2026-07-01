@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { logout, useSession } from "@/hooks/useSession";
 
 const NAV = [
   { href: "/reception", label: "Reception", color: "bg-emerald-600" },
@@ -13,15 +16,20 @@ const NAV = [
 ];
 
 export function ConsoleNav({ current }: { current?: string }) {
+  const { session } = useSession();
+  const visibleNav = session
+    ? NAV.filter((item) => session.navPaths.includes(item.href))
+    : NAV;
+
   return (
-    <nav className="flex flex-wrap gap-2 border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
+    <nav className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
       <Link
         href="/"
         className="mr-2 self-center text-sm font-bold text-slate-800"
       >
         OPD Manager
       </Link>
-      {NAV.map((item) => (
+      {visibleNav.map((item) => (
         <Link
           key={item.href}
           href={item.href}
@@ -32,6 +40,20 @@ export function ConsoleNav({ current }: { current?: string }) {
           {item.label}
         </Link>
       ))}
+      {session && (
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-xs text-slate-500">
+            {session.displayName || session.username}
+          </span>
+          <button
+            type="button"
+            onClick={() => logout()}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+          >
+            Log out
+          </button>
+        </div>
+      )}
     </nav>
   );
 }

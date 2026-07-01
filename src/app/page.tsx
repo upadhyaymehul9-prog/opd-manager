@@ -1,4 +1,8 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { SESSION_COOKIE, verifySessionToken, rolesForNav } from "@/lib/auth";
+import type { UserRole } from "@/lib/auth-types";
 
 const consoles = [
   {
@@ -51,7 +55,44 @@ const consoles = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const session = token ? await verifySessionToken(token) : null;
+
+  if (session) {
+    const allowed = new Set(rolesForNav(session.role as UserRole));
+    const visible = consoles.filter((c) => allowed.has(c.href));
+    if (visible.length === 1) {
+      redirect(visible[0].href);
+    }
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900">
+        <div className="mx-auto max-w-5xl px-6 py-16">
+          <header className="mb-12 text-center text-white">
+            <h1 className="text-4xl font-bold tracking-tight">OPD Manager</h1>
+            <p className="mx-auto mt-3 max-w-2xl text-lg text-slate-300">
+              Signed in as {session.displayName || session.username}
+            </p>
+          </header>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {visible.map((c) => (
+              <Link
+                key={c.href}
+                href={c.href}
+                className={`rounded-2xl border-2 p-6 transition shadow-lg ${c.color}`}
+              >
+                <h2 className="text-xl font-bold text-slate-900">{c.title}</h2>
+                <p className="mt-2 text-slate-700">{c.desc}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900">
       <div className="mx-auto max-w-5xl px-6 py-16">
@@ -59,26 +100,18 @@ export default function Home() {
           <h1 className="text-4xl font-bold tracking-tight">OPD Manager</h1>
           <p className="mx-auto mt-3 max-w-2xl text-lg text-slate-300">
             Guide every patient from reception to exit — doctor, lab, radiology,
-            pharmacy, and live TV updates. Free cloud deployment on Vercel +
-            Neon.
+            pharmacy, and live TV updates.
           </p>
+          <Link
+            href="/login"
+            className="mt-6 inline-block rounded-xl bg-white px-6 py-3 font-semibold text-slate-900 hover:bg-slate-100"
+          >
+            Staff sign in
+          </Link>
         </header>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          {consoles.map((c) => (
-            <Link
-              key={c.href}
-              href={c.href}
-              className={`rounded-2xl border-2 p-6 transition shadow-lg ${c.color}`}
-            >
-              <h2 className="text-xl font-bold text-slate-900">{c.title}</h2>
-              <p className="mt-2 text-slate-700">{c.desc}</p>
-            </Link>
-          ))}
-        </div>
-
-        <p className="mt-10 text-center text-sm text-slate-400">
-          Open each console on its dedicated PC, tablet, or TV browser tab.
+        <p className="text-center text-sm text-slate-400">
+          Each department has its own login ID. Contact your clinic administrator.
         </p>
       </div>
     </div>
