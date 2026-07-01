@@ -225,7 +225,8 @@ export function canAccessApi(
 
   if (
     pathname === "/api/stock" ||
-    pathname === "/api/stock/availability"
+    pathname === "/api/stock/availability" ||
+    pathname === "/api/stock/alerts"
   ) {
     return (
       session.role === "pharmacy" ||

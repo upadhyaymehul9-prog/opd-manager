@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { LOW_STOCK_THRESHOLD } from "@/lib/stock";
+import { LOW_STOCK_THRESHOLD, usableBatchWhere } from "@/lib/stock";
 
 export async function GET(request: Request) {
   try {
@@ -18,11 +18,20 @@ export async function GET(request: Request) {
       );
     }
 
-    const batches = await prisma.stockBatch.groupBy({
-      by: ["medicine_id"],
-      where: { medicine_id: { in: ids }, quantity: { gt: 0 } },
-      _sum: { quantity: true },
+    const batches = await prisma.stockBatch.findMany({
+      where: {
+        medicine_id: { in: ids },
+        ...usableBatchWhere(),
+      },
     });
+
+    const totals = new Map<string, number>();
+    for (const batch of batches) {
+      totals.set(
+        batch.medicine_id,
+        (totals.get(batch.medicine_id) ?? 0) + batch.quantity,
+      );
+    }
 
     const availability: Record<
       string,
@@ -30,8 +39,7 @@ export async function GET(request: Request) {
     > = {};
 
     for (const id of ids) {
-      const row = batches.find((b) => b.medicine_id === id);
-      const available = row?._sum.quantity ?? 0;
+      const available = totals.get(id) ?? 0;
       availability[id] = {
         available,
         low: available > 0 && available <= LOW_STOCK_THRESHOLD,

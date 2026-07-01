@@ -2,29 +2,66 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { format } from "date-fns";
 import { ConsoleShell } from "@/components/ConsoleShell";
 import { formatMedicineLabel } from "@/lib/medicine";
+import { MIN_SHELF_LIFE_MONTHS, minAllowedExpiryDateStr } from "@/lib/stock";
 import type { Medicine } from "@/lib/prescription-types";
+
+type StockBatch = {
+  id: string;
+  batch_no: string;
+  expiry_date: string;
+  quantity: number;
+  mrp: number | null;
+  received_at: string;
+  days_until_expiry: number;
+  expired: boolean;
+  expiring_soon: boolean;
+};
 
 type StockRow = {
   medicine: Medicine;
   available: number;
+  ever_stocked: boolean;
   low: boolean;
+  depleted: boolean;
   out_of_stock: boolean;
-  batches: {
-    id: string;
+  batches: StockBatch[];
+};
+
+type StockAlerts = {
+  counts: {
+    expiring_soon: number;
+    expired: number;
+    total: number;
+  };
+  expiring_soon: {
+    medicine: string;
     batch_no: string;
     expiry_date: string;
     quantity: number;
-    mrp: number | null;
+    days_until_expiry: number;
+  }[];
+  expired: {
+    medicine: string;
+    batch_no: string;
+    expiry_date: string;
+    quantity: number;
   }[];
 };
 
 export default function StockPage() {
   const [rows, setRows] = useState<StockRow[]>([]);
+  const [alerts, setAlerts] = useState<StockAlerts | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showLowOnly, setShowLowOnly] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("low") === "true") setShowLowOnly(true);
+  }, []);
   const [saving, setSaving] = useState(false);
 
   const [medQuery, setMedQuery] = useState("");
@@ -52,11 +89,13 @@ export default function StockPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const stockRes = await fetch(
-        `/api/stock${showLowOnly ? "?low=true" : ""}`,
-      );
+      const [stockRes, alertsRes] = await Promise.all([
+        fetch(`/api/stock${showLowOnly ? "?low=true" : "?stocked=true"}`),
+        fetch("/api/stock/alerts"),
+      ]);
       if (!stockRes.ok) throw new Error("Failed to load stock");
       setRows(await stockRes.json());
+      if (alertsRes.ok) setAlerts(await alertsRes.json());
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
@@ -148,7 +187,7 @@ export default function StockPage() {
   return (
     <ConsoleShell
       title="Pharmacy Stock"
-      subtitle="Generic names · batch & expiry required · search or add medicines"
+      subtitle="Batch & expiry required (min 3 months shelf life) · received timestamp auto-recorded"
       current="/stock"
     >
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -158,12 +197,33 @@ export default function StockPage() {
             checked={showLowOnly}
             onChange={(e) => setShowLowOnly(e.target.checked)}
           />
-          Show low / out of stock only
+          Show low / depleted only (stocked medicines)
         </label>
         <Link href="/pharmacy" className="text-sm text-teal-700">
           ← Back to pharmacy queue
         </Link>
       </div>
+
+      {alerts && alerts.counts.total > 0 && (
+        <div className="mb-6 rounded-xl border border-orange-300 bg-orange-50 p-4 text-orange-950">
+          <p className="font-semibold">Expiry reminders</p>
+          {alerts.expiring_soon.length > 0 && (
+            <ul className="mt-2 space-y-1 text-sm">
+              {alerts.expiring_soon.slice(0, 5).map((b, i) => (
+                <li key={`exp-${i}`}>
+                  {b.medicine} · batch {b.batch_no} · expires {b.expiry_date} (
+                  {b.days_until_expiry} days) · qty {b.quantity}
+                </li>
+              ))}
+            </ul>
+          )}
+          {alerts.expired.length > 0 && (
+            <p className="mt-2 text-sm font-medium text-red-800">
+              {alerts.expired.length} expired batch(es) on hand — remove or write off
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="mb-4 flex flex-wrap gap-2">
         <button
@@ -274,15 +334,21 @@ export default function StockPage() {
           onChange={(e) => setForm((f) => ({ ...f, batch_no: e.target.value }))}
           className="rounded border border-slate-300 px-3 py-2 text-sm"
         />
-        <input
-          type="date"
-          required
-          value={form.expiry_date}
-          onChange={(e) =>
-            setForm((f) => ({ ...f, expiry_date: e.target.value }))
-          }
-          className="rounded border border-slate-300 px-3 py-2 text-sm"
-        />
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-600">
+            Expiry date * (min {MIN_SHELF_LIFE_MONTHS} months)
+          </label>
+          <input
+            type="date"
+            required
+            min={minAllowedExpiryDateStr()}
+            value={form.expiry_date}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, expiry_date: e.target.value }))
+            }
+            className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+          />
+        </div>
         <button
           type="submit"
           disabled={saving}
@@ -307,24 +373,39 @@ export default function StockPage() {
               </p>
               <span
                 className={
-                  row.out_of_stock
+                  row.depleted
                     ? "rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800"
                     : row.low
                       ? "rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900"
                       : "rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800"
                 }
               >
-                {row.out_of_stock
-                  ? "Out of stock"
+                {row.depleted
+                  ? "Depleted"
                   : `${row.available} in stock${row.low ? " (low)" : ""}`}
               </span>
             </div>
             {row.batches.length > 0 && (
               <ul className="mt-2 space-y-1 text-xs text-slate-600">
                 {row.batches.map((b) => (
-                  <li key={b.id}>
+                  <li
+                    key={b.id}
+                    className={
+                      b.expired
+                        ? "text-red-700"
+                        : b.expiring_soon
+                          ? "font-medium text-orange-800"
+                          : undefined
+                    }
+                  >
                     Batch {b.batch_no} · Qty {b.quantity} · Exp {b.expiry_date}
+                    {b.expiring_soon && !b.expired
+                      ? ` · expires in ${b.days_until_expiry} days`
+                      : ""}
+                    {b.expired ? " · EXPIRED" : ""}
                     {b.mrp != null ? ` · MRP ₹${b.mrp}` : ""}
+                    {" · Received "}
+                    {format(new Date(b.received_at), "d MMM yyyy, h:mm a")}
                   </li>
                 ))}
               </ul>

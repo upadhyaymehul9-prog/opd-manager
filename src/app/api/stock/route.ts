@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { LOW_STOCK_THRESHOLD } from "@/lib/stock";
+import {
+  LOW_STOCK_THRESHOLD,
+  serializeBatch,
+  startOfDay,
+  validateExpiryForReceiving,
+} from "@/lib/stock";
 import { serializeMedicine } from "@/lib/serialize";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const lowOnly = searchParams.get("low") === "true";
+    const stockedOnly = searchParams.get("stocked") === "true";
 
     const medicines = await prisma.medicine.findMany({
       where: { is_active: true },
@@ -15,30 +21,36 @@ export async function GET(request: Request) {
           where: { quantity: { gt: 0 } },
           orderBy: [{ expiry_date: "asc" }, { created_at: "asc" }],
         },
+        _count: { select: { stock_batches: true } },
       },
       orderBy: { name: "asc" },
     });
 
     const rows = medicines.map((med) => {
-      const available = med.stock_batches.reduce((sum, b) => sum + b.quantity, 0);
+      const usableBatches = med.stock_batches.filter((b) =>
+        startOfDay(b.expiry_date) >= startOfDay(new Date()),
+      );
+      const available = usableBatches.reduce((sum, b) => sum + b.quantity, 0);
+      const everStocked = med._count.stock_batches > 0;
+
       return {
         medicine: serializeMedicine(med),
         available,
-        low: available > 0 && available <= LOW_STOCK_THRESHOLD,
-        out_of_stock: available === 0,
-        batches: med.stock_batches.map((b) => ({
-          id: b.id,
-          batch_no: b.batch_no,
-          expiry_date: b.expiry_date.toISOString().slice(0, 10),
-          quantity: b.quantity,
-          mrp: b.mrp,
-        })),
+        ever_stocked: everStocked,
+        low: everStocked && available > 0 && available <= LOW_STOCK_THRESHOLD,
+        depleted: everStocked && available === 0,
+        out_of_stock: !everStocked,
+        batches: med.stock_batches.map(serializeBatch),
       };
     });
 
-    const filtered = lowOnly
-      ? rows.filter((r) => r.low || r.out_of_stock)
-      : rows;
+    let filtered = rows;
+    if (stockedOnly) {
+      filtered = filtered.filter((r) => r.ever_stocked);
+    }
+    if (lowOnly) {
+      filtered = filtered.filter((r) => r.low || r.depleted);
+    }
 
     return NextResponse.json(filtered);
   } catch (e) {
@@ -83,6 +95,11 @@ export async function POST(request: Request) {
       );
     }
 
+    const expiryError = validateExpiryForReceiving(expiry_date);
+    if (expiryError) {
+      return NextResponse.json({ error: expiryError }, { status: 400 });
+    }
+
     const medicine = await prisma.medicine.findUnique({
       where: { id: medicine_id },
     });
@@ -100,17 +117,7 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json(
-      {
-        id: batch.id,
-        medicine_id: batch.medicine_id,
-        quantity: batch.quantity,
-        batch_no: batch.batch_no,
-        expiry_date: batch.expiry_date?.toISOString().slice(0, 10) ?? null,
-        mrp: batch.mrp,
-      },
-      { status: 201 },
-    );
+    return NextResponse.json(serializeBatch(batch), { status: 201 });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Stock error";
     return NextResponse.json({ error: message }, { status: 500 });
