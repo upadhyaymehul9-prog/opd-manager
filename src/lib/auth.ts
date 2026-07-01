@@ -96,6 +96,8 @@ export function getHomeForRole(role: UserRole) {
 
 function pageKey(pathname: string) {
   if (pathname === "/doctor" || pathname.startsWith("/doctor/")) return "/doctor";
+  if (pathname === "/pharmacy" || pathname.startsWith("/pharmacy/"))
+    return "/pharmacy";
   return pathname;
 }
 
@@ -152,6 +154,63 @@ export function canAccessApi(
 
   if (pathname.startsWith("/api/patients/") && method === "PATCH") {
     return session.role !== "display";
+  }
+
+  if (pathname === "/api/medicines" && method === "POST") {
+    return session.role === "admin" || session.role === "manager";
+  }
+
+  if (pathname === "/api/medicines" && method === "GET") {
+    return (
+      session.role === "doctor" ||
+      session.role === "pharmacy" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
+  if (pathname === "/api/prescriptions" && method === "GET") {
+    return (
+      session.role === "doctor" ||
+      session.role === "pharmacy" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
+  if (pathname === "/api/prescriptions" && method === "POST") {
+    return (
+      session.role === "doctor" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
+  if (pathname.match(/^\/api\/prescriptions\/[^/]+\/send$/) && method === "POST") {
+    return (
+      session.role === "doctor" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
+  if (
+    pathname.match(/^\/api\/prescriptions\/[^/]+\/complete$/) &&
+    method === "POST"
+  ) {
+    return (
+      session.role === "pharmacy" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
+  if (pathname.startsWith("/api/prescriptions/items/") && method === "PATCH") {
+    return (
+      session.role === "pharmacy" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
   }
 
   if (pathname.startsWith("/api/")) {

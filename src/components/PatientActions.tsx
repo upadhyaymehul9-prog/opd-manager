@@ -10,9 +10,11 @@ import { updatePatient } from "@/hooks/usePatientVisits";
 export function PatientActions({
   visit,
   actions,
+  onUpdated,
 }: {
   visit: PatientVisit;
   actions: StatusAction[];
+  onUpdated?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [etaMinutes, setEtaMinutes] = useState(30);
@@ -31,6 +33,7 @@ export function PatientActions({
     try {
       await updatePatient(visit.id, updates);
       setShowEtaFor(null);
+      onUpdated?.();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Failed to update");
     } finally {

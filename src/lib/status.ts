@@ -85,6 +85,17 @@ export const PHARMACY_ACTIONS: StatusAction[] = [
   { label: "Medicines Given — Exit", status: "completed", variant: "primary" },
 ];
 
+export const PRESCRIPTION_STATUSES: PatientStatus[] = [
+  "calling",
+  "in_consultation",
+  "return_to_doctor",
+  "in_followup",
+];
+
+export function canWritePrescription(status: PatientStatus) {
+  return PRESCRIPTION_STATUSES.includes(status);
+}
+
 export function getRelevantPatients<T extends { status: PatientStatus; doctor_id: string }>(
   visits: T[],
   filter: "doctor" | "lab" | "radiology" | "pharmacy" | "active",

@@ -3,10 +3,11 @@
 import { use } from "react";
 import { ConsoleShell } from "@/components/ConsoleShell";
 import { DoctorStatusPanel } from "@/components/DoctorStatusPanel";
+import { PrescriptionForm } from "@/components/PrescriptionForm";
 import { PatientCard } from "@/components/PatientCard";
 import { PatientActions } from "@/components/PatientActions";
 import { usePatientVisits } from "@/hooks/usePatientVisits";
-import { DOCTOR_ACTIONS, getRelevantPatients } from "@/lib/status";
+import { DOCTOR_ACTIONS, canWritePrescription, getRelevantPatients } from "@/lib/status";
 
 export default function DoctorConsolePage({
   params,
@@ -14,7 +15,7 @@ export default function DoctorConsolePage({
   params: Promise<{ id: string }>;
 }) {
   const { id: doctorId } = use(params);
-  const { visits, loading, error } = usePatientVisits(true);
+  const { visits, loading, error, refresh } = usePatientVisits(true);
 
   const myPatients = getRelevantPatients(visits, "doctor", doctorId).sort(
     (a, b) => a.token_number - b.token_number,
@@ -41,14 +42,22 @@ export default function DoctorConsolePage({
           </p>
         )}
         {myPatients.map((visit) => (
-          <PatientCard
-            key={visit.id}
-            visit={visit}
-            showDoctor={false}
-            actions={
-              <PatientActions visit={visit} actions={DOCTOR_ACTIONS} />
-            }
-          />
+          <div key={visit.id} className="space-y-3">
+            <PatientCard
+              visit={visit}
+              showDoctor={false}
+              actions={
+                <PatientActions
+                  visit={visit}
+                  actions={DOCTOR_ACTIONS}
+                  onUpdated={refresh}
+                />
+              }
+            />
+            {canWritePrescription(visit.status) && (
+              <PrescriptionForm visitId={visit.id} doctorId={doctorId} />
+            )}
+          </div>
         ))}
       </div>
     </ConsoleShell>

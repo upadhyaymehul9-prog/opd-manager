@@ -10,6 +10,7 @@
     "db:push": "dotenv -e .env.local -- prisma db push",
     "db:seed": "dotenv -e .env.local -- prisma db seed",
     "db:seed-users": "dotenv -e .env.local -- tsx prisma/seed-users.ts",
+    "db:seed-medicines": "dotenv -e .env.local -- tsx prisma/seed-medicines.ts",
     "db:reset-doctors": "dotenv -e .env.local -- tsx prisma/reset-doctors-offline.ts",
     "db:studio": "dotenv -e .env.local -- prisma studio",
     "postinstall": "prisma generate"

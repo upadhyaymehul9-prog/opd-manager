@@ -102,6 +102,17 @@ Add `SESSION_SECRET` to Vercel environment variables (long random string).
 
 Staff sign in at `/login` — bookmarks should point to login, not directly to consoles.
 
+## Pharmacy prescriptions (Phase 1)
+
+Doctor writes medicines during consult → pharmacy dispenses line-by-line → patient exits.
+
+```bash
+npm run db:seed-medicines   # common medicine catalog for autocomplete
+```
+
+**Doctor:** open patient in consultation → **Write prescription** → **Send to pharmacy**  
+**Pharmacy:** open patient → tick each medicine dispensed → **Complete & exit**
+
 ## Customize doctors
 
 Add doctors via API or Prisma Studio:
