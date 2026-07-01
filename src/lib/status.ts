@@ -85,11 +85,11 @@ export const PHARMACY_ACTIONS: StatusAction[] = [
   { label: "Medicines Given — Exit", status: "completed", variant: "primary" },
 ];
 
-export function getRelevantPatients(
-  visits: { status: PatientStatus; doctor_id: string }[],
+export function getRelevantPatients<T extends { status: PatientStatus; doctor_id: string }>(
+  visits: T[],
   filter: "doctor" | "lab" | "radiology" | "pharmacy" | "active",
   doctorId?: string,
-) {
+): T[] {
   const labStatuses: PatientStatus[] = [
     "to_lab",
     "at_lab",
