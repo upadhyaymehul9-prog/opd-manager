@@ -15,7 +15,7 @@ const NAV = [
   { href: "/tv", label: "TV Display", color: "bg-rose-600" },
   { href: "/manager", label: "OPD Manager", color: "bg-slate-700" },
   { href: "/analytics", label: "Analytics", color: "bg-indigo-700" },
-  { href: "/settings/doctors", label: "Doctors", color: "bg-violet-700" },
+  { href: "/settings/doctors", label: "My profile", color: "bg-violet-700" },
 ];
 
 export function ConsoleNav({ current }: { current?: string }) {

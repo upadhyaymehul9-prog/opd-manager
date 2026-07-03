@@ -7,6 +7,7 @@ type SessionInfo = {
   username: string;
   role: UserRole;
   displayName: string | null;
+  doctorId: string | null;
   navPaths: string[];
 };
 

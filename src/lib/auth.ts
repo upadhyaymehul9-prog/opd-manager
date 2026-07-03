@@ -29,7 +29,7 @@ const PAGE_ACCESS: Record<string, UserRole[]> = {
   "/manager": ["manager", "admin"],
   "/analytics": ["manager", "admin"],
   "/records": ["pharmacy", "admin", "manager", "reception", "doctor"],
-  "/settings/doctors": ["admin", "manager"],
+  "/settings/doctors": ["admin", "manager", "doctor"],
 };
 
 function getSecret() {

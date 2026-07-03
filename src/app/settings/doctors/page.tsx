@@ -2,9 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { ConsoleShell } from "@/components/ConsoleShell";
+import { useSession } from "@/hooks/useSession";
 import type { Doctor } from "@/lib/types";
 
 export default function DoctorSettingsPage() {
+  const { session } = useSession();
+  const isAdmin = session?.role === "admin" || session?.role === "manager";
+
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [form, setForm] = useState({
@@ -24,12 +28,15 @@ export default function DoctorSettingsPage() {
     fetch("/api/doctors")
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data)) {
-          setDoctors(data);
-          if (data[0]) setSelectedId(data[0].id);
+        if (!Array.isArray(data)) return;
+        setDoctors(data);
+        if (session?.role === "doctor" && session.doctorId) {
+          setSelectedId(session.doctorId);
+        } else if (data[0]) {
+          setSelectedId(data[0].id);
         }
       });
-  }, []);
+  }, [session?.role, session?.doctorId]);
 
   useEffect(() => {
     const d = doctors.find((x) => x.id === selectedId);
@@ -66,25 +73,33 @@ export default function DoctorSettingsPage() {
     setError(null);
     setMessage(null);
     try {
+      const body = isAdmin
+        ? {
+            name: form.name.trim(),
+            room_number: form.room_number.trim(),
+            specialty: form.specialty.trim() || null,
+            qualifications: form.qualifications.trim() || null,
+            bio: form.bio.trim() || null,
+            consultation_fee: form.consultation_fee
+              ? Number(form.consultation_fee)
+              : null,
+            photo_url: form.photo_url || null,
+          }
+        : {
+            qualifications: form.qualifications.trim() || null,
+            bio: form.bio.trim() || null,
+            photo_url: form.photo_url || null,
+          };
+
       const res = await fetch(`/api/doctors/${selectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          room_number: form.room_number.trim(),
-          specialty: form.specialty.trim() || null,
-          qualifications: form.qualifications.trim() || null,
-          bio: form.bio.trim() || null,
-          consultation_fee: form.consultation_fee
-            ? Number(form.consultation_fee)
-            : null,
-          photo_url: form.photo_url || null,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Save failed");
       setDoctors((prev) => prev.map((d) => (d.id === data.id ? data : d)));
-      setMessage("Doctor profile saved");
+      setMessage("Profile saved — photo will show on TV display");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -94,67 +109,109 @@ export default function DoctorSettingsPage() {
 
   return (
     <ConsoleShell
-      title="Doctor profiles"
-      subtitle="Name, specialty, photo, consultation fee — shown on TV display"
+      title={isAdmin ? "Doctor profiles" : "My profile & photo"}
+      subtitle="Upload photo here — it appears on the waiting-room TV"
       current="/settings/doctors"
     >
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white p-6">
-          <label className="block text-sm font-medium text-slate-700">
-            Select doctor
-          </label>
-          <select
-            value={selectedId}
-            onChange={(e) => setSelectedId(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-          >
-            {doctors.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+          {isAdmin ? (
+            <>
+              <label className="block text-sm font-medium text-slate-700">
+                Select doctor
+              </label>
+              <select
+                value={selectedId}
+                onChange={(e) => setSelectedId(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+              >
+                {doctors.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <p className="text-lg font-semibold text-slate-900">{form.name}</p>
+          )}
+
+          <div className="mt-6 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50/50 p-5">
+            <p className="font-semibold text-indigo-900">Upload photo</p>
+            <p className="mt-1 text-sm text-indigo-800">
+              JPG or PNG, max 500 KB — shown on TV next to your name
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-4">
+              {form.photo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={form.photo_url}
+                  alt=""
+                  className="h-20 w-20 rounded-full border-2 border-indigo-400 object-cover"
+                />
+              ) : (
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-indigo-200 text-2xl font-bold text-indigo-800">
+                  {form.name.charAt(0) || "?"}
+                </div>
+              )}
+              <label className="cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                Choose photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handlePhoto(e.target.files?.[0] ?? null)}
+                />
+              </label>
+            </div>
+          </div>
 
           <div className="mt-4 space-y-3">
-            <input
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="Doctor name"
-              className="w-full rounded border border-slate-300 px-3 py-2"
-            />
-            <input
-              value={form.room_number}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, room_number: e.target.value }))
-              }
-              placeholder="Room number"
-              className="w-full rounded border border-slate-300 px-3 py-2"
-            />
-            <input
-              value={form.specialty}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, specialty: e.target.value }))
-              }
-              placeholder="Specialty"
-              className="w-full rounded border border-slate-300 px-3 py-2"
-            />
+            {isAdmin && (
+              <>
+                <input
+                  value={form.name}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, name: e.target.value }))
+                  }
+                  placeholder="Doctor name"
+                  className="w-full rounded border border-slate-300 px-3 py-2"
+                />
+                <input
+                  value={form.room_number}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, room_number: e.target.value }))
+                  }
+                  placeholder="Room number"
+                  className="w-full rounded border border-slate-300 px-3 py-2"
+                />
+                <input
+                  value={form.specialty}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, specialty: e.target.value }))
+                  }
+                  placeholder="Specialty"
+                  className="w-full rounded border border-slate-300 px-3 py-2"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={form.consultation_fee}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, consultation_fee: e.target.value }))
+                  }
+                  placeholder="Default consultation fee (₹)"
+                  className="w-full rounded border border-slate-300 px-3 py-2"
+                />
+              </>
+            )}
             <input
               value={form.qualifications}
               onChange={(e) =>
                 setForm((f) => ({ ...f, qualifications: e.target.value }))
               }
               placeholder="Qualifications (MBBS, MD, etc.)"
-              className="w-full rounded border border-slate-300 px-3 py-2"
-            />
-            <input
-              type="number"
-              min={0}
-              step={1}
-              value={form.consultation_fee}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, consultation_fee: e.target.value }))
-              }
-              placeholder="Default consultation fee (₹)"
               className="w-full rounded border border-slate-300 px-3 py-2"
             />
             <textarea
@@ -164,17 +221,6 @@ export default function DoctorSettingsPage() {
               rows={3}
               className="w-full rounded border border-slate-300 px-3 py-2"
             />
-            <div>
-              <label className="block text-sm font-medium text-slate-700">
-                Photo (max 500 KB)
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => handlePhoto(e.target.files?.[0] ?? null)}
-                className="mt-1 text-sm"
-              />
-            </div>
           </div>
 
           {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
@@ -192,21 +238,29 @@ export default function DoctorSettingsPage() {
 
         <div className="rounded-xl border border-slate-200 bg-slate-900 p-6 text-white">
           <p className="text-sm text-slate-400">TV preview</p>
-          {form.photo_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={form.photo_url}
-              alt=""
-              className="mt-3 h-24 w-24 rounded-full border-2 border-blue-400 object-cover"
-            />
-          )}
-          <p className="mt-4 text-2xl font-bold">{form.name || "Doctor name"}</p>
-          <p className="mt-1 text-slate-300">
-            Room {form.room_number || "—"}
-            {form.specialty ? ` · ${form.specialty}` : ""}
-          </p>
+          <div className="mt-4 flex items-start gap-3">
+            {form.photo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={form.photo_url}
+                alt=""
+                className="h-16 w-16 rounded-full border-2 border-blue-400 object-cover"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-700 text-xl font-bold">
+                {form.name.charAt(0) || "?"}
+              </div>
+            )}
+            <div>
+              <p className="text-2xl font-bold">{form.name || "Doctor name"}</p>
+              <p className="mt-1 text-slate-300">
+                Room {form.room_number || "—"}
+                {form.specialty ? ` · ${form.specialty}` : ""}
+              </p>
+            </div>
+          </div>
           {form.qualifications && (
-            <p className="mt-2 text-sm text-blue-200">{form.qualifications}</p>
+            <p className="mt-3 text-sm text-blue-200">{form.qualifications}</p>
           )}
           {form.bio && (
             <p className="mt-2 text-sm text-slate-400">{form.bio}</p>

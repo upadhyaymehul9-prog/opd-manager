@@ -125,30 +125,32 @@ export function PrescriptionForm({
 
   useEffect(() => {
     if (!query.trim()) {
-      if (activeLine == null) {
-        setSuggestions([]);
-      }
       return;
     }
     const timer = setTimeout(async () => {
       const params = new URLSearchParams({
         q: query,
         stock: "true",
-        limit: "20",
+        limit: "50",
       });
       if (stockOnly) params.set("in_stock", "true");
       const res = await fetch(`/api/medicines?${params}`);
       if (res.ok) setSuggestions(await res.json());
     }, 250);
     return () => clearTimeout(timer);
-  }, [query, stockOnly, activeLine]);
+  }, [query, stockOnly]);
+
+  useEffect(() => {
+    if (activeLine) loadMedicineList(activeLine);
+  }, [stockOnly]);
 
   async function loadMedicineList(lineKey: string) {
     setActiveLine(lineKey);
     const params = new URLSearchParams({
       stock: "true",
-      limit: "50",
+      limit: "100",
     });
+    if (query.trim()) params.set("q", query.trim());
     if (stockOnly) params.set("in_stock", "true");
     const res = await fetch(`/api/medicines?${params}`);
     if (res.ok) setSuggestions(await res.json());
@@ -291,6 +293,12 @@ export function PrescriptionForm({
         />
         Show only medicines in stock
       </label>
+      {stockOnly && (
+        <p className="mt-1 text-xs text-slate-600">
+          Click the medicine box to see in-stock items. Add batches in{" "}
+          <strong>Stock</strong> if the list is empty.
+        </p>
+      )}
       {isSent && (
         <p className="mt-1 text-xs text-teal-800">
           Add new lines or edit undispensed medicines. Dispensed lines are locked.
@@ -342,29 +350,37 @@ export function PrescriptionForm({
                     {stockInfo.text}
                   </p>
                 )}
-                {activeLine === line.key && suggestions.length > 0 && !locked && (
+                {activeLine === line.key && !locked && (
                   <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded border border-slate-200 bg-white shadow-lg">
-                    {suggestions.map((med) => {
-                      const hint = stockLabel(med.stock);
-                      return (
-                        <li key={med.id}>
-                          <button
-                            type="button"
-                            className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
-                            onClick={() => pickMedicine(line.key, med)}
-                          >
-                            <span>{formatMedicineLabel(med)}</span>
-                            {hint && (
-                              <span
-                                className={`shrink-0 text-xs font-medium ${hint.className}`}
-                              >
-                                {hint.text}
-                              </span>
-                            )}
-                          </button>
-                        </li>
-                      );
-                    })}
+                    {suggestions.length === 0 ? (
+                      <li className="px-3 py-3 text-sm text-amber-900">
+                        {stockOnly
+                          ? "No medicines in stock right now. Add stock under Stock, or uncheck the filter above to prescribe any medicine."
+                          : "No matches — keep typing or pick from the list."}
+                      </li>
+                    ) : (
+                      suggestions.map((med) => {
+                        const hint = stockLabel(med.stock);
+                        return (
+                          <li key={med.id}>
+                            <button
+                              type="button"
+                              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                              onClick={() => pickMedicine(line.key, med)}
+                            >
+                              <span>{formatMedicineLabel(med)}</span>
+                              {hint && (
+                                <span
+                                  className={`shrink-0 text-xs font-medium ${hint.className}`}
+                                >
+                                  {hint.text}
+                                </span>
+                              )}
+                            </button>
+                          </li>
+                        );
+                      })
+                    )}
                   </ul>
                 )}
               </div>

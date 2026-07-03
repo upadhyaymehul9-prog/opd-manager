@@ -3,6 +3,21 @@ import { prisma } from "@/lib/prisma";
 import { serializeMedicine } from "@/lib/serialize";
 import { LOW_STOCK_THRESHOLD, startOfDay } from "@/lib/stock";
 
+function stockTotalsForMedicines(
+  medicineIds: string[],
+  batches: { medicine_id: string; quantity: number }[],
+) {
+  const totals = new Map<string, number>();
+  for (const batch of batches) {
+    if (!medicineIds.includes(batch.medicine_id)) continue;
+    totals.set(
+      batch.medicine_id,
+      (totals.get(batch.medicine_id) ?? 0) + batch.quantity,
+    );
+  }
+  return totals;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -14,9 +29,28 @@ export async function GET(request: Request) {
       500,
     );
 
+    const today = startOfDay(new Date());
+
+    const usableBatches = await prisma.stockBatch.findMany({
+      where: {
+        quantity: { gt: 0 },
+        expiry_date: { gte: today },
+      },
+      select: { medicine_id: true, quantity: true },
+    });
+
+    const stockedIds = [
+      ...new Set(usableBatches.map((b) => b.medicine_id)),
+    ];
+
+    if (inStockOnly && stockedIds.length === 0) {
+      return NextResponse.json([]);
+    }
+
     const medicines = await prisma.medicine.findMany({
       where: {
         is_active: true,
+        ...(inStockOnly ? { id: { in: stockedIds } } : {}),
         ...(q
           ? {
               OR: [
@@ -35,22 +69,10 @@ export async function GET(request: Request) {
       return NextResponse.json(medicines.map(serializeMedicine));
     }
 
-    const today = startOfDay(new Date());
-    const batches = await prisma.stockBatch.findMany({
-      where: {
-        medicine_id: { in: medicines.map((m) => m.id) },
-        quantity: { gt: 0 },
-        expiry_date: { gte: today },
-      },
-    });
-
-    const totals = new Map<string, number>();
-    for (const batch of batches) {
-      totals.set(
-        batch.medicine_id,
-        (totals.get(batch.medicine_id) ?? 0) + batch.quantity,
-      );
-    }
+    const totals = stockTotalsForMedicines(
+      medicines.map((m) => m.id),
+      usableBatches,
+    );
 
     return NextResponse.json(
       medicines
@@ -65,7 +87,14 @@ export async function GET(request: Request) {
             },
           };
         })
-        .filter((m) => !inStockOnly || m.stock.available > 0),
+        .filter((m) => !inStockOnly || m.stock.available > 0)
+        .sort((a, b) => {
+          const aStock = a.stock?.available ?? 0;
+          const bStock = b.stock?.available ?? 0;
+          if (aStock > 0 && bStock === 0) return -1;
+          if (bStock > 0 && aStock === 0) return 1;
+          return a.name.localeCompare(b.name);
+        }),
     );
   } catch (e) {
     const message = e instanceof Error ? e.message : "Database error";

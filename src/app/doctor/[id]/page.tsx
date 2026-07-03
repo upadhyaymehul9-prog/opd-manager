@@ -1,6 +1,7 @@
 "use client";
 
 import { use } from "react";
+import Link from "next/link";
 import { ConsoleShell } from "@/components/ConsoleShell";
 import { DoctorStatusPanel } from "@/components/DoctorStatusPanel";
 import { PrescriptionForm } from "@/components/PrescriptionForm";
@@ -30,6 +31,13 @@ export default function DoctorConsolePage({
       subtitle="Tap to call patient or guide them to lab / radiology / pharmacy"
       current="/doctor"
     >
+      <Link
+        href="/settings/doctors"
+        className="mb-4 inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-800 hover:bg-indigo-100"
+      >
+        My profile &amp; photo for TV →
+      </Link>
+
       {loading && <p className="text-slate-600">Loading patients…</p>}
       {error && <p className="text-red-600">{error}</p>}
 

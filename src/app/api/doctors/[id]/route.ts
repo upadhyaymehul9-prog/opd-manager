@@ -80,6 +80,14 @@ export async function PATCH(
             ? Number(body.consultation_fee)
             : null;
       }
+    } else if (session?.role === "doctor" && session.doctorId === id) {
+      if (body.qualifications !== undefined) {
+        data.qualifications = body.qualifications?.trim() || null;
+      }
+      if (body.bio !== undefined) data.bio = body.bio?.trim() || null;
+      if (body.photo_url !== undefined) {
+        data.photo_url = body.photo_url || null;
+      }
     }
 
     if (Object.keys(data).length === 0) {
