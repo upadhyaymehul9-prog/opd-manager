@@ -1,26 +1,53 @@
 import { NextResponse } from "next/server";
-import { startOfDay } from "date-fns";
+import { addDays, startOfDay } from "date-fns";
 import { prisma } from "@/lib/prisma";
+
+function parseDateParam(value: string | null): Date | null {
+  if (!value?.trim()) return null;
+  const d = startOfDay(new Date(value));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function resolveRange(searchParams: URLSearchParams) {
+  const today = startOfDay(new Date());
+  const fromParam = searchParams.get("from") ?? searchParams.get("date");
+  const toParam = searchParams.get("to") ?? searchParams.get("date");
+
+  let rangeStart = parseDateParam(fromParam) ?? today;
+  let rangeEnd = parseDateParam(toParam) ?? rangeStart;
+
+  if (rangeEnd < rangeStart) {
+    [rangeStart, rangeEnd] = [rangeEnd, rangeStart];
+  }
+
+  const rangeEndExclusive = addDays(rangeEnd, 1);
+
+  return {
+    rangeStart,
+    rangeEnd,
+    rangeEndExclusive,
+    from: rangeStart.toISOString().slice(0, 10),
+    to: rangeEnd.toISOString().slice(0, 10),
+  };
+}
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const dateParam = searchParams.get("date");
-    const dayStart = dateParam
-      ? startOfDay(new Date(dateParam))
-      : startOfDay(new Date());
-    const dayEnd = new Date(dayStart);
-    dayEnd.setDate(dayEnd.getDate() + 1);
+    const { rangeStart, rangeEndExclusive, from, to } =
+      resolveRange(searchParams);
 
     const [visits, dispensedItems, procedures] = await Promise.all([
       prisma.patientVisit.findMany({
-        where: { registered_at: { gte: dayStart, lt: dayEnd } },
+        where: {
+          registered_at: { gte: rangeStart, lt: rangeEndExclusive },
+        },
         include: { doctors: { select: { id: true, name: true } } },
       }),
       prisma.prescriptionItem.findMany({
         where: {
           dispensed: true,
-          dispensed_at: { gte: dayStart, lt: dayEnd },
+          dispensed_at: { gte: rangeStart, lt: rangeEndExclusive },
         },
         include: {
           prescription: {
@@ -37,7 +64,7 @@ export async function GET(request: Request) {
         },
       }),
       prisma.visitProcedure.findMany({
-        where: { created_at: { gte: dayStart, lt: dayEnd } },
+        where: { created_at: { gte: rangeStart, lt: rangeEndExclusive } },
       }),
     ]);
 
@@ -94,7 +121,9 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-      date: dayStart.toISOString().slice(0, 10),
+      from,
+      to,
+      date: from === to ? from : null,
       summary: {
         total_visits: visits.length,
         completed: visits.filter((v) => v.status === "completed").length,
