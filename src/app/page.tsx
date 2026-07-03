@@ -65,6 +65,12 @@ const consoles = [
     desc: "Patients, doctors, lab, radiology, turnaround time & OPD prediction",
     color: "border-indigo-300 hover:border-indigo-500 bg-indigo-50",
   },
+  {
+    href: "/settings/doctors",
+    title: "Doctor Profiles",
+    desc: "Name, specialty, photo, consultation fee for TV display",
+    color: "border-violet-300 hover:border-violet-500 bg-violet-50",
+  },
 ];
 
 export default async function Home() {

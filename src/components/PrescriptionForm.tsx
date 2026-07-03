@@ -125,7 +125,9 @@ export function PrescriptionForm({
 
   useEffect(() => {
     if (!query.trim()) {
-      setSuggestions([]);
+      if (activeLine == null) {
+        setSuggestions([]);
+      }
       return;
     }
     const timer = setTimeout(async () => {
@@ -139,7 +141,18 @@ export function PrescriptionForm({
       if (res.ok) setSuggestions(await res.json());
     }, 250);
     return () => clearTimeout(timer);
-  }, [query, stockOnly]);
+  }, [query, stockOnly, activeLine]);
+
+  async function loadMedicineList(lineKey: string) {
+    setActiveLine(lineKey);
+    const params = new URLSearchParams({
+      stock: "true",
+      limit: "50",
+    });
+    if (stockOnly) params.set("in_stock", "true");
+    const res = await fetch(`/api/medicines?${params}`);
+    if (res.ok) setSuggestions(await res.json());
+  }
 
   function updateLine(key: string, patch: Partial<DraftLine>) {
     setLines((prev) =>
@@ -308,6 +321,7 @@ export function PrescriptionForm({
                 <input
                   value={line.medicine_name}
                   disabled={locked}
+                  onFocus={() => loadMedicineList(line.key)}
                   onChange={(e) => {
                     updateLine(line.key, {
                       medicine_name: e.target.value,

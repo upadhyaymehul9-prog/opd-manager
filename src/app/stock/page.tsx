@@ -65,6 +65,30 @@ export default function StockPage() {
   });
   const [addingMed, setAddingMed] = useState(false);
 
+  const [expiredBatches, setExpiredBatches] = useState<
+    { batch: StockBatch; medicine: Medicine }[]
+  >([]);
+  const [writeOffs, setWriteOffs] = useState<
+    {
+      id: string;
+      medicine: Medicine;
+      batch_no: string;
+      quantity: number;
+      reason: string;
+      created_at: string;
+    }[]
+  >([]);
+  const [writeOffBusy, setWriteOffBusy] = useState<string | null>(null);
+
+  const loadExpired = useCallback(async () => {
+    const [expRes, woRes] = await Promise.all([
+      fetch("/api/stock/expired"),
+      fetch("/api/stock/write-off"),
+    ]);
+    if (expRes.ok) setExpiredBatches(await expRes.json());
+    if (woRes.ok) setWriteOffs(await woRes.json());
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -83,7 +107,30 @@ export default function StockPage() {
 
   useEffect(() => {
     load();
-  }, [load]);
+    loadExpired();
+  }, [load, loadExpired]);
+
+  async function writeOffExpired(batchId: string) {
+    if (!confirm("Remove this expired stock from inventory? Record will be kept.")) {
+      return;
+    }
+    setWriteOffBusy(batchId);
+    try {
+      const res = await fetch("/api/stock/write-off", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batch_id: batchId, reason: "expired" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Write-off failed");
+      await load();
+      await loadExpired();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Write-off failed");
+    } finally {
+      setWriteOffBusy(null);
+    }
+  }
 
   useEffect(() => {
     if (!medQuery.trim()) {
@@ -393,6 +440,69 @@ export default function StockPage() {
           </p>
         )}
       </div>
+
+      <section className="mt-10 rounded-xl border border-red-200 bg-red-50/50 p-4">
+        <h2 className="font-semibold text-red-900">Expired stock — write off</h2>
+        <p className="mt-1 text-sm text-red-800">
+          Removes expired quantity from inventory. Medicine stops appearing in
+          doctor in-stock list. All write-offs are recorded below.
+        </p>
+        {expiredBatches.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-600">No expired batches with stock.</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {expiredBatches.map(({ batch, medicine }) => (
+              <li
+                key={batch.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm"
+              >
+                <span>
+                  {formatMedicineLabel(medicine)} · Batch {batch.batch_no} · Qty{" "}
+                  {batch.quantity} · Exp {batch.expiry_date}
+                </span>
+                <button
+                  type="button"
+                  disabled={writeOffBusy === batch.id}
+                  onClick={() => writeOffExpired(batch.id)}
+                  className="rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                >
+                  {writeOffBusy === batch.id ? "Removing…" : "Write off expired"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {writeOffs.length > 0 && (
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4">
+          <h2 className="font-semibold text-slate-900">Write-off records</h2>
+          <table className="mt-3 w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-slate-600">
+                <th className="pb-2">When</th>
+                <th className="pb-2">Medicine</th>
+                <th className="pb-2">Batch</th>
+                <th className="pb-2">Qty</th>
+                <th className="pb-2">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {writeOffs.map((w) => (
+                <tr key={w.id} className="border-b border-slate-100">
+                  <td className="py-2">
+                    {format(new Date(w.created_at), "d MMM h:mm a")}
+                  </td>
+                  <td className="py-2">{formatMedicineLabel(w.medicine)}</td>
+                  <td className="py-2">{w.batch_no}</td>
+                  <td className="py-2">{w.quantity}</td>
+                  <td className="py-2 capitalize">{w.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
     </ConsoleShell>
   );
 }

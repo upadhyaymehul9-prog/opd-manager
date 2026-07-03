@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { startOfDay } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { visitInclude } from "@/lib/db-includes";
+import { nextConsultationBillNo } from "@/lib/consultation-billing";
 import { findOrCreatePatient } from "@/lib/patients";
 import { serializeVisit } from "@/lib/serialize";
 import { nextTokenNumber } from "@/lib/tokens";
@@ -37,7 +38,16 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as CreatePatientInput;
-    const { patient_name, doctor_id, patient_type, age, mobile } = body;
+    const {
+      patient_name,
+      doctor_id,
+      patient_type,
+      patient_id,
+      age,
+      mobile,
+      consultation_fee,
+      consultation_payment_mode,
+    } = body;
 
     if (!patient_name?.trim() || !doctor_id) {
       return NextResponse.json(
@@ -48,16 +58,16 @@ export async function POST(request: Request) {
 
     const doctor = await prisma.doctor.findUnique({
       where: { id: doctor_id },
-      select: { room_number: true },
+      select: { room_number: true, consultation_fee: true },
     });
 
     if (!doctor) {
       return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
     }
 
-    let resolvedType = patient_type ?? "new";
+    let resolvedType = patient_type ?? (patient_id ? "old" : "new");
 
-    if (!patient_type) {
+    if (!patient_type && !patient_id) {
       const prior = await prisma.patientVisit.findFirst({
         where: {
           patient_name: { equals: patient_name.trim(), mode: "insensitive" },
@@ -67,13 +77,33 @@ export async function POST(request: Request) {
       if (prior) resolvedType = "old";
     }
 
+    const fee =
+      consultation_fee != null && consultation_fee > 0
+        ? Number(consultation_fee)
+        : doctor.consultation_fee && doctor.consultation_fee > 0
+          ? doctor.consultation_fee
+          : null;
+
     const token_number = await nextTokenNumber();
 
     const visit = await prisma.$transaction(async (tx) => {
-      const patient = await findOrCreatePatient(tx, {
-        name: patient_name.trim(),
-        mobile: mobile?.trim() || null,
-      });
+      let patient;
+      if (patient_id) {
+        patient = await tx.patient.findUnique({ where: { id: patient_id } });
+        if (!patient) throw new Error("Patient not found");
+      } else {
+        patient = await findOrCreatePatient(tx, {
+          name: patient_name.trim(),
+          mobile: mobile?.trim() || null,
+        });
+      }
+
+      let billNo: string | null = null;
+      let paidAt: Date | null = null;
+      if (fee != null && fee > 0) {
+        billNo = await nextConsultationBillNo(tx);
+        paidAt = new Date();
+      }
 
       return tx.patientVisit.create({
         data: {
@@ -85,7 +115,14 @@ export async function POST(request: Request) {
           status: "registered",
           patient_type: resolvedType,
           age: age != null && age > 0 ? Math.round(age) : null,
-          mobile: mobile?.trim() || null,
+          mobile: mobile?.trim() || patient.mobile || null,
+          consultation_fee: fee,
+          consultation_payment_mode:
+            fee != null && fee > 0
+              ? consultation_payment_mode?.trim() || "cash"
+              : null,
+          consultation_bill_no: billNo,
+          consultation_paid_at: paidAt,
         },
         include: visitInclude,
       });

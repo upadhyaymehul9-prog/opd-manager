@@ -32,6 +32,10 @@ export type Doctor = {
   name: string;
   room_number: string;
   specialty: string | null;
+  bio: string | null;
+  qualifications: string | null;
+  photo_url: string | null;
+  consultation_fee: number | null;
   opd_status: DoctorOpdStatus;
 };
 
@@ -53,6 +57,10 @@ export type PatientVisit = {
   radio_eta: string | null;
   registered_at: string;
   completed_at: string | null;
+  consultation_fee: number | null;
+  consultation_bill_no: string | null;
+  consultation_payment_mode: string | null;
+  consultation_paid_at: string | null;
   updated_at: string;
   doctors?: Doctor | null;
 };
@@ -60,9 +68,12 @@ export type PatientVisit = {
 export type CreatePatientInput = {
   patient_name: string;
   doctor_id: string;
+  patient_id?: string;
   patient_type?: PatientType;
   age?: number | null;
   mobile?: string | null;
+  consultation_fee?: number | null;
+  consultation_payment_mode?: string | null;
 };
 
 export type UpdatePatientInput = {
@@ -73,5 +84,12 @@ export type UpdatePatientInput = {
 };
 
 export type UpdateDoctorInput = {
-  opd_status: DoctorOpdStatus;
+  opd_status?: DoctorOpdStatus;
+  name?: string;
+  room_number?: string;
+  specialty?: string | null;
+  bio?: string | null;
+  qualifications?: string | null;
+  photo_url?: string | null;
+  consultation_fee?: number | null;
 };

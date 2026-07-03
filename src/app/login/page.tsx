@@ -1,7 +1,9 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+
+const REMEMBER_USER_KEY = "opd_remember_username";
 
 function LoginForm() {
   const router = useRouter();
@@ -10,8 +12,14 @@ function LoginForm() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(REMEMBER_USER_KEY);
+    if (saved) setUsername(saved);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -22,11 +30,16 @@ function LoginForm() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, remember_me: rememberMe }),
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || "Login failed");
+      }
+      if (rememberMe) {
+        localStorage.setItem(REMEMBER_USER_KEY, username);
+      } else {
+        localStorage.removeItem(REMEMBER_USER_KEY);
       }
       router.push(next || data.home || "/");
       router.refresh();
@@ -38,7 +51,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 flex items-center justify-center px-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 px-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
         <h1 className="text-2xl font-bold text-slate-900">OPD Manager</h1>
         <p className="mt-2 text-slate-600">Sign in with your clinic ID and password</p>
@@ -71,6 +84,16 @@ function LoginForm() {
               required
             />
           </div>
+
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="rounded border-slate-300"
+            />
+            Remember me on this device
+          </label>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 

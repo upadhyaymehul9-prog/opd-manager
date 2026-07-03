@@ -21,6 +21,10 @@ type VisitWithDoctor = {
   radio_eta: Date | null;
   registered_at: Date;
   completed_at: Date | null;
+  consultation_fee: number | null;
+  consultation_bill_no: string | null;
+  consultation_payment_mode: string | null;
+  consultation_paid_at: Date | null;
   updated_at: Date;
   doctors: {
     id: string;
@@ -37,6 +41,10 @@ export function serializeDoctor(doctor: {
   name: string;
   room_number: string;
   specialty: string | null;
+  bio?: string | null;
+  qualifications?: string | null;
+  photo_url?: string | null;
+  consultation_fee?: number | null;
   opd_status: string;
 }): Doctor {
   return {
@@ -44,6 +52,10 @@ export function serializeDoctor(doctor: {
     name: doctor.name,
     room_number: doctor.room_number,
     specialty: doctor.specialty,
+    bio: doctor.bio ?? null,
+    qualifications: doctor.qualifications ?? null,
+    photo_url: doctor.photo_url ?? null,
+    consultation_fee: doctor.consultation_fee ?? null,
     opd_status: doctor.opd_status as DoctorOpdStatus,
   };
 }
@@ -67,6 +79,10 @@ export function serializeVisit(visit: VisitWithDoctor): PatientVisit {
     radio_eta: visit.radio_eta?.toISOString() ?? null,
     registered_at: visit.registered_at.toISOString(),
     completed_at: visit.completed_at?.toISOString() ?? null,
+    consultation_fee: visit.consultation_fee ?? null,
+    consultation_bill_no: visit.consultation_bill_no ?? null,
+    consultation_payment_mode: visit.consultation_payment_mode ?? null,
+    consultation_paid_at: visit.consultation_paid_at?.toISOString() ?? null,
     updated_at: visit.updated_at.toISOString(),
     doctors: serializeDoctor(visit.doctors),
   };

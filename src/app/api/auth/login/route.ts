@@ -30,13 +30,17 @@ export async function POST(request: Request) {
     }
 
     const role = user.role as UserRole;
-    const token = await createSessionToken({
-      userId: user.id,
-      username: user.username,
-      role,
-      displayName: user.display_name,
-      doctorId: user.doctor_id,
-    });
+    const remember = Boolean(body.remember_me);
+    const token = await createSessionToken(
+      {
+        userId: user.id,
+        username: user.username,
+        role,
+        displayName: user.display_name,
+        doctorId: user.doctor_id,
+      },
+      remember,
+    );
 
     const response = NextResponse.json({
       ok: true,
@@ -44,7 +48,7 @@ export async function POST(request: Request) {
       home: getHomeForRole(role),
       displayName: user.display_name,
     });
-    const cookie = sessionCookieOptions(token);
+    const cookie = sessionCookieOptions(token, remember);
     response.cookies.set(cookie);
     return response;
   } catch (e) {

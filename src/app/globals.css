@@ -9,10 +9,13 @@ body {
     visibility: hidden;
   }
   .pharmacy-bill-print,
-  .pharmacy-bill-print * {
+  .pharmacy-bill-print *,
+  .consultation-bill-print,
+  .consultation-bill-print * {
     visibility: visible;
   }
-  .pharmacy-bill-print {
+  .pharmacy-bill-print,
+  .consultation-bill-print {
     position: absolute;
     left: 0;
     top: 0;
@@ -20,4 +23,20 @@ body {
     border: none;
     box-shadow: none;
   }
+}
+
+@keyframes tv-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.tv-blink-name {
+  animation: tv-blink 1s ease-in-out infinite;
+  font-weight: 700;
+  color: #b45309;
 }

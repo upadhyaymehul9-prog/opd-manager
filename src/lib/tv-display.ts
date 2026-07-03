@@ -45,3 +45,34 @@ export function isTokenWaiting(status: PatientStatus) {
     status,
   );
 }
+
+const QUEUE_STATUSES: PatientStatus[] = [
+  "registered",
+  "calling",
+  "return_to_doctor",
+  "in_followup",
+];
+
+export function getTvTokenStatus(
+  visit: { id: string; doctor_id: string; status: PatientStatus },
+  visits: { id: string; doctor_id: string; status: PatientStatus; token_number: number }[],
+): string {
+  if (visit.status === "calling") {
+    return TV_TOKEN_STATUS_LABELS.calling;
+  }
+
+  const queue = visits
+    .filter(
+      (v) =>
+        v.doctor_id === visit.doctor_id &&
+        QUEUE_STATUSES.includes(v.status),
+    )
+    .sort((a, b) => a.token_number - b.token_number);
+
+  const callingIdx = queue.findIndex((v) => v.status === "calling");
+  if (callingIdx >= 0 && queue[callingIdx + 1]?.id === visit.id) {
+    return "YOU ARE NEXT";
+  }
+
+  return TV_TOKEN_STATUS_LABELS[visit.status];
+}

@@ -32,6 +32,10 @@ model Doctor {
   name           String
   room_number    String
   specialty      String?
+  bio            String?
+  qualifications String?
+  photo_url      String?
+  consultation_fee Float?
   opd_status     String         @default("offline")
   created_at     DateTime       @default(now()) @db.Timestamptz(6)
   patient_visits PatientVisit[]
@@ -75,6 +79,10 @@ model PatientVisit {
   radio_ready_at  DateTime? @db.Timestamptz(6)
   registered_at   DateTime  @default(now()) @db.Timestamptz(6)
   completed_at    DateTime? @db.Timestamptz(6)
+  consultation_fee        Float?
+  consultation_payment_mode String?
+  consultation_bill_no      String?   @unique
+  consultation_paid_at      DateTime? @db.Timestamptz(6)
   updated_at      DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
   patient         Patient?       @relation(fields: [patient_id], references: [id], onDelete: SetNull)
   doctors         Doctor         @relation(fields: [doctor_id], references: [id], onDelete: Restrict)
@@ -108,6 +116,7 @@ model Medicine {
   created_at         DateTime           @default(now()) @db.Timestamptz(6)
   prescription_items PrescriptionItem[]
   stock_batches      StockBatch[]
+  write_offs         StockWriteOff[]
 
   @@index([name])
   @@index([brand])
@@ -115,18 +124,43 @@ model Medicine {
 }
 
 model StockBatch {
-  id          String   @id @default(uuid()) @db.Uuid
-  medicine_id String   @db.Uuid
+  id          String          @id @default(uuid()) @db.Uuid
+  medicine_id String          @db.Uuid
   batch_no    String
-  expiry_date DateTime @db.Date
+  expiry_date DateTime        @db.Date
   quantity    Int
   mrp         Float?
-  created_at  DateTime @default(now()) @db.Timestamptz(6)
-  medicine    Medicine @relation(fields: [medicine_id], references: [id], onDelete: Cascade)
+  created_at  DateTime        @default(now()) @db.Timestamptz(6)
+  medicine    Medicine        @relation(fields: [medicine_id], references: [id], onDelete: Cascade)
+  write_offs  StockWriteOff[]
 
   @@index([medicine_id])
   @@index([expiry_date])
   @@map("stock_batches")
+}
+
+model StockWriteOff {
+  id          String      @id @default(uuid()) @db.Uuid
+  medicine_id String      @db.Uuid
+  batch_id    String?     @db.Uuid
+  batch_no    String
+  quantity    Int
+  reason      String      @default("expired")
+  notes       String?
+  created_at  DateTime    @default(now()) @db.Timestamptz(6)
+  medicine    Medicine    @relation(fields: [medicine_id], references: [id], onDelete: Cascade)
+  batch       StockBatch? @relation(fields: [batch_id], references: [id], onDelete: SetNull)
+
+  @@index([medicine_id])
+  @@index([created_at(sort: Desc)])
+  @@map("stock_write_offs")
+}
+
+model ConsultationBillCounter {
+  id      String @id @default("default")
+  last_no Int    @default(0)
+
+  @@map("consultation_bill_counter")
 }
 
 model Prescription {

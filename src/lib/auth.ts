@@ -4,7 +4,8 @@ import type { NextRequest } from "next/server";
 import type { SessionPayload, UserRole } from "@/lib/auth-types";
 
 export const SESSION_COOKIE = "opd_session";
-const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 7;
+const SESSION_REMEMBER_SEC = 60 * 60 * 24 * 30;
+const SESSION_DEFAULT_SEC = 60 * 60 * 8;
 
 const ROLE_HOME: Record<UserRole, string> = {
   admin: "/manager",
@@ -28,6 +29,7 @@ const PAGE_ACCESS: Record<string, UserRole[]> = {
   "/manager": ["manager", "admin"],
   "/analytics": ["manager", "admin"],
   "/records": ["pharmacy", "admin", "manager", "reception", "doctor"],
+  "/settings/doctors": ["admin", "manager"],
 };
 
 function getSecret() {
@@ -47,12 +49,20 @@ export function verifyPassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
 }
 
-export async function createSessionToken(payload: SessionPayload) {
+export async function createSessionToken(
+  payload: SessionPayload,
+  remember = false,
+) {
+  const maxAge = remember ? SESSION_REMEMBER_SEC : SESSION_DEFAULT_SEC;
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_MAX_AGE_SEC}s`)
+    .setExpirationTime(`${maxAge}s`)
     .sign(getSecret());
+}
+
+export function sessionMaxAge(remember = false) {
+  return remember ? SESSION_REMEMBER_SEC : SESSION_DEFAULT_SEC;
 }
 
 export async function verifySessionToken(
@@ -72,7 +82,8 @@ export async function verifySessionToken(
   }
 }
 
-export function sessionCookieOptions(token: string) {
+export function sessionCookieOptions(token: string, remember = false) {
+  const maxAge = sessionMaxAge(remember);
   return {
     name: SESSION_COOKIE,
     value: token,
@@ -80,7 +91,7 @@ export function sessionCookieOptions(token: string) {
     sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: SESSION_MAX_AGE_SEC,
+    maxAge,
   };
 }
 
@@ -103,6 +114,8 @@ function pageKey(pathname: string) {
   if (pathname === "/stock" || pathname.startsWith("/stock/")) return "/stock";
   if (pathname === "/records" || pathname.startsWith("/records/"))
     return "/records";
+  if (pathname === "/settings/doctors" || pathname.startsWith("/settings/"))
+    return "/settings/doctors";
   return pathname;
 }
 
@@ -224,6 +237,37 @@ export function canAccessApi(
 
   if (pathname === "/api/stock" && method === "POST") {
     return session.role === "admin" || session.role === "manager";
+  }
+
+  if (pathname === "/api/stock/write-off" && method === "POST") {
+    return session.role === "admin" || session.role === "manager";
+  }
+
+  if (
+    pathname === "/api/stock/write-off" ||
+    pathname === "/api/stock/expired"
+  ) {
+    return (
+      session.role === "pharmacy" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
+  if (pathname === "/api/patients/search") {
+    return (
+      session.role === "reception" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
+  if (pathname === "/api/doctors" && method === "POST") {
+    return session.role === "admin" || session.role === "manager";
+  }
+
+  if (pathname.match(/^\/api\/doctors\/[^/]+$/) && method === "PATCH") {
+    return true;
   }
 
   if (

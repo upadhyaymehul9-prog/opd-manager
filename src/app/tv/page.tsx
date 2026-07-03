@@ -12,11 +12,11 @@ import {
 } from "@/lib/doctor-status";
 import {
   getLabReportStatusLabel,
+  getTvTokenStatus,
   isLabPending,
   isLabReady,
   isTokenWaiting,
   LAB_REPORT_STATUSES,
-  TV_TOKEN_STATUS_LABELS,
 } from "@/lib/tv-display";
 import type { Doctor, PatientVisit } from "@/lib/types";
 
@@ -90,18 +90,29 @@ export default function TVDisplayPage() {
                 "Status",
               ]}
               emptyMessage="No active tokens"
-              rows={tokens.map((v) => ({
-                key: v.id,
-                highlight: v.status === "calling",
-                cells: [
-                  String(v.token_number),
-                  v.patient_name,
-                  v.doctors?.name ?? "—",
-                  v.room_number,
-                  String(waitMinutes(v)),
-                  TV_TOKEN_STATUS_LABELS[v.status],
-                ],
-              }))}
+              rows={tokens.map((v) => {
+                const statusLabel = getTvTokenStatus(v, tokens);
+                return {
+                  key: v.id,
+                  highlight:
+                    v.status === "calling" || statusLabel === "YOU ARE NEXT",
+                  blinkName: v.status === "calling",
+                  statusClass:
+                    statusLabel === "YOU ARE NEXT"
+                      ? "bg-green-600 text-white"
+                      : v.status === "calling"
+                        ? "bg-amber-500 text-white"
+                        : undefined,
+                  cells: [
+                    String(v.token_number),
+                    v.patient_name,
+                    v.doctors?.name ?? "—",
+                    v.room_number,
+                    String(waitMinutes(v)),
+                    statusLabel,
+                  ],
+                };
+              })}
             />
           </TvSection>
         </div>
@@ -148,11 +159,30 @@ function DoctorStatusSidebar({
             key={doctor.id}
             className={`rounded-lg border-l-4 bg-slate-800 p-4 shadow-md ${DOCTOR_OPD_STATUS_SIDEBAR_ACCENT[doctor.opd_status]}`}
           >
-            <p className="text-lg font-bold leading-tight">{doctor.name}</p>
-            <p className="mt-1 text-sm text-slate-300">
-              Room <span className="font-semibold text-white">{doctor.room_number}</span>
-              {doctor.specialty ? ` · ${doctor.specialty}` : ""}
-            </p>
+            <div className="flex items-start gap-3">
+              {doctor.photo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={doctor.photo_url}
+                  alt=""
+                  className="h-14 w-14 shrink-0 rounded-full border-2 border-blue-400 object-cover"
+                />
+              ) : (
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-slate-700 text-lg font-bold text-slate-300">
+                  {doctor.name.charAt(0)}
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-lg font-bold leading-tight">{doctor.name}</p>
+                <p className="mt-1 text-sm text-slate-300">
+                  Room{" "}
+                  <span className="font-semibold text-white">
+                    {doctor.room_number}
+                  </span>
+                  {doctor.specialty ? ` · ${doctor.specialty}` : ""}
+                </p>
+              </div>
+            </div>
             <p
               className={`mt-3 inline-block rounded-md px-3 py-1.5 text-sm font-bold ${DOCTOR_OPD_STATUS_COLORS[doctor.opd_status]}`}
             >
@@ -230,6 +260,7 @@ function TvTable({
     key: string;
     cells: string[];
     highlight?: boolean;
+    blinkName?: boolean;
     statusClass?: string;
   }[];
   emptyMessage: string;
@@ -265,6 +296,7 @@ function TvTable({
             >
               {row.cells.map((cell, i) => {
                 const isStatusCol = headers[i] === "Status";
+                const isNameCol = headers[i] === "Name";
                 return (
                   <td
                     key={`${row.key}-${i}`}
@@ -276,6 +308,8 @@ function TvTable({
                       >
                         {cell}
                       </span>
+                    ) : isNameCol && row.blinkName ? (
+                      <span className="tv-blink-name">{cell}</span>
                     ) : (
                       cell
                     )}
