@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ConsoleShell } from "@/components/ConsoleShell";
 import { DoctorStatusPanel } from "@/components/DoctorStatusPanel";
 import { PrescriptionForm } from "@/components/PrescriptionForm";
+import { ProcedurePanel } from "@/components/ProcedurePanel";
+import { TransferDoctorPanel } from "@/components/TransferDoctorPanel";
 import { PatientCard } from "@/components/PatientCard";
 import { PatientActions } from "@/components/PatientActions";
 import { usePatientVisits } from "@/hooks/usePatientVisits";
@@ -55,15 +57,25 @@ export default function DoctorConsolePage({
               visit={visit}
               showDoctor={false}
               actions={
-                <PatientActions
-                  visit={visit}
-                  actions={DOCTOR_ACTIONS}
-                  onUpdated={refresh}
-                />
+                <div className="space-y-3">
+                  <PatientActions
+                    visit={visit}
+                    actions={DOCTOR_ACTIONS}
+                    onUpdated={refresh}
+                  />
+                  <TransferDoctorPanel
+                    visitId={visit.id}
+                    currentDoctorId={doctorId}
+                    onTransferred={refresh}
+                  />
+                </div>
               }
             />
             {canWritePrescription(visit.status) && (
-              <PrescriptionForm visitId={visit.id} doctorId={doctorId} />
+              <>
+                <ProcedurePanel visitId={visit.id} />
+                <PrescriptionForm visitId={visit.id} doctorId={doctorId} />
+              </>
             )}
           </div>
         ))}

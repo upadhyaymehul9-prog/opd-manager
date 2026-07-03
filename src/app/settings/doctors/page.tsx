@@ -23,6 +23,13 @@ export default function DoctorSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showAddDoctor, setShowAddDoctor] = useState(false);
+  const [newDoctor, setNewDoctor] = useState({
+    name: "",
+    room_number: "",
+    specialty: "",
+  });
+  const [addingDoctor, setAddingDoctor] = useState(false);
 
   useEffect(() => {
     fetch("/api/doctors")
@@ -65,6 +72,30 @@ export default function DoctorSettingsPage() {
       setError(null);
     };
     reader.readAsDataURL(file);
+  }
+
+  async function addDoctor() {
+    if (!newDoctor.name.trim() || !newDoctor.room_number.trim()) return;
+    setAddingDoctor(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/doctors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newDoctor),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not add doctor");
+      setDoctors((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedId(data.id);
+      setNewDoctor({ name: "", room_number: "", specialty: "" });
+      setShowAddDoctor(false);
+      setMessage("Doctor added — edit name and fee below, then save");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not add doctor");
+    } finally {
+      setAddingDoctor(false);
+    }
   }
 
   async function save() {
@@ -113,6 +144,58 @@ export default function DoctorSettingsPage() {
       subtitle="Upload photo here — it appears on the waiting-room TV"
       current="/settings/doctors"
     >
+      {isAdmin && (
+        <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+          <p className="text-sm text-emerald-900">
+            <strong>Add or edit doctor name:</strong> use &quot;Add new doctor&quot; below,
+            or select a doctor and change the name field → Save profile.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowAddDoctor((v) => !v)}
+            className="mt-3 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+          >
+            {showAddDoctor ? "Cancel" : "+ Add new doctor"}
+          </button>
+          {showAddDoctor && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <input
+                placeholder="Doctor name *"
+                value={newDoctor.name}
+                onChange={(e) =>
+                  setNewDoctor((d) => ({ ...d, name: e.target.value }))
+                }
+                className="rounded border border-slate-300 px-3 py-2 text-sm"
+              />
+              <input
+                placeholder="Room no *"
+                value={newDoctor.room_number}
+                onChange={(e) =>
+                  setNewDoctor((d) => ({ ...d, room_number: e.target.value }))
+                }
+                className="w-24 rounded border border-slate-300 px-3 py-2 text-sm"
+              />
+              <input
+                placeholder="Specialty"
+                value={newDoctor.specialty}
+                onChange={(e) =>
+                  setNewDoctor((d) => ({ ...d, specialty: e.target.value }))
+                }
+                className="rounded border border-slate-300 px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                disabled={addingDoctor}
+                onClick={addDoctor}
+                className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                {addingDoctor ? "Adding…" : "Create doctor"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           {isAdmin ? (

@@ -12,6 +12,7 @@ model Patient {
   patient_number Int            @unique
   name           String
   mobile         String?
+  address        String?
   created_at     DateTime       @default(now()) @db.Timestamptz(6)
   visits         PatientVisit[]
 
@@ -69,6 +70,7 @@ model PatientVisit {
   patient_type    String    @default("new")
   age             Int?
   mobile          String?
+  address         String?
   lab_referred    Boolean   @default(false)
   radio_referred  Boolean   @default(false)
   lab_eta         DateTime? @db.Timestamptz(6)
@@ -88,6 +90,7 @@ model PatientVisit {
   doctors         Doctor         @relation(fields: [doctor_id], references: [id], onDelete: Restrict)
   prescription    Prescription?
   pharmacy_bill   PharmacyBill?
+  procedures      VisitProcedure[]
 
   @@index([status])
   @@index([doctor_id])
@@ -129,6 +132,7 @@ model StockBatch {
   batch_no    String
   expiry_date DateTime        @db.Date
   quantity    Int
+  pack_size   Int             @default(1)
   mrp         Float?
   created_at  DateTime        @default(now()) @db.Timestamptz(6)
   medicine    Medicine        @relation(fields: [medicine_id], references: [id], onDelete: Cascade)
@@ -235,4 +239,19 @@ model PharmacyBillItem {
 
   @@index([bill_id])
   @@map("pharmacy_bill_items")
+}
+
+model VisitProcedure {
+  id               String       @id @default(uuid()) @db.Uuid
+  patient_visit_id String       @db.Uuid
+  procedure_type   String
+  notes            String?
+  fee              Float?
+  created_at       DateTime     @default(now()) @db.Timestamptz(6)
+  patient_visit    PatientVisit @relation(fields: [patient_visit_id], references: [id], onDelete: Cascade)
+
+  @@index([patient_visit_id])
+  @@index([procedure_type])
+  @@index([created_at(sort: Desc)])
+  @@map("visit_procedures")
 }

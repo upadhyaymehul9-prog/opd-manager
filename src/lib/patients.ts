@@ -13,20 +13,24 @@ export async function nextPatientNumber(tx: Tx): Promise<number> {
 
 export async function findOrCreatePatient(
   tx: Tx,
-  input: { name: string; mobile: string | null },
+  input: { name: string; mobile: string | null; address?: string | null },
 ) {
   const name = input.name.trim();
   const mobile = input.mobile?.trim() || null;
+  const address = input.address?.trim() || null;
 
   if (mobile) {
     const byMobile = await tx.patient.findFirst({
       where: { mobile },
     });
     if (byMobile) {
-      if (byMobile.name !== name) {
+      const updates: { name?: string; address?: string | null } = {};
+      if (byMobile.name !== name) updates.name = name;
+      if (address && byMobile.address !== address) updates.address = address;
+      if (Object.keys(updates).length > 0) {
         return tx.patient.update({
           where: { id: byMobile.id },
-          data: { name },
+          data: updates,
         });
       }
       return byMobile;
@@ -35,6 +39,6 @@ export async function findOrCreatePatient(
 
   const patient_number = await nextPatientNumber(tx);
   return tx.patient.create({
-    data: { patient_number, name, mobile },
+    data: { patient_number, name, mobile, address },
   });
 }

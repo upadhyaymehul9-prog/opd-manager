@@ -142,16 +142,24 @@ export function serializeBatch(b: {
   batch_no: string;
   expiry_date: Date;
   quantity: number;
+  pack_size?: number;
   mrp: number | null;
   created_at: Date;
 }) {
   const days = daysUntil(b.expiry_date);
+  const packSize = b.pack_size && b.pack_size > 0 ? b.pack_size : 1;
+  const unitPrice =
+    b.mrp != null && packSize > 0
+      ? Math.round((b.mrp / packSize) * 100) / 100
+      : null;
   return {
     id: b.id,
     batch_no: b.batch_no,
     expiry_date: b.expiry_date.toISOString().slice(0, 10),
     quantity: b.quantity,
+    pack_size: packSize,
     mrp: b.mrp,
+    unit_price: unitPrice,
     received_at: b.created_at.toISOString(),
     days_until_expiry: days,
     expired: days < 0,

@@ -45,7 +45,9 @@ export async function getSuggestedUnitPrice(
     },
     orderBy: [{ expiry_date: "asc" }, { created_at: "asc" }],
   });
-  return batch?.mrp ?? 0;
+  if (!batch?.mrp) return 0;
+  const packSize = batch.pack_size > 0 ? batch.pack_size : 1;
+  return round2(batch.mrp / packSize);
 }
 
 export async function buildBillPreview(

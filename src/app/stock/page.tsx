@@ -15,6 +15,8 @@ type StockBatch = {
   expiry_date: string;
   quantity: number;
   mrp: number | null;
+  pack_size: number;
+  unit_price: number | null;
   received_at: string;
   days_until_expiry: number;
   expired: boolean;
@@ -54,6 +56,7 @@ export default function StockPage() {
     batch_no: "",
     expiry_date: "",
     mrp: "",
+    pack_size: "10",
   });
 
   const [showAddMed, setShowAddMed] = useState(false);
@@ -193,11 +196,18 @@ export default function StockPage() {
           batch_no: form.batch_no.trim(),
           expiry_date: form.expiry_date,
           mrp: form.mrp || null,
+          pack_size: form.pack_size ? Number(form.pack_size) : 1,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Add stock failed");
-      setForm({ quantity: "", batch_no: "", expiry_date: "", mrp: "" });
+      setForm({
+        quantity: "",
+        batch_no: "",
+        expiry_date: "",
+        mrp: "",
+        pack_size: "10",
+      });
       setSelectedMedicine(null);
       setMedQuery("");
       await load();
@@ -358,7 +368,7 @@ export default function StockPage() {
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-600">
-            MRP per unit (₹) *
+            MRP per pack/strip (₹) *
           </label>
           <input
             type="number"
@@ -370,6 +380,28 @@ export default function StockPage() {
             onChange={(e) => setForm((f) => ({ ...f, mrp: e.target.value }))}
             className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
           />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-600">
+            Units per pack *
+          </label>
+          <input
+            type="number"
+            min={1}
+            required
+            placeholder="e.g. 10 tablets"
+            value={form.pack_size}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, pack_size: e.target.value }))
+            }
+            className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+          />
+          {form.mrp && form.pack_size && Number(form.pack_size) > 0 && (
+            <p className="mt-1 text-xs text-green-700">
+              Per tablet: ₹
+              {(Number(form.mrp) / Number(form.pack_size)).toFixed(2)}
+            </p>
+          )}
         </div>
         <button
           type="submit"
@@ -426,6 +458,10 @@ export default function StockPage() {
                       : ""}
                     {b.expired ? " · EXPIRED" : ""}
                     {b.mrp != null ? ` · MRP ₹${b.mrp}` : ""}
+                    {b.pack_size > 1 ? ` · ${b.pack_size}/pack` : ""}
+                    {b.unit_price != null
+                      ? ` · ₹${b.unit_price.toFixed(2)}/unit`
+                      : ""}
                     {" · Received "}
                     {format(new Date(b.received_at), "d MMM yyyy, h:mm a")}
                   </li>

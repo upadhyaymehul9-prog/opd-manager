@@ -49,6 +49,32 @@ export async function PATCH(
     }
     if (status === "radio_ready") data.radio_ready_at = now;
 
+    if (body.doctor_id && body.doctor_id !== existing?.doctor_id) {
+      const newDoctor = await prisma.doctor.findUnique({
+        where: { id: body.doctor_id },
+        select: { room_number: true },
+      });
+      if (!newDoctor) {
+        return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
+      }
+      data.doctor_id = body.doctor_id;
+      data.room_number = newDoctor.room_number;
+      const earlyDoctorStatuses = [
+        "registered",
+        "calling",
+        "in_consultation",
+        "in_followup",
+        "return_to_doctor",
+      ];
+      if (existing && earlyDoctorStatuses.includes(existing.status)) {
+        data.status = "registered";
+      }
+      await prisma.prescription.updateMany({
+        where: { patient_visit_id: id },
+        data: { doctor_id: body.doctor_id },
+      });
+    }
+
     const visit = await prisma.patientVisit.update({
       where: { id },
       data,

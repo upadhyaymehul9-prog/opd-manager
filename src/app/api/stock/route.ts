@@ -113,6 +113,10 @@ export async function POST(request: Request) {
         quantity: Math.round(quantity),
         batch_no,
         expiry_date,
+        pack_size:
+          body.pack_size != null && Number(body.pack_size) > 0
+            ? Math.round(Number(body.pack_size))
+            : 1,
         mrp: body.mrp != null && body.mrp !== "" ? Number(body.mrp) : null,
       },
     });

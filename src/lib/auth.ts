@@ -28,6 +28,7 @@ const PAGE_ACCESS: Record<string, UserRole[]> = {
   "/tv": ["display", "admin", "manager"],
   "/manager": ["manager", "admin"],
   "/analytics": ["manager", "admin"],
+  "/reports": ["manager", "admin", "pharmacy"],
   "/records": ["pharmacy", "admin", "manager", "reception", "doctor"],
   "/settings/doctors": ["admin", "manager", "doctor"],
 };
@@ -149,6 +150,14 @@ export function canAccessApi(
 
   if (pathname === "/api/analytics") {
     return session.role === "admin" || session.role === "manager";
+  }
+
+  if (pathname === "/api/reports") {
+    return (
+      session.role === "admin" ||
+      session.role === "manager" ||
+      session.role === "pharmacy"
+    );
   }
 
   if (pathname === "/api/doctors" && method === "POST") {

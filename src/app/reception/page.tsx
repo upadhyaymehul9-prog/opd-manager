@@ -29,6 +29,7 @@ export default function ReceptionPage() {
   const [doctorId, setDoctorId] = useState("");
   const [age, setAge] = useState("");
   const [mobile, setMobile] = useState("");
+  const [address, setAddress] = useState("");
   const [consultationFee, setConsultationFee] = useState("");
   const [paymentMode, setPaymentMode] = useState("cash");
   const [collectFee, setCollectFee] = useState(true);
@@ -92,6 +93,7 @@ export default function ReceptionPage() {
     setPatientName("");
     setAge("");
     setMobile("");
+    setAddress("");
     setSearchQuery("");
     setSearchResults([]);
   }
@@ -118,6 +120,7 @@ export default function ReceptionPage() {
           patient_type: patientType,
           age: age ? Number(age) : null,
           mobile: mobile || null,
+          address: address.trim() || null,
           consultation_fee:
             collectFee && consultationFee ? Number(consultationFee) : null,
           consultation_payment_mode: collectFee ? paymentMode : null,
@@ -130,6 +133,7 @@ export default function ReceptionPage() {
       setPatientName("");
       setAge("");
       setMobile("");
+      setAddress("");
       setSelectedPatientId(null);
       setSelectedPatientNumber(null);
       setPatientType("new");
@@ -256,6 +260,17 @@ export default function ReceptionPage() {
               />
             </div>
           </div>
+
+          <label className="mt-4 block text-sm font-medium text-slate-700">
+            Address
+          </label>
+          <textarea
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="Village, street, landmark (optional)"
+            rows={2}
+            className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3"
+          />
 
           <label className="mt-4 block text-sm font-medium text-slate-700">
             Consultant

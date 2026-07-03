@@ -45,6 +45,7 @@ export async function POST(request: Request) {
       patient_id,
       age,
       mobile,
+      address,
       consultation_fee,
       consultation_payment_mode,
     } = body;
@@ -95,6 +96,7 @@ export async function POST(request: Request) {
         patient = await findOrCreatePatient(tx, {
           name: patient_name.trim(),
           mobile: mobile?.trim() || null,
+          address: address?.trim() || null,
         });
       }
 
@@ -116,6 +118,7 @@ export async function POST(request: Request) {
           patient_type: resolvedType,
           age: age != null && age > 0 ? Math.round(age) : null,
           mobile: mobile?.trim() || patient.mobile || null,
+          address: address?.trim() || null,
           consultation_fee: fee,
           consultation_payment_mode:
             fee != null && fee > 0

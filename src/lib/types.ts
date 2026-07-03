@@ -51,6 +51,7 @@ export type PatientVisit = {
   patient_type: PatientType;
   age: number | null;
   mobile: string | null;
+  address: string | null;
   lab_referred: boolean;
   radio_referred: boolean;
   lab_eta: string | null;
@@ -72,16 +73,28 @@ export type CreatePatientInput = {
   patient_type?: PatientType;
   age?: number | null;
   mobile?: string | null;
+  address?: string | null;
   consultation_fee?: number | null;
   consultation_payment_mode?: string | null;
 };
 
 export type UpdatePatientInput = {
   status?: PatientStatus;
+  doctor_id?: string;
   lab_eta?: string | null;
   radio_eta?: string | null;
   room_number?: string;
 };
+
+export const PROCEDURE_TYPES = [
+  "iv_drip",
+  "dressing",
+  "nebulisation",
+  "injection",
+  "other",
+] as const;
+
+export type ProcedureType = (typeof PROCEDURE_TYPES)[number];
 
 export type UpdateDoctorInput = {
   opd_status?: DoctorOpdStatus;

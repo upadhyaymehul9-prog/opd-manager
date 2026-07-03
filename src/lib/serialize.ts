@@ -15,6 +15,7 @@ type VisitWithDoctor = {
   patient_type: string;
   age: number | null;
   mobile: string | null;
+  address: string | null;
   lab_referred: boolean;
   radio_referred: boolean;
   lab_eta: Date | null;
@@ -73,6 +74,7 @@ export function serializeVisit(visit: VisitWithDoctor): PatientVisit {
     patient_type: visit.patient_type as PatientType,
     age: visit.age,
     mobile: visit.mobile,
+    address: visit.address ?? null,
     lab_referred: visit.lab_referred,
     radio_referred: visit.radio_referred,
     lab_eta: visit.lab_eta?.toISOString() ?? null,
