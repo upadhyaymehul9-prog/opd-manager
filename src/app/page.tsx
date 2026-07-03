@@ -42,6 +42,12 @@ const consoles = [
     color: "border-amber-200 hover:border-amber-400 bg-amber-50",
   },
   {
+    href: "/records",
+    title: "Patient Records",
+    desc: "Today's visits — prescriptions, dispense history, bills, print & PDF",
+    color: "border-cyan-200 hover:border-cyan-400 bg-cyan-50",
+  },
+  {
     href: "/tv",
     title: "TV Display",
     desc: "Waiting room screen — calls, directions, report ETAs",

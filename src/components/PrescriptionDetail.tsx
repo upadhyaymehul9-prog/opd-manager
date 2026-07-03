@@ -8,6 +8,7 @@ import type { Prescription } from "@/lib/prescription-types";
 import type { PatientVisit } from "@/lib/types";
 import { ActionButton } from "./PatientCard";
 import { PharmacyBillReceipt } from "./PharmacyBillReceipt";
+import { PrintActions } from "./PrintActions";
 import { updatePatient } from "@/hooks/usePatientVisits";
 
 export function PrescriptionDetail({
@@ -142,6 +143,15 @@ export function PrescriptionDetail({
 
   async function completeWithBill() {
     if (!prescription || !billTotals) return;
+
+    const zeroRates = billTotals.lines.filter((l) => l.unit_price <= 0);
+    if (zeroRates.length > 0) {
+      setError(
+        `Enter rate (₹) for: ${zeroRates.map((l) => l.medicine_name).join(", ")}. Add MRP in Stock if missing.`,
+      );
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
@@ -179,17 +189,11 @@ export function PrescriptionDetail({
     return (
       <div className="space-y-4">
         <PharmacyBillReceipt bill={completedBill} visit={visit} />
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
-        >
-          Print receipt
-        </button>
+        <PrintActions label="Print receipt" pdfLabel="Save receipt as PDF" />
         <button
           type="button"
           onClick={() => onComplete?.()}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700"
+          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 print:hidden"
         >
           Back to pharmacy queue
         </button>
@@ -289,6 +293,12 @@ export function PrescriptionDetail({
           <p className="mt-1 text-xs text-slate-600">
             Rates from stock MRP · edit if needed · GST 12% default
           </p>
+          {billTotals.lines.some((l) => l.unit_price <= 0) && (
+            <p className="mt-2 rounded bg-amber-100 px-3 py-2 text-xs text-amber-900">
+              Some rates are ₹0 — enter MRP in Stock for new batches, or type
+              rates below before generating the bill.
+            </p>
+          )}
           <table className="mt-3 w-full text-sm">
             <thead>
               <tr className="text-left text-slate-600">

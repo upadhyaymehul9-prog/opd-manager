@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { buildBillPreview, serializeBill } from "@/lib/billing";
+import {
+  buildBillPreview,
+  createPharmacyBill,
+  isPaymentMode,
+  serializeBill,
+} from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
@@ -39,6 +44,87 @@ export async function GET(request: Request) {
     );
   } catch (e) {
     const message = e instanceof Error ? e.message : "Bill error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const visit_id = String(body.visit_id ?? "").trim();
+    const payment_mode = String(body.payment_mode ?? "cash");
+
+    if (!visit_id) {
+      return NextResponse.json({ error: "visit_id required" }, { status: 400 });
+    }
+    if (!isPaymentMode(payment_mode)) {
+      return NextResponse.json(
+        { error: "payment_mode must be cash, upi, or card" },
+        { status: 400 },
+      );
+    }
+
+    const visit = await prisma.patientVisit.findUnique({
+      where: { id: visit_id },
+      include: {
+        prescription: { include: { items: true } },
+        pharmacy_bill: true,
+      },
+    });
+
+    if (!visit?.prescription) {
+      return NextResponse.json({ error: "No prescription found" }, { status: 404 });
+    }
+
+    if (visit.pharmacy_bill) {
+      const bill = await prisma.pharmacyBill.findUniqueOrThrow({
+        where: { id: visit.pharmacy_bill.id },
+        include: { items: true },
+      });
+      return NextResponse.json(serializeBill(bill));
+    }
+
+    const pending = visit.prescription.items.filter((i) => !i.dispensed);
+    if (pending.length > 0) {
+      return NextResponse.json(
+        { error: `${pending.length} medicine(s) not yet dispensed` },
+        { status: 400 },
+      );
+    }
+
+    const priceOverrides = new Map<string, number>();
+    if (Array.isArray(body.lines)) {
+      for (const line of body.lines) {
+        if (line.prescription_item_id != null && line.unit_price != null) {
+          priceOverrides.set(
+            String(line.prescription_item_id),
+            Number(line.unit_price),
+          );
+        }
+      }
+    }
+
+    const bill = await prisma.$transaction((tx) =>
+      createPharmacyBill(
+        tx,
+        visit.prescription!.id,
+        payment_mode,
+        priceOverrides.size > 0 ? priceOverrides : undefined,
+      ),
+    );
+
+    return NextResponse.json(serializeBill(bill), { status: 201 });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Bill error";
+    if (message.includes("pharmacy_bills") || message.includes("does not exist")) {
+      return NextResponse.json(
+        {
+          error:
+            "Billing not set up on database — run npm run db:push, then redeploy.",
+        },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

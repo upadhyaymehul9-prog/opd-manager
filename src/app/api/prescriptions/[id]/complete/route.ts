@@ -80,6 +80,15 @@ export async function POST(
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Complete failed";
+    if (message.includes("pharmacy_bills") || message.includes("does not exist")) {
+      return NextResponse.json(
+        {
+          error:
+            "Billing not set up on database — run npm run db:push, then redeploy.",
+        },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

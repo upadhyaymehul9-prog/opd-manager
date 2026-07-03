@@ -1,6 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
+import Link from "next/link";
 import { ConsoleShell } from "@/components/ConsoleShell";
 import { StatusBadge } from "@/components/PatientCard";
 import { usePatientVisits } from "@/hooks/usePatientVisits";
@@ -40,7 +41,7 @@ const FLOW_STAGES: { key: string; label: string; statuses: PatientStatus[] }[] =
     },
     {
       key: "exit",
-      label: "Completed",
+      label: "Exited today",
       statuses: ["completed"],
     },
   ];
@@ -59,7 +60,10 @@ export default function ManagerPage() {
 
   const byStage = FLOW_STAGES.map((stage) => ({
     ...stage,
-    count: active.filter((v) => stage.statuses.includes(v.status)).length,
+    count:
+      stage.key === "exit"
+        ? completedToday.length
+        : active.filter((v) => stage.statuses.includes(v.status)).length,
   }));
 
   return (
@@ -83,13 +87,21 @@ export default function ManagerPage() {
         ))}
       </div>
 
-      <div className="mb-4 flex gap-4 text-sm text-slate-600">
-        <span>
-          <strong>{active.length}</strong> active
-        </span>
-        <span>
-          <strong>{completedToday.length}</strong> completed today
-        </span>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-4 text-sm text-slate-600">
+          <span>
+            <strong>{active.length}</strong> in clinic now
+          </span>
+          <span>
+            <strong>{completedToday.length}</strong> exited today
+          </span>
+        </div>
+        <Link
+          href="/records"
+          className="text-sm font-medium text-indigo-700 hover:underline"
+        >
+          Patient records & bills →
+        </Link>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -104,6 +116,7 @@ export default function ManagerPage() {
               <th className="px-4 py-3 font-semibold">Status</th>
               <th className="px-4 py-3 font-semibold">Registered</th>
               <th className="px-4 py-3 font-semibold">ETAs</th>
+              <th className="px-4 py-3 font-semibold">Record</th>
             </tr>
           </thead>
           <tbody>
@@ -130,6 +143,14 @@ export default function ManagerPage() {
                   {v.radio_eta &&
                     `Radio ${format(new Date(v.radio_eta), "h:mm a")}`}
                   {!v.lab_eta && !v.radio_eta && "—"}
+                </td>
+                <td className="px-4 py-3">
+                  <Link
+                    href={`/records/${v.id}`}
+                    className="text-indigo-700 hover:underline"
+                  >
+                    View
+                  </Link>
                 </td>
               </tr>
             ))}

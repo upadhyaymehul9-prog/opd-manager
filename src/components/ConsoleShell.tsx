@@ -11,6 +11,7 @@ const NAV = [
   { href: "/radiology", label: "Radiology", color: "bg-indigo-600" },
   { href: "/pharmacy", label: "Pharmacy", color: "bg-teal-600" },
   { href: "/stock", label: "Stock", color: "bg-amber-600" },
+  { href: "/records", label: "Records", color: "bg-cyan-700" },
   { href: "/tv", label: "TV Display", color: "bg-rose-600" },
   { href: "/manager", label: "OPD Manager", color: "bg-slate-700" },
   { href: "/analytics", label: "Analytics", color: "bg-indigo-700" },

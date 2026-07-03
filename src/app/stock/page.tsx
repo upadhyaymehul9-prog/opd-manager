@@ -309,6 +309,21 @@ export default function StockPage() {
             className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-600">
+            MRP per unit (₹) *
+          </label>
+          <input
+            type="number"
+            min={0.01}
+            step={0.01}
+            required
+            placeholder="e.g. 25.00"
+            value={form.mrp}
+            onChange={(e) => setForm((f) => ({ ...f, mrp: e.target.value }))}
+            className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+          />
+        </div>
         <button
           type="submit"
           disabled={saving}

@@ -27,6 +27,7 @@ const PAGE_ACCESS: Record<string, UserRole[]> = {
   "/tv": ["display", "admin", "manager"],
   "/manager": ["manager", "admin"],
   "/analytics": ["manager", "admin"],
+  "/records": ["pharmacy", "admin", "manager", "reception", "doctor"],
 };
 
 function getSecret() {
@@ -100,6 +101,8 @@ function pageKey(pathname: string) {
   if (pathname === "/pharmacy" || pathname.startsWith("/pharmacy/"))
     return "/pharmacy";
   if (pathname === "/stock" || pathname.startsWith("/stock/")) return "/stock";
+  if (pathname === "/records" || pathname.startsWith("/records/"))
+    return "/records";
   return pathname;
 }
 
@@ -244,6 +247,19 @@ export function canAccessApi(
       session.role === "pharmacy" ||
       session.role === "admin" ||
       session.role === "manager"
+    );
+  }
+
+  if (
+    pathname === "/api/records" ||
+    pathname.startsWith("/api/records/")
+  ) {
+    return (
+      session.role === "pharmacy" ||
+      session.role === "admin" ||
+      session.role === "manager" ||
+      session.role === "reception" ||
+      session.role === "doctor"
     );
   }
 
