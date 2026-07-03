@@ -57,6 +57,7 @@ model PatientVisit {
   updated_at      DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
   doctors         Doctor         @relation(fields: [doctor_id], references: [id], onDelete: Restrict)
   prescription    Prescription?
+  pharmacy_bill   PharmacyBill?
 
   @@index([status])
   @@index([doctor_id])
@@ -78,6 +79,8 @@ model Medicine {
   brand              String?
   form               String?
   strength           String?
+  gst_rate           Float              @default(12)
+  hsn_code           String?
   is_active          Boolean            @default(true)
   created_at         DateTime           @default(now()) @db.Timestamptz(6)
   prescription_items PrescriptionItem[]
@@ -115,6 +118,7 @@ model Prescription {
   patient_visit       PatientVisit       @relation(fields: [patient_visit_id], references: [id], onDelete: Cascade)
   doctor              Doctor             @relation(fields: [doctor_id], references: [id], onDelete: Restrict)
   items               PrescriptionItem[]
+  pharmacy_bill       PharmacyBill?
 
   @@index([status])
   @@map("prescriptions")
@@ -139,4 +143,39 @@ model PrescriptionItem {
 
   @@index([prescription_id])
   @@map("prescription_items")
+}
+
+model PharmacyBill {
+  id               String             @id @default(uuid()) @db.Uuid
+  bill_no          String             @unique
+  patient_visit_id String             @unique @db.Uuid
+  prescription_id  String             @unique @db.Uuid
+  payment_mode     String
+  subtotal         Float
+  gst_total        Float
+  grand_total      Float
+  created_at       DateTime           @default(now()) @db.Timestamptz(6)
+  patient_visit    PatientVisit       @relation(fields: [patient_visit_id], references: [id], onDelete: Cascade)
+  prescription     Prescription       @relation(fields: [prescription_id], references: [id], onDelete: Cascade)
+  items            PharmacyBillItem[]
+
+  @@index([created_at(sort: Desc)])
+  @@map("pharmacy_bills")
+}
+
+model PharmacyBillItem {
+  id                   String       @id @default(uuid()) @db.Uuid
+  bill_id              String       @db.Uuid
+  prescription_item_id String?      @db.Uuid
+  medicine_name        String
+  quantity             Int
+  unit_price           Float
+  gst_rate             Float
+  taxable_amount       Float
+  gst_amount           Float
+  line_total           Float
+  bill                 PharmacyBill @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  @@index([bill_id])
+  @@map("pharmacy_bill_items")
 }

@@ -235,6 +235,18 @@ export function canAccessApi(
     );
   }
 
+  if (
+    pathname === "/api/bills" ||
+    pathname === "/api/bills/preview" ||
+    pathname.startsWith("/api/bills/")
+  ) {
+    return (
+      session.role === "pharmacy" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
   if (pathname.startsWith("/api/")) {
     return true;
   }

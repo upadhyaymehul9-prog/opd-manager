@@ -5,6 +5,7 @@ import type {
   AnalyticsDoctorRow,
   AnalyticsHourly,
   AnalyticsPayload,
+  AnalyticsPharmacySales,
   AnalyticsPrediction,
   AnalyticsSummary,
   VisitForAnalytics,
@@ -68,6 +69,12 @@ export function buildAnalytics(
   todayVisits: VisitForAnalytics[],
   recentVisits: VisitForAnalytics[],
   now = new Date(),
+  pharmacy: AnalyticsPharmacySales = {
+    billsToday: 0,
+    revenueToday: 0,
+    gstToday: 0,
+    byPayment: [],
+  },
 ): AnalyticsPayload {
   const todayStart = startOfDay(now);
   const completedToday = todayVisits.filter((v) => v.status === "completed");
@@ -95,7 +102,7 @@ export function buildAnalytics(
   const radiology = buildDeptStats(todayVisits, "radiology");
   const hourlyToday = buildHourly(todayVisits, now);
   const prediction = buildPrediction(todayVisits, recentVisits, now);
-  const insights = buildInsights(summary, lab, radiology, prediction, byDoctor);
+  const insights = buildInsights(summary, lab, radiology, prediction, byDoctor, pharmacy);
 
   return {
     summary,
@@ -103,6 +110,7 @@ export function buildAnalytics(
     byDoctor,
     lab,
     radiology,
+    pharmacy,
     hourlyToday,
     prediction,
     insights,
@@ -287,6 +295,7 @@ function buildInsights(
   radio: AnalyticsDept,
   prediction: AnalyticsPrediction,
   doctors: AnalyticsDoctorRow[],
+  pharmacy: AnalyticsPharmacySales,
 ): string[] {
   const insights: string[] = [];
 
@@ -338,6 +347,12 @@ function buildInsights(
 
   if (prediction.busyness === "high") {
     insights.push("High OPD load — consider extra reception support.");
+  }
+
+  if (pharmacy.billsToday > 0) {
+    insights.push(
+      `Pharmacy: ${pharmacy.billsToday} bill(s) today — ₹${Math.round(pharmacy.revenueToday)} revenue (GST ₹${Math.round(pharmacy.gstToday)}).`,
+    );
   }
 
   return insights;

@@ -39,6 +39,31 @@ export default function AnalyticsPage() {
             />
           </section>
 
+          <section className="rounded-xl border border-teal-200 bg-gradient-to-r from-teal-50 to-emerald-50 p-6">
+            <h2 className="text-lg font-bold text-slate-900">
+              Pharmacy sales (today)
+            </h2>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatCard label="Bills" value={data.pharmacy.billsToday} />
+              <StatCard
+                label="Revenue"
+                value={`₹${Math.round(data.pharmacy.revenueToday)}`}
+                accent="border-teal-300"
+              />
+              <StatCard
+                label="GST collected"
+                value={`₹${Math.round(data.pharmacy.gstToday)}`}
+              />
+              <StatCard
+                label="Cash / UPI / Card"
+                value={data.pharmacy.byPayment
+                  .filter((p) => p.count > 0)
+                  .map((p) => `${p.mode}: ₹${Math.round(p.amount)}`)
+                  .join(" · ") || "—"}
+              />
+            </div>
+          </section>
+
           <section className="rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-indigo-50 p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>

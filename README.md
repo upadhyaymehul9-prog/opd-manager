@@ -126,6 +126,12 @@ Dispense is **blocked** if quantity is not available in stock.
 
 Seed ~140 common generics: `npm run db:seed-medicines` (add more anytime from **Stock → Add new medicine**).
 
+## Pharmacy billing + GST (Phase 3)
+
+After all medicines are dispensed, pharmacy generates a **GST bill** (cash / UPI / card). Rates from stock **MRP**; GST default **12%**.
+
+**Analytics** shows today's pharmacy revenue and GST.
+
 ## Customize doctors
 
 Add doctors via API or Prisma Studio:

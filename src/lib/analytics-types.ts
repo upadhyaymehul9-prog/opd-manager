@@ -66,12 +66,20 @@ export type AnalyticsPrediction = {
   message: string;
 };
 
+export type AnalyticsPharmacySales = {
+  billsToday: number;
+  revenueToday: number;
+  gstToday: number;
+  byPayment: { mode: string; count: number; amount: number }[];
+};
+
 export type AnalyticsPayload = {
   summary: AnalyticsSummary;
   ageGroups: AnalyticsAgeGroup[];
   byDoctor: AnalyticsDoctorRow[];
   lab: AnalyticsDept;
   radiology: AnalyticsDept;
+  pharmacy: AnalyticsPharmacySales;
   hourlyToday: AnalyticsHourly[];
   prediction: AnalyticsPrediction;
   insights: string[];
