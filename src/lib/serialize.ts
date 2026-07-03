@@ -29,6 +29,7 @@ type VisitWithDoctor = {
     specialty: string | null;
     opd_status: string;
   };
+  patient?: { id: string; patient_number: number } | null;
 };
 
 export function serializeDoctor(doctor: {
@@ -50,6 +51,8 @@ export function serializeDoctor(doctor: {
 export function serializeVisit(visit: VisitWithDoctor): PatientVisit {
   return {
     id: visit.id,
+    patient_id: visit.patient?.id ?? null,
+    patient_number: visit.patient?.patient_number ?? null,
     token_number: visit.token_number,
     patient_name: visit.patient_name,
     doctor_id: visit.doctor_id,

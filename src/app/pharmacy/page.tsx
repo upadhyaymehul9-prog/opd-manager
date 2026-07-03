@@ -35,7 +35,7 @@ function RxBadge({ visitId }: { visitId: string }) {
 }
 
 export default function PharmacyPage() {
-  const { visits, loading, error } = usePatientVisits(true);
+  const { visits, loading, error } = usePatientVisits({ activeOnly: true });
   const pharmacyPatients = getRelevantPatients(visits, "pharmacy");
 
   return (

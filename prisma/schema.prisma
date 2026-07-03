@@ -7,6 +7,26 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Patient {
+  id             String         @id @default(uuid()) @db.Uuid
+  patient_number Int            @unique
+  name           String
+  mobile         String?
+  created_at     DateTime       @default(now()) @db.Timestamptz(6)
+  visits         PatientVisit[]
+
+  @@index([mobile])
+  @@index([name])
+  @@map("patients")
+}
+
+model PatientRegistry {
+  id          String @id @default("default")
+  last_number Int    @default(0)
+
+  @@map("patient_registry")
+}
+
 model Doctor {
   id             String         @id @default(uuid()) @db.Uuid
   name           String
@@ -36,6 +56,7 @@ model User {
 
 model PatientVisit {
   id              String    @id @default(uuid()) @db.Uuid
+  patient_id      String?   @db.Uuid
   token_number    Int
   patient_name    String
   doctor_id       String    @db.Uuid
@@ -55,12 +76,14 @@ model PatientVisit {
   registered_at   DateTime  @default(now()) @db.Timestamptz(6)
   completed_at    DateTime? @db.Timestamptz(6)
   updated_at      DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  patient         Patient?       @relation(fields: [patient_id], references: [id], onDelete: SetNull)
   doctors         Doctor         @relation(fields: [doctor_id], references: [id], onDelete: Restrict)
   prescription    Prescription?
   pharmacy_bill   PharmacyBill?
 
   @@index([status])
   @@index([doctor_id])
+  @@index([patient_id])
   @@index([registered_at(sort: Desc)])
   @@index([patient_name])
   @@map("patient_visits")

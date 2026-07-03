@@ -65,6 +65,7 @@ export function PrescriptionForm({
     Record<string, { available: number; low: boolean; out_of_stock: boolean }>
   >({});
   const [activeLine, setActiveLine] = useState<string | null>(null);
+  const [stockOnly, setStockOnly] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -128,13 +129,17 @@ export function PrescriptionForm({
       return;
     }
     const timer = setTimeout(async () => {
-      const res = await fetch(
-        `/api/medicines?q=${encodeURIComponent(query)}&stock=true&limit=20`,
-      );
+      const params = new URLSearchParams({
+        q: query,
+        stock: "true",
+        limit: "20",
+      });
+      if (stockOnly) params.set("in_stock", "true");
+      const res = await fetch(`/api/medicines?${params}`);
       if (res.ok) setSuggestions(await res.json());
     }, 250);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, stockOnly]);
 
   function updateLine(key: string, patch: Partial<DraftLine>) {
     setLines((prev) =>
@@ -264,6 +269,15 @@ export function PrescriptionForm({
       <h3 className="font-semibold text-slate-900">
         {isSent ? "Edit prescription (patient at pharmacy)" : "Write prescription"}
       </h3>
+      <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+        <input
+          type="checkbox"
+          checked={stockOnly}
+          onChange={(e) => setStockOnly(e.target.checked)}
+          className="rounded border-slate-300"
+        />
+        Show only medicines in stock
+      </label>
       {isSent && (
         <p className="mt-1 text-xs text-teal-800">
           Add new lines or edit undispensed medicines. Dispensed lines are locked.
@@ -302,7 +316,11 @@ export function PrescriptionForm({
                     setQuery(e.target.value);
                     setActiveLine(line.key);
                   }}
-                  placeholder="Search medicine — stock shown in list"
+                  placeholder={
+                    stockOnly
+                      ? "Search in-stock medicines"
+                      : "Search or type any medicine name"
+                  }
                   className="w-full rounded border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
                 />
                 {stockInfo && (

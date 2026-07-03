@@ -206,6 +206,9 @@ export function PrescriptionDetail({
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <p className="text-lg font-bold text-slate-900">{visit.patient_name}</p>
         <p className="text-sm text-slate-600">
+          {visit.patient_number != null && (
+            <>Patient P-{visit.patient_number} · </>
+          )}
           Token #{visit.token_number} · {visit.doctors?.name ?? "Doctor"} · Room{" "}
           {visit.room_number}
         </p>

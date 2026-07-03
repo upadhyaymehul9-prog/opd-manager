@@ -15,7 +15,7 @@ export default function DoctorConsolePage({
   params: Promise<{ id: string }>;
 }) {
   const { id: doctorId } = use(params);
-  const { visits, loading, error, refresh } = usePatientVisits(true);
+  const { visits, loading, error, refresh } = usePatientVisits({ activeOnly: true });
 
   const myPatients = getRelevantPatients(visits, "doctor", doctorId).sort(
     (a, b) => a.token_number - b.token_number,

@@ -7,7 +7,7 @@ import { usePatientVisits } from "@/hooks/usePatientVisits";
 import { RADIOLOGY_ACTIONS, getRelevantPatients } from "@/lib/status";
 
 export default function RadiologyPage() {
-  const { visits, loading, error } = usePatientVisits(true);
+  const { visits, loading, error } = usePatientVisits({ activeOnly: true });
   const radioPatients = getRelevantPatients(visits, "radiology");
 
   return (

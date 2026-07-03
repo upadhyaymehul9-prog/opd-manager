@@ -21,7 +21,7 @@ import {
 import type { Doctor, PatientVisit } from "@/lib/types";
 
 export default function TVDisplayPage() {
-  const { visits, loading: visitsLoading } = usePatientVisits(true);
+  const { visits, loading: visitsLoading } = usePatientVisits({ activeOnly: true });
   const { doctors, loading: doctorsLoading } = useDoctors();
 
   const labReports = visits

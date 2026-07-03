@@ -28,6 +28,11 @@ export function PatientCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
+            {visit.patient_number != null && (
+              <span className="rounded-lg bg-indigo-700 px-2 py-1 text-sm font-bold text-white">
+                P-{visit.patient_number}
+              </span>
+            )}
             <span className="rounded-lg bg-slate-900 px-2 py-1 text-sm font-bold text-white">
               #{visit.token_number}
             </span>
@@ -80,13 +85,16 @@ export function ActionButton({
 }: {
   label: string;
   onClick: () => void;
-  variant?: "primary" | "secondary" | "danger";
+  variant?: "primary" | "secondary" | "danger" | "lab" | "radio" | "pharmacy";
   disabled?: boolean;
 }) {
   const styles = {
     primary: "bg-blue-600 text-white hover:bg-blue-700",
     secondary: "bg-slate-100 text-slate-800 hover:bg-slate-200",
     danger: "bg-red-600 text-white hover:bg-red-700",
+    lab: "bg-purple-600 text-white hover:bg-purple-700",
+    radio: "bg-indigo-600 text-white hover:bg-indigo-700",
+    pharmacy: "bg-teal-600 text-white hover:bg-teal-700",
   };
 
   return (

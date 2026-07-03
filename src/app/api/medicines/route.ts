@@ -8,6 +8,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const q = searchParams.get("q")?.trim() ?? "";
     const withStock = searchParams.get("stock") === "true";
+    const inStockOnly = searchParams.get("in_stock") === "true";
     const limit = Math.min(
       Number(searchParams.get("limit") ?? (q ? 50 : 200)),
       500,
@@ -52,17 +53,19 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json(
-      medicines.map((m) => {
-        const available = totals.get(m.id) ?? 0;
-        return {
-          ...serializeMedicine(m),
-          stock: {
-            available,
-            low: available > 0 && available <= LOW_STOCK_THRESHOLD,
-            out_of_stock: available === 0,
-          },
-        };
-      }),
+      medicines
+        .map((m) => {
+          const available = totals.get(m.id) ?? 0;
+          return {
+            ...serializeMedicine(m),
+            stock: {
+              available,
+              low: available > 0 && available <= LOW_STOCK_THRESHOLD,
+              out_of_stock: available === 0,
+            },
+          };
+        })
+        .filter((m) => !inStockOnly || m.stock.available > 0),
     );
   } catch (e) {
     const message = e instanceof Error ? e.message : "Database error";

@@ -21,6 +21,7 @@ export async function GET(request: Request) {
       },
       include: {
         doctors: true,
+        patient: true,
         prescription: {
           include: {
             items: { orderBy: { sort_order: "asc" } },

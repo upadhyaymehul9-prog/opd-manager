@@ -7,7 +7,7 @@ import { usePatientVisits } from "@/hooks/usePatientVisits";
 import { LAB_ACTIONS, getRelevantPatients } from "@/lib/status";
 
 export default function LabPage() {
-  const { visits, loading, error } = usePatientVisits(true);
+  const { visits, loading, error } = usePatientVisits({ activeOnly: true });
   const labPatients = getRelevantPatients(visits, "lab");
 
   return (

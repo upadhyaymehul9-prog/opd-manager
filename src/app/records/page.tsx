@@ -56,6 +56,7 @@ export default function RecordsPage() {
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50">
             <tr>
+              <th className="px-4 py-3">Patient ID</th>
               <th className="px-4 py-3">Token</th>
               <th className="px-4 py-3">Patient</th>
               <th className="px-4 py-3">Doctor</th>
@@ -70,6 +71,11 @@ export default function RecordsPage() {
           <tbody>
             {rows.map((row) => (
               <tr key={row.visit.id} className="border-b border-slate-100">
+                <td className="px-4 py-3 font-medium text-indigo-800">
+                  {row.visit.patient_number != null
+                    ? `P-${row.visit.patient_number}`
+                    : "—"}
+                </td>
                 <td className="px-4 py-3 font-bold">#{row.visit.token_number}</td>
                 <td className="px-4 py-3">{row.visit.patient_name}</td>
                 <td className="px-4 py-3">{row.visit.doctors?.name ?? "—"}</td>

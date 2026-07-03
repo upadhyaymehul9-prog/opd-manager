@@ -53,7 +53,7 @@ function stageForStatus(status: PatientStatus) {
 }
 
 export default function ManagerPage() {
-  const { visits, loading, error } = usePatientVisits(false);
+  const { visits, loading, error } = usePatientVisits({ todayOnly: true });
 
   const active = visits.filter((v) => v.status !== "completed");
   const completedToday = visits.filter((v) => v.status === "completed");
@@ -108,6 +108,7 @@ export default function ManagerPage() {
         <table className="w-full min-w-[800px] text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50">
             <tr>
+              <th className="px-4 py-3 font-semibold">Patient ID</th>
               <th className="px-4 py-3 font-semibold">Token</th>
               <th className="px-4 py-3 font-semibold">Patient</th>
               <th className="px-4 py-3 font-semibold">Consultant</th>
@@ -125,6 +126,9 @@ export default function ManagerPage() {
                 key={v.id}
                 className={`border-b border-slate-100 ${v.status === "completed" ? "opacity-50" : ""}`}
               >
+                <td className="px-4 py-3 font-medium text-indigo-800">
+                  {v.patient_number != null ? `P-${v.patient_number}` : "—"}
+                </td>
                 <td className="px-4 py-3 font-bold">#{v.token_number}</td>
                 <td className="px-4 py-3">{v.patient_name}</td>
                 <td className="px-4 py-3">{v.doctors?.name ?? "—"}</td>

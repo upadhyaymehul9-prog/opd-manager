@@ -52,16 +52,16 @@ export const TV_DESTINATIONS: Partial<Record<PatientStatus, string>> = {
 export type StatusAction = {
   label: string;
   status: PatientStatus;
-  variant?: "primary" | "secondary" | "danger";
+  variant?: "primary" | "secondary" | "danger" | "lab" | "radio" | "pharmacy";
   needsEta?: "lab" | "radio";
 };
 
 export const DOCTOR_ACTIONS: StatusAction[] = [
   { label: "Call Patient", status: "calling", variant: "primary" },
   { label: "In Consultation", status: "in_consultation", variant: "primary" },
-  { label: "Send to Lab", status: "to_lab", variant: "secondary" },
-  { label: "Send to Radiology", status: "to_radiology", variant: "secondary" },
-  { label: "Send to Pharmacy", status: "to_pharmacy", variant: "secondary" },
+  { label: "Send to Lab", status: "to_lab", variant: "lab" },
+  { label: "Send to Radiology", status: "to_radiology", variant: "radio" },
+  { label: "Send to Pharmacy", status: "to_pharmacy", variant: "pharmacy" },
   { label: "Follow-up Done → Pharmacy", status: "to_pharmacy", variant: "primary" },
   { label: "Discharge (Exit)", status: "completed", variant: "danger" },
 ];

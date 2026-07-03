@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { startOfDay } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { visitInclude } from "@/lib/db-includes";
+import { findOrCreatePatient } from "@/lib/patients";
 import { serializeVisit } from "@/lib/serialize";
 import { nextTokenNumber } from "@/lib/tokens";
 import type { CreatePatientInput } from "@/lib/types";
@@ -9,9 +11,18 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const activeOnly = searchParams.get("active") === "true";
+    const todayOnly = searchParams.get("today") === "true";
+
+    const where: {
+      status?: { not: string };
+      registered_at?: { gte: Date };
+    } = {};
+
+    if (activeOnly) where.status = { not: "completed" };
+    if (todayOnly) where.registered_at = { gte: startOfDay(new Date()) };
 
     const visits = await prisma.patientVisit.findMany({
-      where: activeOnly ? { status: { not: "completed" } } : undefined,
+      where: Object.keys(where).length > 0 ? where : undefined,
       include: visitInclude,
       orderBy: { registered_at: "desc" },
     });
@@ -58,18 +69,26 @@ export async function POST(request: Request) {
 
     const token_number = await nextTokenNumber();
 
-    const visit = await prisma.patientVisit.create({
-      data: {
-        patient_name: patient_name.trim(),
-        doctor_id,
-        room_number: doctor.room_number,
-        token_number,
-        status: "registered",
-        patient_type: resolvedType,
-        age: age != null && age > 0 ? Math.round(age) : null,
+    const visit = await prisma.$transaction(async (tx) => {
+      const patient = await findOrCreatePatient(tx, {
+        name: patient_name.trim(),
         mobile: mobile?.trim() || null,
-      },
-      include: visitInclude,
+      });
+
+      return tx.patientVisit.create({
+        data: {
+          patient_name: patient_name.trim(),
+          patient_id: patient.id,
+          doctor_id,
+          room_number: doctor.room_number,
+          token_number,
+          status: "registered",
+          patient_type: resolvedType,
+          age: age != null && age > 0 ? Math.round(age) : null,
+          mobile: mobile?.trim() || null,
+        },
+        include: visitInclude,
+      });
     });
 
     return NextResponse.json(serializeVisit(visit), { status: 201 });

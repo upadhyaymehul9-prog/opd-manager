@@ -14,6 +14,7 @@ export default function ReceptionPage() {
   const [mobile, setMobile] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [lastRegistered, setLastRegistered] = useState<{
+    patientNumber: number | null;
     token: number;
     name: string;
     room: string;
@@ -58,6 +59,7 @@ export default function ReceptionPage() {
 
       const doctor = doctors.find((d) => d.id === doctorId);
       setLastRegistered({
+        patientNumber: data.patient_number ?? null,
         token: data.token_number,
         name: data.patient_name,
         room: data.room_number,
@@ -198,6 +200,11 @@ export default function ReceptionPage() {
             <p className="mt-2 text-5xl font-black text-emerald-900">
               Token #{lastRegistered.token}
             </p>
+            {lastRegistered.patientNumber != null && (
+              <p className="mt-1 text-lg font-semibold text-indigo-800">
+                Patient ID: P-{lastRegistered.patientNumber}
+              </p>
+            )}
             <dl className="mt-4 space-y-2 text-slate-800">
               <div>
                 <dt className="text-xs text-slate-500">Patient</dt>

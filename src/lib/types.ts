@@ -37,6 +37,8 @@ export type Doctor = {
 
 export type PatientVisit = {
   id: string;
+  patient_id: string | null;
+  patient_number: number | null;
   token_number: number;
   patient_name: string;
   doctor_id: string;

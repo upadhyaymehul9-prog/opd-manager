@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { use } from "react";
+import { use, useEffect, useState } from "react";
 import { ConsoleShell } from "@/components/ConsoleShell";
 import { PrescriptionDetail } from "@/components/PrescriptionDetail";
-import { usePatientVisits } from "@/hooks/usePatientVisits";
-import { useRouter } from "next/navigation";
+import type { PatientVisit } from "@/lib/types";
 
 export default function PharmacyVisitPage({
   params,
@@ -13,9 +12,25 @@ export default function PharmacyVisitPage({
   params: Promise<{ visitId: string }>;
 }) {
   const { visitId } = use(params);
-  const router = useRouter();
-  const { visits, loading, error } = usePatientVisits(true);
-  const visit = visits.find((v) => v.id === visitId);
+  const [visit, setVisit] = useState<PatientVisit | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  function loadVisit() {
+    setLoading(true);
+    fetch(`/api/patients/${visitId}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data) => {
+        setVisit(data);
+        setError(null);
+      })
+      .catch(() => setError("Could not load patient visit"))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    loadVisit();
+  }, [visitId]);
 
   return (
     <ConsoleShell
@@ -32,11 +47,8 @@ export default function PharmacyVisitPage({
       {visit && (
         <PrescriptionDetail
           visit={visit}
-          onComplete={() => router.push("/pharmacy")}
+          onComplete={loadVisit}
         />
-      )}
-      {!loading && !visit && (
-        <p className="text-slate-600">Patient not found in active pharmacy queue.</p>
       )}
     </ConsoleShell>
   );

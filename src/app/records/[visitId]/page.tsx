@@ -20,6 +20,14 @@ export default function RecordDetailPage({
   const [visit, setVisit] = useState<PatientVisit | null>(null);
   const [prescription, setPrescription] = useState<Prescription | null>(null);
   const [bill, setBill] = useState<PharmacyBillView | null>(null);
+  const [priorVisits, setPriorVisits] = useState<
+    {
+      visit: PatientVisit;
+      medicine_count: number;
+      bill_total: number | null;
+      bill_no: string | null;
+    }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -32,6 +40,7 @@ export default function RecordDetailPage({
         setVisit(data.visit);
         setPrescription(data.prescription);
         setBill(data.bill);
+        setPriorVisits(data.prior_visits ?? []);
         setError(null);
       })
       .catch(() => setError("Could not load record"))
@@ -77,8 +86,8 @@ export default function RecordDetailPage({
 
   return (
     <ConsoleShell
-      title={`#${visit.token_number} ${visit.patient_name}`}
-      subtitle="Full visit record — prescription, dispense, bill"
+      title={`${visit.patient_number != null ? `P-${visit.patient_number} · ` : ""}#${visit.token_number} ${visit.patient_name}`}
+      subtitle="Full visit record — lab, radiology, prescription, dispense, bill"
       current="/records"
     >
       <Link href="/records" className="mb-4 inline-block text-sm text-indigo-700">
@@ -100,7 +109,40 @@ export default function RecordDetailPage({
             </span>
           )}
         </div>
+        {(visit.age || visit.mobile) && (
+          <p className="mt-2 text-sm text-slate-600">
+            {visit.age ? `Age ${visit.age}` : ""}
+            {visit.age && visit.mobile ? " · " : ""}
+            {visit.mobile ?? ""}
+          </p>
+        )}
       </div>
+
+      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="font-semibold text-slate-900">Lab & radiology</h2>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 text-sm">
+          <div className="rounded-lg bg-purple-50 p-3">
+            <p className="font-medium text-purple-900">Laboratory</p>
+            <p className="mt-1 text-purple-800">
+              {visit.lab_referred
+                ? visit.lab_eta
+                  ? `Referred · ETA ${format(new Date(visit.lab_eta), "h:mm a")}`
+                  : "Referred"
+                : "Not referred"}
+            </p>
+          </div>
+          <div className="rounded-lg bg-indigo-50 p-3">
+            <p className="font-medium text-indigo-900">Radiology</p>
+            <p className="mt-1 text-indigo-800">
+              {visit.radio_referred
+                ? visit.radio_eta
+                  ? `Referred · ETA ${format(new Date(visit.radio_eta), "h:mm a")}`
+                  : "Referred"
+                : "Not referred"}
+            </p>
+          </div>
+        </div>
+      </section>
 
       {prescription ? (
         <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
@@ -157,6 +199,49 @@ export default function RecordDetailPage({
           </button>
         </section>
       ) : null}
+
+      {priorVisits.length > 0 && (
+        <section className="mt-8 rounded-xl border border-slate-200 bg-white p-4">
+          <h2 className="font-semibold text-slate-900">Previous visits</h2>
+          <table className="mt-3 w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-slate-600">
+                <th className="pb-2">Date</th>
+                <th className="pb-2">Token</th>
+                <th className="pb-2">Doctor</th>
+                <th className="pb-2">Medicines</th>
+                <th className="pb-2">Bill</th>
+                <th className="pb-2">Record</th>
+              </tr>
+            </thead>
+            <tbody>
+              {priorVisits.map((row) => (
+                <tr key={row.visit.id} className="border-b border-slate-100">
+                  <td className="py-2">
+                    {format(new Date(row.visit.registered_at), "d MMM yyyy")}
+                  </td>
+                  <td className="py-2">#{row.visit.token_number}</td>
+                  <td className="py-2">{row.visit.doctors?.name ?? "—"}</td>
+                  <td className="py-2">{row.medicine_count}</td>
+                  <td className="py-2">
+                    {row.bill_total != null
+                      ? `₹${row.bill_total.toFixed(2)}`
+                      : "—"}
+                  </td>
+                  <td className="py-2">
+                    <Link
+                      href={`/records/${row.visit.id}`}
+                      className="text-indigo-700 hover:underline"
+                    >
+                      Open
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       {error && <p className="mt-4 text-red-600">{error}</p>}
     </ConsoleShell>

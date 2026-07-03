@@ -10,4 +10,7 @@ export const visitInclude = {
   doctors: {
     select: doctorSelect,
   },
+  patient: {
+    select: { id: true, patient_number: true },
+  },
 } as const;
