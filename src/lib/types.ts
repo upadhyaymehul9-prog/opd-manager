@@ -63,6 +63,17 @@ export type PatientVisit = {
   consultation_payment_mode: string | null;
   consultation_paid_at: string | null;
   updated_at: string;
+  chief_complaint: string | null;
+  diagnosis: string | null;
+  examination_notes: string | null;
+  advice: string | null;
+  vitals_bp: string | null;
+  vitals_pulse: number | null;
+  vitals_temp: number | null;
+  vitals_weight: number | null;
+  vitals_spo2: number | null;
+  patient_allergies: string | null;
+  patient_blood_group: string | null;
   doctors?: Doctor | null;
 };
 

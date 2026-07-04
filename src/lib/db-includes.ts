@@ -11,6 +11,6 @@ export const visitInclude = {
     select: doctorSelect,
   },
   patient: {
-    select: { id: true, patient_number: true },
+    select: { id: true, patient_number: true, allergies: true, blood_group: true },
   },
 } as const;

@@ -27,6 +27,15 @@ type VisitWithDoctor = {
   consultation_payment_mode: string | null;
   consultation_paid_at: Date | null;
   updated_at: Date;
+  chief_complaint: string | null;
+  diagnosis: string | null;
+  examination_notes: string | null;
+  advice: string | null;
+  vitals_bp: string | null;
+  vitals_pulse: number | null;
+  vitals_temp: number | null;
+  vitals_weight: number | null;
+  vitals_spo2: number | null;
   doctors: {
     id: string;
     name: string;
@@ -34,7 +43,7 @@ type VisitWithDoctor = {
     specialty: string | null;
     opd_status: string;
   };
-  patient?: { id: string; patient_number: number } | null;
+  patient?: { id: string; patient_number: number; allergies: string | null; blood_group: string | null } | null;
 };
 
 export function serializeDoctor(doctor: {
@@ -86,6 +95,17 @@ export function serializeVisit(visit: VisitWithDoctor): PatientVisit {
     consultation_payment_mode: visit.consultation_payment_mode ?? null,
     consultation_paid_at: visit.consultation_paid_at?.toISOString() ?? null,
     updated_at: visit.updated_at.toISOString(),
+    chief_complaint: visit.chief_complaint ?? null,
+    diagnosis: visit.diagnosis ?? null,
+    examination_notes: visit.examination_notes ?? null,
+    advice: visit.advice ?? null,
+    vitals_bp: visit.vitals_bp ?? null,
+    vitals_pulse: visit.vitals_pulse ?? null,
+    vitals_temp: visit.vitals_temp ?? null,
+    vitals_weight: visit.vitals_weight ?? null,
+    vitals_spo2: visit.vitals_spo2 ?? null,
+    patient_allergies: visit.patient?.allergies ?? null,
+    patient_blood_group: visit.patient?.blood_group ?? null,
     doctors: serializeDoctor(visit.doctors),
   };
 }

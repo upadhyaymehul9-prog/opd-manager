@@ -13,6 +13,8 @@ model Patient {
   name           String
   mobile         String?
   address        String?
+  allergies      String?
+  blood_group    String?
   created_at     DateTime       @default(now()) @db.Timestamptz(6)
   visits         PatientVisit[]
   appointments   Appointment[]
@@ -44,6 +46,7 @@ model Doctor {
   prescriptions  Prescription[]
   appointments   Appointment[]
   users          User[]
+  consultation_templates ConsultationTemplate[]
 
   @@map("doctors")
 }
@@ -87,6 +90,15 @@ model PatientVisit {
   consultation_payment_mode String?
   consultation_bill_no      String?   @unique
   consultation_paid_at      DateTime? @db.Timestamptz(6)
+  chief_complaint           String?
+  diagnosis                 String?
+  examination_notes         String?
+  advice                    String?
+  vitals_bp                 String?
+  vitals_pulse              Int?
+  vitals_temp               Float?
+  vitals_weight             Float?
+  vitals_spo2               Int?
   updated_at      DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
   patient         Patient?       @relation(fields: [patient_id], references: [id], onDelete: SetNull)
   doctors         Doctor         @relation(fields: [doctor_id], references: [id], onDelete: Restrict)
@@ -293,4 +305,20 @@ model Appointment {
   @@index([status])
   @@index([source])
   @@map("appointments")
+}
+
+model ConsultationTemplate {
+  id                String   @id @default(uuid()) @db.Uuid
+  doctor_id         String?  @db.Uuid
+  title             String
+  chief_complaint   String?
+  diagnosis         String?
+  examination_notes String?
+  advice            String?
+  sort_order        Int      @default(0)
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  doctor            Doctor?  @relation(fields: [doctor_id], references: [id], onDelete: Cascade)
+
+  @@index([doctor_id])
+  @@map("consultation_templates")
 }

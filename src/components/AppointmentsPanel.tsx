@@ -6,6 +6,8 @@ import type { AppointmentView } from "@/lib/appointments";
 import type { Doctor, PatientVisit } from "@/lib/types";
 import { ConsultationBillReceipt } from "@/components/ConsultationBillReceipt";
 import { PrintActions } from "@/components/PrintActions";
+import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { appointmentReminderMessage, tokenRegisteredMessage } from "@/lib/whatsapp-messages";
 
 type Slot = { time: string; label: string; available: boolean };
 
@@ -377,6 +379,15 @@ export function AppointmentsPanel({
                   {a.status.replace("_", " ")}
                 </span>
                 <div className="flex flex-wrap gap-2">
+                  <WhatsAppLink
+                    mobile={a.mobile}
+                    message={appointmentReminderMessage({
+                      patientName: a.patient_name,
+                      doctorName: a.doctor_name,
+                      scheduledAt: a.scheduled_at,
+                    })}
+                    label="WhatsApp reminder"
+                  />
                   {a.status === "booked" && (
                     <>
                       <button
@@ -423,6 +434,20 @@ export function AppointmentsPanel({
             <p className="mt-1 font-semibold text-indigo-800">
               Patient ID: P-{lastArrival.patient_number}
             </p>
+          )}
+          {lastArrival.mobile && lastArrival.doctors && (
+            <div className="mt-3">
+              <WhatsAppLink
+                mobile={lastArrival.mobile}
+                message={tokenRegisteredMessage({
+                  patientName: lastArrival.patient_name,
+                  tokenNumber: lastArrival.token_number,
+                  doctorName: lastArrival.doctors.name,
+                  roomNumber: lastArrival.room_number,
+                })}
+                label="Send token on WhatsApp"
+              />
+            </div>
           )}
           {lastArrival.consultation_bill_no && (
             <div className="mt-4 space-y-3">

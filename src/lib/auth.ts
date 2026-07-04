@@ -185,6 +185,33 @@ export function canAccessApi(
     );
   }
 
+  if (pathname.match(/^\/api\/visits\/[^/]+\/emr$/)) {
+    if (method === "GET") {
+      return (
+        session.role === "doctor" ||
+        session.role === "admin" ||
+        session.role === "manager" ||
+        session.role === "reception"
+      );
+    }
+    return (
+      session.role === "doctor" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
+  if (
+    pathname === "/api/consultation-templates" ||
+    pathname.match(/^\/api\/consultation-templates\/[^/]+$/)
+  ) {
+    return (
+      session.role === "doctor" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
   if (pathname === "/api/doctors" && method === "POST") {
     return session.role === "admin" || session.role === "manager";
   }

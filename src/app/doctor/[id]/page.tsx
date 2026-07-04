@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ConsoleShell } from "@/components/ConsoleShell";
 import { DoctorStatusPanel } from "@/components/DoctorStatusPanel";
 import { PrescriptionForm } from "@/components/PrescriptionForm";
+import { ConsultationEmrPanel } from "@/components/ConsultationEmrPanel";
 import { ProcedurePanel } from "@/components/ProcedurePanel";
 import { TransferDoctorPanel } from "@/components/TransferDoctorPanel";
 import { PatientCard } from "@/components/PatientCard";
@@ -73,6 +74,11 @@ export default function DoctorConsolePage({
             />
             {canWritePrescription(visit.status) && (
               <>
+                <ConsultationEmrPanel
+                  visitId={visit.id}
+                  doctorId={doctorId}
+                  initialAllergies={visit.patient_allergies}
+                />
                 <ProcedurePanel visitId={visit.id} />
                 <PrescriptionForm visitId={visit.id} doctorId={doctorId} />
               </>

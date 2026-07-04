@@ -5,6 +5,8 @@ import { format } from "date-fns";
 import { ConsoleShell, SetupBanner } from "@/components/ConsoleShell";
 import { TodayCollectionPanel } from "@/components/TodayCollectionPanel";
 import { AppointmentsPanel } from "@/components/AppointmentsPanel";
+import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { tokenRegisteredMessage } from "@/lib/whatsapp-messages";
 import { ConsultationBillReceipt } from "@/components/ConsultationBillReceipt";
 import { PrintActions } from "@/components/PrintActions";
 import type { Doctor, PatientType, PatientVisit } from "@/lib/types";
@@ -365,6 +367,21 @@ export default function ReceptionPage() {
                 </p>
               )}
               <p className="mt-2 text-xl font-semibold">{lastVisit.patient_name}</p>
+              {lastVisit.mobile && lastVisit.doctors && (
+                <div className="mt-4">
+                  <WhatsAppLink
+                    mobile={lastVisit.mobile}
+                    message={tokenRegisteredMessage({
+                      patientName: lastVisit.patient_name,
+                      tokenNumber: lastVisit.token_number,
+                      doctorName: lastVisit.doctors.name,
+                      roomNumber: lastVisit.room_number,
+                    })}
+                    label="Send token on WhatsApp"
+                    className="text-sm"
+                  />
+                </div>
+              )}
             </div>
 
             {lastVisit.consultation_bill_no && (
