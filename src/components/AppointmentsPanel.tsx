@@ -28,6 +28,8 @@ export function AppointmentsPanel({
   const [bookDoctorId, setBookDoctorId] = useState("");
   const [bookDate, setBookDate] = useState(today);
   const [slots, setSlots] = useState<Slot[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [patientName, setPatientName] = useState("");
   const [mobile, setMobile] = useState("");
@@ -73,18 +75,33 @@ export function AppointmentsPanel({
   useEffect(() => {
     if (!bookDoctorId || !bookDate) {
       setSlots([]);
+      setSlotsError(null);
       return;
     }
+    setSlotsLoading(true);
+    setSlotsError(null);
     fetch(
       `/api/appointments/slots?doctor_id=${bookDoctorId}&date=${bookDate}`,
     )
-      .then((r) => r.json())
-      .then((data) => {
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || "Could not load times");
         setSlots(data.slots ?? []);
         setSelectedSlot(null);
       })
-      .catch(() => setSlots([]));
+      .catch((e) => {
+        setSlots([]);
+        setSlotsError(
+          e instanceof Error ? e.message : "Could not load available times",
+        );
+      })
+      .finally(() => setSlotsLoading(false));
   }, [bookDoctorId, bookDate]);
+
+  const availableSlots = slots.filter((s) => s.available);
+  const selectedSlotLabel = selectedSlot
+    ? slots.find((s) => s.time === selectedSlot)?.label
+    : null;
 
   async function handleBook(e: React.FormEvent) {
     e.preventDefault();
@@ -178,6 +195,9 @@ export function AppointmentsPanel({
           className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
         >
           <h2 className="text-lg font-semibold text-slate-900">Book appointment</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Choose date and time — same as BookMyClinic (9 AM–6 PM, 15 min slots)
+          </p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700">Doctor</label>
@@ -201,7 +221,52 @@ export function AppointmentsPanel({
                 min={today}
                 onChange={(e) => setBookDate(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                required
               />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-slate-700">Time</label>
+              {slotsLoading ? (
+                <p className="mt-2 text-sm text-slate-600">Loading available times…</p>
+              ) : slotsError ? (
+                <p className="mt-2 text-sm text-red-600">{slotsError}</p>
+              ) : availableSlots.length === 0 ? (
+                <p className="mt-2 text-sm text-amber-700">
+                  No times available for this date — try another date or doctor.
+                </p>
+              ) : (
+                <>
+                  <select
+                    value={selectedSlot ?? ""}
+                    onChange={(e) => setSelectedSlot(e.target.value || null)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                    required
+                  >
+                    <option value="">Select time…</option>
+                    {availableSlots.map((s) => (
+                      <option key={s.time} value={s.time}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {availableSlots.map((s) => (
+                      <button
+                        key={s.time}
+                        type="button"
+                        onClick={() => setSelectedSlot(s.time)}
+                        className={`rounded-lg border px-3 py-1.5 text-sm ${
+                          selectedSlot === s.time
+                            ? "border-emerald-600 bg-emerald-50 text-emerald-900"
+                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700">
@@ -238,28 +303,11 @@ export function AppointmentsPanel({
             </div>
           </div>
 
-          {slots.length > 0 && (
-            <div className="mt-4">
-              <p className="text-sm font-medium text-slate-700">Available slots</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {slots
-                  .filter((s) => s.available)
-                  .map((s) => (
-                    <button
-                      key={s.time}
-                      type="button"
-                      onClick={() => setSelectedSlot(s.time)}
-                      className={`rounded-lg border px-3 py-1.5 text-sm ${
-                        selectedSlot === s.time
-                          ? "border-emerald-600 bg-emerald-50 text-emerald-900"
-                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                      }`}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-              </div>
-            </div>
+          {selectedSlot && selectedSlotLabel && (
+            <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+              <strong>Scheduled:</strong>{" "}
+              {format(new Date(bookDate), "d MMM yyyy")} at {selectedSlotLabel}
+            </p>
           )}
 
           <textarea
@@ -285,12 +333,15 @@ export function AppointmentsPanel({
           <h2 className="text-lg font-semibold text-slate-900">
             {compact ? "Today's appointments" : "Appointments"}
           </h2>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
-          />
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            Date
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
+            />
+          </label>
         </div>
 
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
@@ -302,8 +353,13 @@ export function AppointmentsPanel({
           <ul className="mt-4 divide-y divide-slate-100">
             {appointments.map((a) => (
               <li key={a.id} className="flex flex-wrap items-center gap-3 py-3">
-                <div className="min-w-[4.5rem] text-sm font-bold text-slate-800">
-                  {format(new Date(a.scheduled_at), "h:mm a")}
+                <div className="min-w-[7rem]">
+                  <p className="text-sm font-bold text-slate-800">
+                    {format(new Date(a.scheduled_at), "h:mm a")}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {format(new Date(a.scheduled_at), "d MMM yyyy")}
+                  </p>
                 </div>
                 <div className="flex-1 min-w-[10rem]">
                   <p className="font-medium text-slate-900">{a.patient_name}</p>
