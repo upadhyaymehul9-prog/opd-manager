@@ -25,13 +25,31 @@ export async function PATCH(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const dispensed = Boolean(body.dispensed);
+    const dispensed = body.dispensed !== undefined ? Boolean(body.dispensed) : item.dispensed;
     const substitutedNote =
       body.substituted_note != null
         ? String(body.substituted_note).trim() || null
         : undefined;
 
-    const qty = item.quantity && item.quantity > 0 ? item.quantity : 1;
+    let quantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
+    if (body.quantity !== undefined) {
+      if (item.dispensed) {
+        return NextResponse.json(
+          { error: "Cannot change quantity after medicine is dispensed" },
+          { status: 400 },
+        );
+      }
+      const nextQty =
+        body.quantity != null && Number(body.quantity) > 0
+          ? Math.round(Number(body.quantity))
+          : null;
+      if (!nextQty) {
+        return NextResponse.json({ error: "Quantity must be at least 1" }, { status: 400 });
+      }
+      quantity = nextQty;
+    }
+
+    const qty = quantity;
 
     const updatedItem = await prisma.$transaction(async (tx) => {
       if (dispensed && !item.dispensed && item.medicine_id) {
@@ -53,6 +71,7 @@ export async function PATCH(
         data: {
           dispensed,
           dispensed_at: dispensed ? new Date() : null,
+          quantity,
           ...(substitutedNote !== undefined
             ? { substituted_note: substitutedNote }
             : {}),
@@ -86,6 +105,52 @@ export async function PATCH(
     return NextResponse.json(serializePrescriptionItem(updatedItem));
   } catch (e) {
     const message = e instanceof Error ? e.message : "Update failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+
+    const item = await prisma.prescriptionItem.findUnique({
+      where: { id },
+      include: { prescription: { include: { items: true } } },
+    });
+
+    if (!item) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    if (item.dispensed) {
+      return NextResponse.json(
+        { error: "Cannot remove a medicine already dispensed — uncheck dispensed first" },
+        { status: 400 },
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.prescriptionItem.delete({ where: { id } });
+
+      const remaining = item.prescription.items.filter((row) => row.id !== id);
+
+      await tx.prescription.update({
+        where: { id: item.prescription_id },
+        data: {
+          status: computePrescriptionStatus(
+            remaining,
+            item.prescription.status,
+          ),
+        },
+      });
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Delete failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

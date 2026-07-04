@@ -32,6 +32,7 @@ export function PrescriptionDetail({
   const [completedBill, setCompletedBill] = useState<PharmacyBillView | null>(
     null,
   );
+  const [quantities, setQuantities] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,6 +41,11 @@ export function PrescriptionDetail({
       if (!res.ok) throw new Error("Could not load prescription");
       const data = await res.json();
       setPrescription(data);
+      const qtyMap: Record<string, string> = {};
+      for (const item of data?.items ?? []) {
+        qtyMap[item.id] = String(item.quantity ?? 1);
+      }
+      setQuantities(qtyMap);
 
       const billRes = await fetch(`/api/bills?visit_id=${visit.id}`);
       if (billRes.ok) {
@@ -130,6 +136,7 @@ export function PrescriptionDetail({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           dispensed,
+          quantity: Number(quantities[itemId]) || undefined,
           substituted_note: notes[itemId] || null,
         }),
       });
@@ -138,6 +145,56 @@ export function PrescriptionDetail({
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveQuantity(itemId: string) {
+    const qty = Math.round(Number(quantities[itemId]));
+    if (!qty || qty < 1) {
+      setError("Quantity must be at least 1");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/prescriptions/items/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: qty }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not update quantity");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update quantity");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeItem(itemId: string, medicineName: string) {
+    if (
+      !window.confirm(
+        `Remove "${medicineName.split(" · ")[0]}" from this prescription? (e.g. out of stock)`,
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/prescriptions/items/${itemId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not remove medicine");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not remove medicine");
     } finally {
       setBusy(false);
     }
@@ -220,13 +277,18 @@ export function PrescriptionDetail({
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <p className="border-b border-slate-100 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+          Change qty if patient wants more days (e.g. 10-day supply). Remove lines
+          that are out of stock before billing.
+        </p>
+        <table className="w-full min-w-[800px] text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50">
             <tr>
               <th className="px-4 py-3">Medicine</th>
               <th className="px-4 py-3">Qty</th>
               <th className="px-4 py-3">Stock</th>
               <th className="px-4 py-3">Dispensed</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -250,10 +312,32 @@ export function PrescriptionDetail({
                       }))
                     }
                     placeholder="Substitution note"
-                    className="mt-1 w-full rounded border border-slate-200 px-2 py-1 text-xs"
+                    disabled={item.dispensed}
+                    className="mt-1 w-full rounded border border-slate-200 px-2 py-1 text-xs disabled:bg-slate-100"
                   />
                 </td>
-                <td className="px-4 py-3">{item.quantity ?? "—"}</td>
+                <td className="px-4 py-3">
+                  {item.dispensed ? (
+                    <span className="font-medium">{item.quantity ?? 1}</span>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={1}
+                        value={quantities[item.id] ?? String(item.quantity ?? 1)}
+                        disabled={busy}
+                        onChange={(e) =>
+                          setQuantities((prev) => ({
+                            ...prev,
+                            [item.id]: e.target.value,
+                          }))
+                        }
+                        onBlur={() => saveQuantity(item.id)}
+                        className="w-16 rounded border border-slate-300 px-2 py-1 text-sm"
+                      />
+                    </div>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   {item.medicine_id ? (
                     <span
@@ -262,7 +346,10 @@ export function PrescriptionDetail({
                           ? "font-medium text-red-600"
                           : stock[item.medicine_id]?.low
                             ? "font-medium text-amber-700"
-                            : "text-green-700"
+                            : Number(quantities[item.id] ?? item.quantity ?? 1) >
+                                (stock[item.medicine_id]?.available ?? 0)
+                              ? "font-medium text-red-600"
+                              : "text-green-700"
                       }
                     >
                       {stock[item.medicine_id]?.out_of_stock
@@ -285,6 +372,18 @@ export function PrescriptionDetail({
                     />
                     <span>{item.dispensed ? "Yes" : "No"}</span>
                   </label>
+                </td>
+                <td className="px-4 py-3">
+                  {!item.dispensed && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => removeItem(item.id, item.medicine_name)}
+                      className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

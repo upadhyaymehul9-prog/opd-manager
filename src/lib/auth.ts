@@ -296,6 +296,14 @@ export function canAccessApi(
     );
   }
 
+  if (pathname.startsWith("/api/prescriptions/items/") && method === "DELETE") {
+    return (
+      session.role === "pharmacy" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
   if (pathname === "/api/stock" && method === "POST") {
     return session.role === "admin" || session.role === "manager";
   }
