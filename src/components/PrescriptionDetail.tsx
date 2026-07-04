@@ -68,6 +68,8 @@ export function PrescriptionDetail({
     if (visit.status === "to_pharmacy") {
       updatePatient(visit.id, { status: "at_pharmacy" }).catch(() => {});
     }
+    const t = setInterval(load, 15_000);
+    return () => clearInterval(t);
   }, [load, visit.id, visit.status]);
 
   const pending = prescription?.items.filter((i) => !i.dispensed).length ?? 0;

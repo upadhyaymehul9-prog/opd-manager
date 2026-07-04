@@ -7,7 +7,9 @@ import type {
   PrescriptionItemInput,
 } from "@/lib/prescription-types";
 import { ActionButton } from "./PatientCard";
+import { PrescriptionCompactQueue } from "./PrescriptionCompactQueue";
 import { formatMedicineLabel } from "@/lib/medicine";
+import type { PatientVisit } from "@/lib/types";
 
 const FREQUENCIES = ["OD", "BD", "TDS", "QID", "SOS", "HS"];
 
@@ -18,6 +20,7 @@ type MedicineWithStock = Medicine & {
 type DraftLine = PrescriptionItemInput & {
   key: string;
   dispensed?: boolean;
+  persisted?: boolean;
 };
 
 function newLineKey() {
@@ -35,7 +38,36 @@ function emptyLine(): DraftLine {
     duration_days: 5,
     quantity: 10,
     instructions: "",
+    persisted: false,
   };
+}
+
+function buildSaveItems(
+  lines: DraftLine[],
+  persistedIds: Set<string>,
+): PrescriptionItemInput[] {
+  return lines
+    .filter((line) => line.medicine_name.trim())
+    .map((line, index) => {
+      const item: PrescriptionItemInput = {
+        medicine_id: line.medicine_id ?? null,
+        medicine_name: line.medicine_name.trim(),
+        dose: line.dose?.trim() || null,
+        frequency: line.frequency?.trim() || null,
+        duration_days:
+          line.duration_days != null && line.duration_days > 0
+            ? line.duration_days
+            : null,
+        quantity:
+          line.quantity != null && line.quantity > 0 ? line.quantity : null,
+        instructions: line.instructions?.trim() || null,
+        sort_order: index,
+      };
+      if (line.id && persistedIds.has(line.id)) {
+        item.id = line.id;
+      }
+      return item;
+    });
 }
 
 function stockLabel(stock?: MedicineWithStock["stock"]) {
@@ -52,9 +84,11 @@ function stockLabel(stock?: MedicineWithStock["stock"]) {
 export function PrescriptionForm({
   visitId,
   doctorId,
+  visit,
 }: {
   visitId: string;
   doctorId: string;
+  visit: PatientVisit;
 }) {
   const [prescription, setPrescription] = useState<Prescription | null>(null);
   const [notes, setNotes] = useState("");
@@ -69,6 +103,8 @@ export function PrescriptionForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [persistedIds, setPersistedIds] = useState<Set<string>>(new Set());
 
   const isSent =
     prescription != null &&
@@ -83,6 +119,7 @@ export function PrescriptionForm({
     if (!data) return;
     setPrescription(data);
     setNotes(data.notes ?? "");
+    setPersistedIds(new Set(data.items.map((i: Prescription["items"][number]) => i.id)));
     if (data.items.length > 0) {
       setLines(
         data.items.map((item: Prescription["items"][number]) => ({
@@ -96,6 +133,7 @@ export function PrescriptionForm({
           quantity: item.quantity,
           instructions: item.instructions,
           dispensed: item.dispensed,
+          persisted: true,
         })),
       );
       const ids = data.items
@@ -122,6 +160,12 @@ export function PrescriptionForm({
   useEffect(() => {
     loadPrescription();
   }, [loadPrescription]);
+
+  useEffect(() => {
+    if (!isSent || expanded) return;
+    const t = setInterval(loadPrescription, 15_000);
+    return () => clearInterval(t);
+  }, [isSent, expanded, loadPrescription]);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -195,6 +239,8 @@ export function PrescriptionForm({
       return null;
     }
 
+    const payloadItems = buildSaveItems(validLines, persistedIds);
+
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -206,14 +252,24 @@ export function PrescriptionForm({
           patient_visit_id: visitId,
           doctor_id: doctorId,
           notes,
-          items: validLines.map(({ key, dispensed, ...item }) => item),
+          items: payloadItems,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Save failed");
+      if (data.items.length < payloadItems.length) {
+        throw new Error(
+          `Only ${data.items.length} of ${payloadItems.length} medicines saved — try again`,
+        );
+      }
       setPrescription(data);
-      setMessage(isSent ? "Prescription updated" : "Prescription saved");
+      setMessage(
+        isSent
+          ? `Saved ${data.items.length} medicine(s) — pharmacy will see all`
+          : `Saved ${data.items.length} medicine(s)`,
+      );
       await loadPrescription();
+      if (isSent) setExpanded(false);
       return data as Prescription;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
@@ -230,6 +286,8 @@ export function PrescriptionForm({
       return;
     }
 
+    const payloadItems = buildSaveItems(validLines, persistedIds);
+
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -241,11 +299,16 @@ export function PrescriptionForm({
           patient_visit_id: visitId,
           doctor_id: doctorId,
           notes,
-          items: validLines.map(({ key, dispensed, ...item }) => item),
+          items: payloadItems,
         }),
       });
       const saved = await saveRes.json();
       if (!saveRes.ok) throw new Error(saved.error || "Save failed");
+      if (saved.items.length < payloadItems.length) {
+        throw new Error(
+          `Only ${saved.items.length} of ${payloadItems.length} medicines saved before send`,
+        );
+      }
 
       const res = await fetch(`/api/prescriptions/${saved.id}/send`, {
         method: "POST",
@@ -253,7 +316,8 @@ export function PrescriptionForm({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Send failed");
       setPrescription(data);
-      setMessage("Sent to pharmacy");
+      setMessage(`Sent ${saved.items.length} medicine(s) to pharmacy`);
+      setExpanded(false);
       await loadPrescription();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Send failed");
@@ -263,19 +327,16 @@ export function PrescriptionForm({
   }
 
   if (isFullyDispensed) {
+    return null;
+  }
+
+  if (isSent && prescription && !expanded) {
     return (
-      <div className="rounded-xl border border-teal-200 bg-teal-50 p-4">
-        <p className="font-semibold text-teal-900">All medicines dispensed</p>
-        <ul className="mt-2 space-y-1 text-sm text-teal-800">
-          {prescription.items.map((item) => (
-            <li key={item.id}>
-              {item.medicine_name}
-              {item.dose ? ` — ${item.dose}` : ""}
-              {item.frequency ? `, ${item.frequency}` : ""}
-            </li>
-          ))}
-        </ul>
-      </div>
+      <PrescriptionCompactQueue
+        visit={visit}
+        prescription={prescription}
+        onExpand={() => setExpanded(true)}
+      />
     );
   }
 
@@ -284,6 +345,15 @@ export function PrescriptionForm({
       <h3 className="font-semibold text-slate-900">
         {isSent ? "Edit prescription (patient at pharmacy)" : "Write prescription"}
       </h3>
+      {isSent && (
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          className="mt-1 text-xs font-medium text-teal-700 hover:underline"
+        >
+          ← Back to compact queue view
+        </button>
+      )}
       <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-slate-700">
         <input
           type="checkbox"
@@ -475,16 +545,17 @@ export function PrescriptionForm({
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       {message && <p className="mt-2 text-sm text-green-700">{message}</p>}
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
         <ActionButton
-          label={isSent ? "Update prescription" : "Save draft"}
+          label={isSent ? "Save medicines" : "Save medicines"}
           onClick={savePrescription}
           disabled={busy}
+          variant={isSent ? "secondary" : "primary"}
         />
         {!isSent && (
           <ActionButton
             label="Send to pharmacy"
-            variant="primary"
+            variant="pharmacy"
             onClick={sendToPharmacy}
             disabled={busy}
           />

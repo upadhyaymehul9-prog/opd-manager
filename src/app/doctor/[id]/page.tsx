@@ -80,7 +80,7 @@ export default function DoctorConsolePage({
                   initialAllergies={visit.patient_allergies}
                 />
                 <ProcedurePanel visitId={visit.id} />
-                <PrescriptionForm visitId={visit.id} doctorId={doctorId} />
+                <PrescriptionForm visitId={visit.id} doctorId={doctorId} visit={visit} />
               </>
             )}
           </div>

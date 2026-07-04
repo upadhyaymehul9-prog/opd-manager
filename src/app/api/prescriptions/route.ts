@@ -4,7 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { serializePrescription } from "@/lib/serialize";
 import type { PrescriptionItemInput } from "@/lib/prescription-types";
 
-const prescriptionInclude = { items: true };
+const prescriptionInclude = {
+  items: { orderBy: { sort_order: "asc" as const } },
+};
 
 const EDITABLE_RX_STATUSES = ["draft", "sent_to_pharmacy", "partially_dispensed"];
 
@@ -142,10 +144,16 @@ export async function POST(request: Request) {
               order += 1;
               continue;
             }
-            await tx.prescriptionItem.update({
-              where: { id: item.id },
-              data: itemData(rx.id, item, order),
-            });
+            if (cur) {
+              await tx.prescriptionItem.update({
+                where: { id: item.id },
+                data: itemData(rx.id, item, order),
+              });
+            } else {
+              await tx.prescriptionItem.create({
+                data: itemData(rx.id, item, order),
+              });
+            }
           } else {
             await tx.prescriptionItem.create({
               data: itemData(rx.id, item, order),
@@ -169,9 +177,11 @@ export async function POST(request: Request) {
           where: { prescription_id: rx.id },
         });
 
-        await tx.prescriptionItem.createMany({
-          data: items.map((item, index) => itemData(rx.id, item, index)),
-        });
+        for (const [index, item] of items.entries()) {
+          await tx.prescriptionItem.create({
+            data: itemData(rx.id, item, index),
+          });
+        }
       }
 
       return tx.prescription.findUniqueOrThrow({

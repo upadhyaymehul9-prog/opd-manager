@@ -35,21 +35,26 @@ export default function PharmacyPage() {
 
   useEffect(() => {
     if (queue.length === 0) return;
-    Promise.all(
-      queue.map((v) =>
-        fetch(`/api/prescriptions?visit_id=${v.id}`)
-          .then((r) => (r.ok ? r.json() : null))
-          .then((data: Prescription | null) => {
-            if (!data?.items) return { id: v.id, total: 0, pending: 0 };
-            const pending = data.items.filter((i) => !i.dispensed).length;
-            return { id: v.id, total: data.items.length, pending };
-          }),
-      ),
-    ).then((rows) => {
-      const map: Record<string, { total: number; pending: number }> = {};
-      for (const r of rows) map[r.id] = { total: r.total, pending: r.pending };
-      setRxByVisit(map);
-    });
+    const loadRx = () => {
+      Promise.all(
+        queue.map((v) =>
+          fetch(`/api/prescriptions?visit_id=${v.id}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data: Prescription | null) => {
+              if (!data?.items) return { id: v.id, total: 0, pending: 0 };
+              const pending = data.items.filter((i) => !i.dispensed).length;
+              return { id: v.id, total: data.items.length, pending };
+            }),
+        ),
+      ).then((rows) => {
+        const map: Record<string, { total: number; pending: number }> = {};
+        for (const r of rows) map[r.id] = { total: r.total, pending: r.pending };
+        setRxByVisit(map);
+      });
+    };
+    loadRx();
+    const t = setInterval(loadRx, 15_000);
+    return () => clearInterval(t);
   }, [queue]);
 
   const atCounter = queue.filter((v) => v.status === "at_pharmacy").length;
