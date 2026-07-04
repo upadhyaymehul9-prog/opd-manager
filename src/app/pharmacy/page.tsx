@@ -20,7 +20,10 @@ function pharmacySort(a: PatientVisit, b: PatientVisit) {
 }
 
 export default function PharmacyPage() {
-  const { visits, loading, error } = usePatientVisits({ activeOnly: true });
+  const { visits, loading, error, refresh } = usePatientVisits({
+    activeOnly: true,
+    pollMs: 60_000,
+  });
   const [rxByVisit, setRxByVisit] = useState<
     Record<string, { total: number; pending: number }>
   >({});
@@ -33,29 +36,32 @@ export default function PharmacyPage() {
     [visits],
   );
 
+  const queueKey = useMemo(
+    () => queue.map((v) => `${v.id}:${v.status}`).join("|"),
+    [queue],
+  );
+
   useEffect(() => {
-    if (queue.length === 0) return;
-    const loadRx = () => {
-      Promise.all(
-        queue.map((v) =>
-          fetch(`/api/prescriptions?visit_id=${v.id}`)
-            .then((r) => (r.ok ? r.json() : null))
-            .then((data: Prescription | null) => {
-              if (!data?.items) return { id: v.id, total: 0, pending: 0 };
-              const pending = data.items.filter((i) => !i.dispensed).length;
-              return { id: v.id, total: data.items.length, pending };
-            }),
-        ),
-      ).then((rows) => {
-        const map: Record<string, { total: number; pending: number }> = {};
-        for (const r of rows) map[r.id] = { total: r.total, pending: r.pending };
-        setRxByVisit(map);
-      });
-    };
-    loadRx();
-    const t = setInterval(loadRx, 15_000);
-    return () => clearInterval(t);
-  }, [queue]);
+    if (queue.length === 0) {
+      setRxByVisit({});
+      return;
+    }
+    Promise.all(
+      queue.map((v) =>
+        fetch(`/api/prescriptions?visit_id=${v.id}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data: Prescription | null) => {
+            if (!data?.items) return { id: v.id, total: 0, pending: 0 };
+            const pending = data.items.filter((i) => !i.dispensed).length;
+            return { id: v.id, total: data.items.length, pending };
+          }),
+      ),
+    ).then((rows) => {
+      const map: Record<string, { total: number; pending: number }> = {};
+      for (const r of rows) map[r.id] = { total: r.total, pending: r.pending };
+      setRxByVisit(map);
+    });
+  }, [queueKey, queue]);
 
   const atCounter = queue.filter((v) => v.status === "at_pharmacy").length;
   const waiting = queue.filter((v) => v.status === "to_pharmacy").length;
@@ -68,7 +74,7 @@ export default function PharmacyPage() {
     >
       <TodayCollectionPanel variant="pharmacy" />
 
-      <div className="mb-4 flex gap-4 text-sm text-slate-600">
+      <div className="mb-4 flex flex-wrap items-center gap-4 text-sm text-slate-600">
         <span>
           <strong>{queue.length}</strong> in pharmacy queue
         </span>
@@ -78,6 +84,13 @@ export default function PharmacyPage() {
         <span>
           <strong>{waiting}</strong> on the way
         </span>
+        <button
+          type="button"
+          onClick={() => refresh()}
+          className="ml-auto text-xs text-teal-700 hover:underline"
+        >
+          Refresh queue
+        </button>
       </div>
 
       {loading && <p className="text-slate-600">Loading…</p>}

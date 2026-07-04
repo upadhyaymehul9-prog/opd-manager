@@ -34,18 +34,20 @@ export function PrescriptionDetail({
   );
   const [quantities, setQuantities] = useState<Record<string, string>>({});
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch(`/api/prescriptions?visit_id=${visit.id}`);
       if (!res.ok) throw new Error("Could not load prescription");
       const data = await res.json();
       setPrescription(data);
-      const qtyMap: Record<string, string> = {};
-      for (const item of data?.items ?? []) {
-        qtyMap[item.id] = String(item.quantity ?? 1);
+      if (!silent) {
+        const qtyMap: Record<string, string> = {};
+        for (const item of data?.items ?? []) {
+          qtyMap[item.id] = String(item.quantity ?? 1);
+        }
+        setQuantities(qtyMap);
       }
-      setQuantities(qtyMap);
 
       const billRes = await fetch(`/api/bills?visit_id=${visit.id}`);
       if (billRes.ok) {
@@ -70,12 +72,10 @@ export function PrescriptionDetail({
   }, [visit.id]);
 
   useEffect(() => {
-    load();
+    load(false);
     if (visit.status === "to_pharmacy") {
       updatePatient(visit.id, { status: "at_pharmacy" }).catch(() => {});
     }
-    const t = setInterval(load, 15_000);
-    return () => clearInterval(t);
   }, [load, visit.id, visit.status]);
 
   const pending = prescription?.items.filter((i) => !i.dispensed).length ?? 0;
@@ -142,7 +142,7 @@ export function PrescriptionDetail({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Update failed");
-      await load();
+      await load(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
     } finally {
@@ -167,7 +167,8 @@ export function PrescriptionDetail({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not update quantity");
-      await load();
+      await load(true);
+      setQuantities((prev) => ({ ...prev, [itemId]: String(qty) }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not update quantity");
     } finally {
@@ -192,7 +193,7 @@ export function PrescriptionDetail({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not remove medicine");
-      await load();
+      await load(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not remove medicine");
     } finally {

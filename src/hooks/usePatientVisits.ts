@@ -10,11 +10,14 @@ export function usePatientVisits(options?: {
   todayOnly?: boolean;
   from?: string;
   to?: string;
+  /** Poll interval in ms. Default 3000. Set false to disable polling. */
+  pollMs?: number | false;
 }) {
   const activeOnly = options?.activeOnly ?? false;
   const todayOnly = options?.todayOnly ?? false;
   const from = options?.from;
   const to = options?.to;
+  const pollMs = options?.pollMs ?? POLL_INTERVAL_MS;
   const [visits, setVisits] = useState<PatientVisit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,9 +47,10 @@ export function usePatientVisits(options?: {
 
   useEffect(() => {
     fetchVisits();
-    const interval = setInterval(fetchVisits, POLL_INTERVAL_MS);
+    if (pollMs === false) return;
+    const interval = setInterval(fetchVisits, pollMs);
     return () => clearInterval(interval);
-  }, [fetchVisits]);
+  }, [fetchVisits, pollMs]);
 
   return { visits, loading, error, refresh: fetchVisits };
 }
