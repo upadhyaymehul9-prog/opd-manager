@@ -117,14 +117,22 @@ const PROCEDURE_LABELS: Record<string, string> = {
 type ReportsDashboardProps = {
   initialTab?: ReportTab;
   showTabs?: ReportTab[];
+  fromDate?: string;
+  toDate?: string;
+  hideDateBar?: boolean;
 };
 
 export function ReportsDashboard({
   initialTab = "overview",
   showTabs,
+  fromDate: controlledFrom,
+  toDate: controlledTo,
+  hideDateBar = false,
 }: ReportsDashboardProps) {
-  const [fromDate, setFromDate] = useState(todayStr);
-  const [toDate, setToDate] = useState(todayStr);
+  const [internalFrom, setInternalFrom] = useState(todayStr);
+  const [internalTo, setInternalTo] = useState(todayStr);
+  const fromDate = controlledFrom ?? internalFrom;
+  const toDate = controlledTo ?? internalTo;
   const [tab, setTab] = useState<ReportTab>(initialTab);
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -158,19 +166,21 @@ export function ReportsDashboard({
   }, [queryRange]);
 
   function setPreset(from: string, to: string) {
-    setFromDate(from);
-    setToDate(to);
+    if (controlledFrom == null) setInternalFrom(from);
+    if (controlledTo == null) setInternalTo(to);
   }
 
   return (
     <div>
-      <DateRangeBar
-        fromDate={fromDate}
-        toDate={toDate}
-        onFromChange={setFromDate}
-        onToChange={setToDate}
-        onPreset={setPreset}
-      />
+      {!hideDateBar && (
+        <DateRangeBar
+          fromDate={fromDate}
+          toDate={toDate}
+          onFromChange={setInternalFrom}
+          onToChange={setInternalTo}
+          onPreset={setPreset}
+        />
+      )}
 
       <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
         {visibleTabs.map((t) => (

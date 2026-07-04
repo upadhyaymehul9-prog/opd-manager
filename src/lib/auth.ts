@@ -28,7 +28,7 @@ const PAGE_ACCESS: Record<string, UserRole[]> = {
   "/tv": ["display", "admin", "manager"],
   "/manager": ["manager", "admin"],
   "/analytics": ["manager", "admin"],
-  "/reports": ["manager", "admin", "pharmacy", "reception"],
+  "/reports": ["manager", "admin", "pharmacy"],
   "/records": ["pharmacy", "admin", "manager", "reception", "doctor"],
   "/settings/doctors": ["admin", "manager", "doctor"],
 };
@@ -156,8 +156,7 @@ export function canAccessApi(
     return (
       session.role === "admin" ||
       session.role === "manager" ||
-      session.role === "pharmacy" ||
-      session.role === "reception"
+      session.role === "pharmacy"
     );
   }
 
@@ -337,7 +336,13 @@ export function canAccessPath(
 
 export function rolesForNav(role: UserRole) {
   if (role === "admin" || role === "manager") {
-    return Object.keys(PAGE_ACCESS);
+    return [
+      "/manager",
+      "/analytics",
+      "/records",
+      "/reports",
+      "/settings/doctors",
+    ];
   }
   return Object.entries(PAGE_ACCESS)
     .filter(([, roles]) => roles.includes(role))

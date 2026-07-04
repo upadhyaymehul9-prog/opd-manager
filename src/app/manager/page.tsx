@@ -102,15 +102,6 @@ export default function ManagerPage() {
         }}
       />
 
-      <div className="mb-4 flex flex-wrap gap-3">
-        <Link
-          href="/reports"
-          className="rounded-lg border border-sky-300 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-900 hover:bg-sky-100"
-        >
-          Full clinic reports & revenue →
-        </Link>
-      </div>
-
       {loading && <p className="text-slate-600">Loading…</p>}
       {error && <p className="text-red-600">{error}</p>}
 

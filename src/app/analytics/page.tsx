@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ConsoleShell } from "@/components/ConsoleShell";
 import { DateRangeBar } from "@/components/DateRangeBar";
+import { ReportsDashboard } from "@/components/ReportsDashboard";
 import { StockAlertsPanel } from "@/components/StockAlertsPanel";
 import {
   BarChart,
@@ -262,6 +263,21 @@ export default function AnalyticsPage() {
           </section>
         </div>
       )}
+
+      <section className="mt-10 border-t border-slate-200 pt-10">
+        <h2 className="mb-2 text-xl font-bold text-slate-900">
+          Clinic revenue & department registers
+        </h2>
+        <p className="mb-6 text-sm text-slate-600">
+          Revenue breakdown, department registers, and medicine tracking for the
+          selected date range above.
+        </p>
+        <ReportsDashboard
+          hideDateBar
+          fromDate={queryRange.from}
+          toDate={queryRange.to}
+        />
+      </section>
     </ConsoleShell>
   );
 }

@@ -4,7 +4,15 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { logout, useSession } from "@/hooks/useSession";
 
-const NAV = [
+const ADMIN_NAV = [
+  { href: "/manager", label: "OPD Manager", color: "bg-slate-700" },
+  { href: "/analytics", label: "Analytics", color: "bg-indigo-700" },
+  { href: "/records", label: "Records", color: "bg-cyan-700" },
+  { href: "/reports", label: "Reports", color: "bg-sky-700" },
+  { href: "/settings/doctors", label: "My profile", color: "bg-violet-700" },
+];
+
+const STAFF_NAV = [
   { href: "/reception", label: "Reception", color: "bg-emerald-600" },
   { href: "/doctor", label: "Doctor", color: "bg-blue-600" },
   { href: "/lab", label: "Lab", color: "bg-purple-600" },
@@ -13,22 +21,24 @@ const NAV = [
   { href: "/stock", label: "Stock", color: "bg-amber-600" },
   { href: "/records", label: "Records", color: "bg-cyan-700" },
   { href: "/tv", label: "TV Display", color: "bg-rose-600" },
-  { href: "/manager", label: "OPD Manager", color: "bg-slate-700" },
-  { href: "/analytics", label: "Analytics", color: "bg-indigo-700" },
   { href: "/reports", label: "Reports", color: "bg-sky-700" },
   { href: "/settings/doctors", label: "My profile", color: "bg-violet-700" },
 ];
 
 export function ConsoleNav({ current }: { current?: string }) {
   const { session } = useSession();
+  const isAdminView =
+    session?.role === "admin" || session?.role === "manager";
+  const navPool = isAdminView ? ADMIN_NAV : STAFF_NAV;
   const visibleNav = session
-    ? NAV.filter((item) => session.navPaths.includes(item.href))
-    : NAV;
+    ? navPool.filter((item) => session.navPaths.includes(item.href))
+    : navPool;
+  const homeHref = isAdminView ? "/manager" : "/";
 
   return (
     <nav className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
       <Link
-        href="/"
+        href={homeHref}
         className="mr-2 self-center text-sm font-bold text-slate-800"
       >
         OPD Manager
