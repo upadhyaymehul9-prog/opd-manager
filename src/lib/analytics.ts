@@ -7,6 +7,7 @@ import type {
   AnalyticsPayload,
   AnalyticsPharmacySales,
   AnalyticsPrediction,
+  AnalyticsRevenue,
   AnalyticsSummary,
   VisitForAnalytics,
 } from "./analytics-types";
@@ -66,46 +67,105 @@ function isToday(d: Date, todayStart: Date): boolean {
 }
 
 export function buildAnalytics(
-  todayVisits: VisitForAnalytics[],
+  periodVisits: VisitForAnalytics[],
   recentVisits: VisitForAnalytics[],
   now = new Date(),
   pharmacy: AnalyticsPharmacySales = {
-    billsToday: 0,
-    revenueToday: 0,
-    gstToday: 0,
+    billsCount: 0,
+    revenue: 0,
+    gst: 0,
     byPayment: [],
   },
+  periodMeta: {
+    from: string;
+    to: string;
+    isToday: boolean;
+    rangeStart?: Date;
+    rangeEndExclusive?: Date;
+  } = {
+    from: now.toISOString().slice(0, 10),
+    to: now.toISOString().slice(0, 10),
+    isToday: true,
+  },
+  procedureRevenue = 0,
 ): AnalyticsPayload {
-  const todayStart = startOfDay(now);
-  const completedToday = todayVisits.filter((v) => v.status === "completed");
-  const activeToday = todayVisits.filter((v) => v.status !== "completed");
-  const tatValues = completedToday
+  const completedInPeriod = periodVisits.filter((v) => v.status === "completed");
+  const activeInPeriod = periodVisits.filter((v) => v.status !== "completed");
+  const tatValues = completedInPeriod
     .map(turnaroundMinutes)
     .filter((v): v is number => v !== null);
 
+  const periodLabel =
+    periodMeta.from === periodMeta.to
+      ? periodMeta.from
+      : `${periodMeta.from} – ${periodMeta.to}`;
+
+  const receptionRevenue = periodVisits
+    .filter((v) => {
+      if (!v.consultation_fee || !v.consultation_paid_at) return false;
+      if (periodMeta.rangeStart && periodMeta.rangeEndExclusive) {
+        return (
+          v.consultation_paid_at >= periodMeta.rangeStart &&
+          v.consultation_paid_at < periodMeta.rangeEndExclusive
+        );
+      }
+      return true;
+    })
+    .reduce((s, v) => s + (v.consultation_fee ?? 0), 0);
+
   const summary: AnalyticsSummary = {
-    period: "today",
-    totalPatients: todayVisits.length,
-    newPatients: todayVisits.filter((v) => v.patient_type === "new").length,
-    oldPatients: todayVisits.filter((v) => v.patient_type === "old").length,
-    completed: completedToday.length,
-    active: activeToday.length,
+    periodLabel,
+    from: periodMeta.from,
+    to: periodMeta.to,
+    isToday: periodMeta.isToday,
+    totalPatients: periodVisits.length,
+    newPatients: periodVisits.filter((v) => v.patient_type === "new").length,
+    oldPatients: periodVisits.filter((v) => v.patient_type === "old").length,
+    completed: completedInPeriod.length,
+    active: activeInPeriod.length,
     avgTurnaroundMinutes: avg(tatValues),
     medianTurnaroundMinutes: median(tatValues),
     fastestMinutes: tatValues.length ? Math.min(...tatValues) : null,
     slowestMinutes: tatValues.length ? Math.max(...tatValues) : null,
   };
 
-  const ageGroups = buildAgeGroups(todayVisits);
-  const byDoctor = buildDoctorStats(todayVisits);
-  const lab = buildDeptStats(todayVisits, "lab");
-  const radiology = buildDeptStats(todayVisits, "radiology");
-  const hourlyToday = buildHourly(todayVisits, now);
-  const prediction = buildPrediction(todayVisits, recentVisits, now);
-  const insights = buildInsights(summary, lab, radiology, prediction, byDoctor, pharmacy);
+  const revenue: AnalyticsRevenue = {
+    total: receptionRevenue + pharmacy.revenue + procedureRevenue,
+    reception: receptionRevenue,
+    pharmacy: pharmacy.revenue,
+    procedures: procedureRevenue,
+  };
+
+  const ageGroups = buildAgeGroups(periodVisits);
+  const byDoctor = buildDoctorStats(periodVisits);
+  const lab = buildDeptStats(periodVisits, "lab");
+  const radiology = buildDeptStats(periodVisits, "radiology");
+  const hourlyToday = buildHourly(periodVisits, now);
+  const prediction = periodMeta.isToday
+    ? buildPrediction(periodVisits, recentVisits, now)
+    : {
+        currentCount: periodVisits.length,
+        predictedEndOfDay: periodVisits.length,
+        expectedMoreToday: 0,
+        avgPerHour: 0,
+        peakHourLabel: null,
+        busyness: "low" as const,
+        recentWeekdayAvg: null,
+        message: "End-of-day prediction is only shown when viewing today.",
+      };
+  const insights = buildInsights(
+    summary,
+    lab,
+    radiology,
+    prediction,
+    byDoctor,
+    pharmacy,
+    revenue,
+  );
 
   return {
     summary,
+    revenue,
     ageGroups,
     byDoctor,
     lab,
@@ -296,27 +356,35 @@ function buildInsights(
   prediction: AnalyticsPrediction,
   doctors: AnalyticsDoctorRow[],
   pharmacy: AnalyticsPharmacySales,
+  revenue: AnalyticsRevenue,
 ): string[] {
   const insights: string[] = [];
+  const when = summary.isToday ? "today" : "in this period";
 
   if (summary.totalPatients === 0) {
-    insights.push("No patients registered today yet.");
+    insights.push(`No patients registered ${when} yet.`);
     return insights;
+  }
+
+  if (revenue.total > 0) {
+    insights.push(
+      `Total revenue ${when}: ₹${Math.round(revenue.total)} (Reception ₹${Math.round(revenue.reception)}, Pharmacy ₹${Math.round(revenue.pharmacy)}, Procedures ₹${Math.round(revenue.procedures)}).`,
+    );
   }
 
   if (summary.newPatients > summary.oldPatients) {
     insights.push(
-      `More new patients (${summary.newPatients}) than follow-ups (${summary.oldPatients}) today.`,
+      `More new patients (${summary.newPatients}) than follow-ups (${summary.oldPatients}) ${when}.`,
     );
   } else if (summary.oldPatients > summary.newPatients) {
     insights.push(
-      `More follow-up patients (${summary.oldPatients}) than new registrations today.`,
+      `More follow-up patients (${summary.oldPatients}) than new registrations ${when}.`,
     );
   }
 
   if (summary.avgTurnaroundMinutes != null) {
     insights.push(
-      `Average OPD turnaround today: ${summary.avgTurnaroundMinutes} minutes (registration → exit).`,
+      `Average OPD turnaround ${when}: ${summary.avgTurnaroundMinutes} minutes (registration → exit).`,
     );
   }
 
@@ -349,9 +417,9 @@ function buildInsights(
     insights.push("High OPD load — consider extra reception support.");
   }
 
-  if (pharmacy.billsToday > 0) {
+  if (pharmacy.billsCount > 0) {
     insights.push(
-      `Pharmacy: ${pharmacy.billsToday} bill(s) today — ₹${Math.round(pharmacy.revenueToday)} revenue (GST ₹${Math.round(pharmacy.gstToday)}).`,
+      `Pharmacy: ${pharmacy.billsCount} bill(s) ${when} — ₹${Math.round(pharmacy.revenue)} revenue (GST ₹${Math.round(pharmacy.gst)}).`,
     );
   }
 

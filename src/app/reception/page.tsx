@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ConsoleShell, SetupBanner } from "@/components/ConsoleShell";
+import { ReportsDashboard } from "@/components/ReportsDashboard";
 import { ConsultationBillReceipt } from "@/components/ConsultationBillReceipt";
 import { PrintActions } from "@/components/PrintActions";
 import type { Doctor, PatientType, PatientVisit } from "@/lib/types";
+
+type ReceptionView = "register" | "registers";
 
 type PatientSearchHit = {
   id: string;
@@ -16,6 +19,7 @@ type PatientSearchHit = {
 };
 
 export default function ReceptionPage() {
+  const [view, setView] = useState<ReceptionView>("register");
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [patientType, setPatientType] = useState<PatientType>("new");
   const [searchQuery, setSearchQuery] = useState("");
@@ -154,6 +158,34 @@ export default function ReceptionPage() {
     >
       {doctors.length === 0 && <SetupBanner />}
 
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+        <button
+          type="button"
+          onClick={() => setView("register")}
+          className={`rounded-t-lg px-4 py-2 text-sm font-medium ${
+            view === "register"
+              ? "border border-b-0 border-slate-200 bg-white text-slate-900"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          Register patient
+        </button>
+        <button
+          type="button"
+          onClick={() => setView("registers")}
+          className={`rounded-t-lg px-4 py-2 text-sm font-medium ${
+            view === "registers"
+              ? "border border-b-0 border-slate-200 bg-white text-slate-900"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          Clinic registers & revenue
+        </button>
+      </div>
+
+      {view === "registers" ? (
+        <ReportsDashboard initialTab="overview" />
+      ) : (
       <div className="grid gap-8 lg:grid-cols-2">
         <form
           onSubmit={handleSubmit}
@@ -371,6 +403,7 @@ export default function ReceptionPage() {
           </div>
         )}
       </div>
+      )}
     </ConsoleShell>
   );
 }

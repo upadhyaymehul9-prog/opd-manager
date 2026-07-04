@@ -8,9 +8,13 @@ const POLL_INTERVAL_MS = 3000;
 export function usePatientVisits(options?: {
   activeOnly?: boolean;
   todayOnly?: boolean;
+  from?: string;
+  to?: string;
 }) {
   const activeOnly = options?.activeOnly ?? false;
   const todayOnly = options?.todayOnly ?? false;
+  const from = options?.from;
+  const to = options?.to;
   const [visits, setVisits] = useState<PatientVisit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +24,8 @@ export function usePatientVisits(options?: {
       const params = new URLSearchParams();
       if (activeOnly) params.set("active", "true");
       if (todayOnly) params.set("today", "true");
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
       const qs = params.toString();
       const res = await fetch(`/api/patients${qs ? `?${qs}` : ""}`);
       if (!res.ok) {
@@ -34,7 +40,7 @@ export function usePatientVisits(options?: {
     } finally {
       setLoading(false);
     }
-  }, [activeOnly, todayOnly]);
+  }, [activeOnly, todayOnly, from, to]);
 
   useEffect(() => {
     fetchVisits();

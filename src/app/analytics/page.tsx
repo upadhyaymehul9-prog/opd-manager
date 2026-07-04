@@ -1,6 +1,8 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { ConsoleShell } from "@/components/ConsoleShell";
+import { DateRangeBar } from "@/components/DateRangeBar";
 import { StockAlertsPanel } from "@/components/StockAlertsPanel";
 import {
   BarChart,
@@ -9,16 +11,41 @@ import {
   formatMinutes,
   useAnalytics,
 } from "@/components/AnalyticsWidgets";
+import { todayStr } from "@/lib/date-range";
 
 export default function AnalyticsPage() {
-  const { data, loading, error } = useAnalytics();
+  const [fromDate, setFromDate] = useState(todayStr);
+  const [toDate, setToDate] = useState(todayStr);
+
+  const queryRange = useMemo(() => {
+    if (fromDate <= toDate) return { from: fromDate, to: toDate };
+    return { from: toDate, to: fromDate };
+  }, [fromDate, toDate]);
+
+  const { data, loading, error } = useAnalytics(
+    queryRange.from,
+    queryRange.to,
+  );
+
+  const periodLabel = data?.summary.isToday ? "today" : "in period";
 
   return (
     <ConsoleShell
       title="OPD Analytics"
-      subtitle="Today's clinic performance — auto-refreshes every 30 seconds"
+      subtitle="Clinic performance by date range — auto-refreshes every 30 seconds"
       current="/analytics"
     >
+      <DateRangeBar
+        fromDate={fromDate}
+        toDate={toDate}
+        onFromChange={setFromDate}
+        onToChange={setToDate}
+        onPreset={(from, to) => {
+          setFromDate(from);
+          setToDate(to);
+        }}
+      />
+
       {loading && !data && (
         <p className="text-slate-600">Loading analytics…</p>
       )}
@@ -26,8 +53,20 @@ export default function AnalyticsPage() {
 
       {data && (
         <div className="mx-auto max-w-7xl space-y-8">
+          <section className="rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 p-6">
+            <h2 className="text-lg font-bold text-slate-900">Total revenue</h2>
+            <p className="mt-1 text-3xl font-bold text-emerald-800">
+              ₹{Math.round(data.revenue.total)}
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              Reception ₹{Math.round(data.revenue.reception)} · Pharmacy ₹
+              {Math.round(data.revenue.pharmacy)} · Procedures ₹
+              {Math.round(data.revenue.procedures)}
+            </p>
+          </section>
+
           <section className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
-            <StatCard label="Total patients today" value={data.summary.totalPatients} accent="border-indigo-200" />
+            <StatCard label={`Total patients ${periodLabel}`} value={data.summary.totalPatients} accent="border-indigo-200" />
             <StatCard label="New patients" value={data.summary.newPatients} accent="border-emerald-200" />
             <StatCard label="Old / follow-up" value={data.summary.oldPatients} accent="border-blue-200" />
             <StatCard label="Completed (exit)" value={data.summary.completed} />
@@ -41,18 +80,18 @@ export default function AnalyticsPage() {
 
           <section className="rounded-xl border border-teal-200 bg-gradient-to-r from-teal-50 to-emerald-50 p-6">
             <h2 className="text-lg font-bold text-slate-900">
-              Pharmacy sales (today)
+              Pharmacy sales ({periodLabel})
             </h2>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatCard label="Bills" value={data.pharmacy.billsToday} />
+              <StatCard label="Bills" value={data.pharmacy.billsCount} />
               <StatCard
                 label="Revenue"
-                value={`₹${Math.round(data.pharmacy.revenueToday)}`}
+                value={`₹${Math.round(data.pharmacy.revenue)}`}
                 accent="border-teal-300"
               />
               <StatCard
                 label="GST collected"
-                value={`₹${Math.round(data.pharmacy.gstToday)}`}
+                value={`₹${Math.round(data.pharmacy.gst)}`}
               />
               <StatCard
                 label="Cash / UPI / Card"
@@ -64,6 +103,7 @@ export default function AnalyticsPage() {
             </div>
           </section>
 
+          {data.summary.isToday && (
           <section className="rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-indigo-50 p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
@@ -96,6 +136,7 @@ export default function AnalyticsPage() {
               />
             </div>
           </section>
+          )}
 
           {data.insights.length > 0 && (
             <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">

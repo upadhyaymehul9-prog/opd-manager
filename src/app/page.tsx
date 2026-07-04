@@ -66,6 +66,12 @@ const consoles = [
     color: "border-indigo-300 hover:border-indigo-500 bg-indigo-50",
   },
   {
+    href: "/reports",
+    title: "Clinic Reports",
+    desc: "Department registers, revenue, medicine tracking by date range",
+    color: "border-sky-300 hover:border-sky-500 bg-sky-50",
+  },
+  {
     href: "/settings/doctors",
     title: "Doctor Profiles",
     desc: "Name, specialty, photo, consultation fee for TV display",

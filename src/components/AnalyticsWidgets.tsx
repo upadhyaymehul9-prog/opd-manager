@@ -4,14 +4,18 @@ import { useCallback, useEffect, useState } from "react";
 import type { AnalyticsPayload } from "@/lib/analytics-types";
 import { formatMinutes } from "@/lib/analytics";
 
-export function useAnalytics(pollMs = 30_000) {
+export function useAnalytics(from?: string, to?: string, pollMs = 30_000) {
   const [data, setData] = useState<AnalyticsPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/analytics");
+      const params = new URLSearchParams();
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      const qs = params.toString();
+      const res = await fetch(`/api/analytics${qs ? `?${qs}` : ""}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Failed to load analytics");
@@ -23,9 +27,10 @@ export function useAnalytics(pollMs = 30_000) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [from, to]);
 
   useEffect(() => {
+    setLoading(true);
     load();
     const t = setInterval(load, pollMs);
     return () => clearInterval(t);

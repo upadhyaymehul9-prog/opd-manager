@@ -1,7 +1,10 @@
 export type PatientType = "new" | "old";
 
 export type AnalyticsSummary = {
-  period: "today";
+  periodLabel: string;
+  from: string;
+  to: string;
+  isToday: boolean;
   totalPatients: number;
   newPatients: number;
   oldPatients: number;
@@ -67,14 +70,22 @@ export type AnalyticsPrediction = {
 };
 
 export type AnalyticsPharmacySales = {
-  billsToday: number;
-  revenueToday: number;
-  gstToday: number;
+  billsCount: number;
+  revenue: number;
+  gst: number;
   byPayment: { mode: string; count: number; amount: number }[];
+};
+
+export type AnalyticsRevenue = {
+  total: number;
+  reception: number;
+  pharmacy: number;
+  procedures: number;
 };
 
 export type AnalyticsPayload = {
   summary: AnalyticsSummary;
+  revenue: AnalyticsRevenue;
   ageGroups: AnalyticsAgeGroup[];
   byDoctor: AnalyticsDoctorRow[];
   lab: AnalyticsDept;
@@ -99,6 +110,8 @@ export type VisitForAnalytics = {
   lab_ready_at: Date | null;
   radio_started_at: Date | null;
   radio_ready_at: Date | null;
+  consultation_fee: number | null;
+  consultation_paid_at: Date | null;
   registered_at: Date;
   completed_at: Date | null;
   doctors: { name: string };

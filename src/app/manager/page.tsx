@@ -1,10 +1,13 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { ConsoleShell } from "@/components/ConsoleShell";
+import { DateRangeBar } from "@/components/DateRangeBar";
 import { StatusBadge } from "@/components/PatientCard";
 import { usePatientVisits } from "@/hooks/usePatientVisits";
+import { todayStr } from "@/lib/date-range";
 import type { PatientStatus } from "@/lib/types";
 
 const FLOW_STAGES: { key: string; label: string; statuses: PatientStatus[] }[] =
@@ -41,7 +44,7 @@ const FLOW_STAGES: { key: string; label: string; statuses: PatientStatus[] }[] =
     },
     {
       key: "exit",
-      label: "Exited today",
+      label: "Completed",
       statuses: ["completed"],
     },
   ];
@@ -53,13 +56,29 @@ function stageForStatus(status: PatientStatus) {
 }
 
 export default function ManagerPage() {
-  const { visits, loading, error } = usePatientVisits({ todayOnly: true });
+  const [fromDate, setFromDate] = useState(todayStr);
+  const [toDate, setToDate] = useState(todayStr);
+
+  const queryRange = useMemo(() => {
+    if (fromDate <= toDate) return { from: fromDate, to: toDate };
+    return { from: toDate, to: fromDate };
+  }, [fromDate, toDate]);
+
+  const isToday =
+    queryRange.from === todayStr() && queryRange.to === todayStr();
+
+  const { visits, loading, error } = usePatientVisits({
+    from: queryRange.from,
+    to: queryRange.to,
+  });
 
   const active = visits.filter((v) => v.status !== "completed");
   const completedToday = visits.filter((v) => v.status === "completed");
 
   const byStage = FLOW_STAGES.map((stage) => ({
     ...stage,
+    label:
+      stage.key === "exit" && isToday ? "Exited today" : stage.label,
     count:
       stage.key === "exit"
         ? completedToday.length
@@ -72,6 +91,26 @@ export default function ManagerPage() {
       subtitle="Full clinic view — every patient from entry to exit"
       current="/manager"
     >
+      <DateRangeBar
+        fromDate={fromDate}
+        toDate={toDate}
+        onFromChange={setFromDate}
+        onToChange={setToDate}
+        onPreset={(from, to) => {
+          setFromDate(from);
+          setToDate(to);
+        }}
+      />
+
+      <div className="mb-4 flex flex-wrap gap-3">
+        <Link
+          href="/reports"
+          className="rounded-lg border border-sky-300 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-900 hover:bg-sky-100"
+        >
+          Full clinic reports & revenue →
+        </Link>
+      </div>
+
       {loading && <p className="text-slate-600">Loading…</p>}
       {error && <p className="text-red-600">{error}</p>}
 
@@ -93,7 +132,7 @@ export default function ManagerPage() {
             <strong>{active.length}</strong> in clinic now
           </span>
           <span>
-            <strong>{completedToday.length}</strong> exited today
+            <strong>{completedToday.length}</strong> completed
           </span>
         </div>
         <Link
@@ -161,7 +200,7 @@ export default function ManagerPage() {
           </tbody>
         </table>
         {visits.length === 0 && !loading && (
-          <p className="p-8 text-center text-slate-500">No visits yet today</p>
+          <p className="p-8 text-center text-slate-500">No visits in this period</p>
         )}
       </div>
     </ConsoleShell>

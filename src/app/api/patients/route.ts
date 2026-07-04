@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { startOfDay } from "date-fns";
+import { addDays, startOfDay } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { visitInclude } from "@/lib/db-includes";
 import { nextConsultationBillNo } from "@/lib/consultation-billing";
+import { parseDateParam } from "@/lib/date-range";
 import { findOrCreatePatient } from "@/lib/patients";
 import { serializeVisit } from "@/lib/serialize";
 import { nextTokenNumber } from "@/lib/tokens";
@@ -13,14 +14,23 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const activeOnly = searchParams.get("active") === "true";
     const todayOnly = searchParams.get("today") === "true";
+    const fromParam = searchParams.get("from");
+    const toParam = searchParams.get("to");
 
     const where: {
       status?: { not: string };
-      registered_at?: { gte: Date };
+      registered_at?: { gte: Date; lt?: Date };
     } = {};
 
     if (activeOnly) where.status = { not: "completed" };
     if (todayOnly) where.registered_at = { gte: startOfDay(new Date()) };
+    else if (fromParam || toParam) {
+      const rangeStart = parseDateParam(fromParam) ?? startOfDay(new Date());
+      const rangeEnd = parseDateParam(toParam) ?? rangeStart;
+      const start = rangeStart <= rangeEnd ? rangeStart : rangeEnd;
+      const end = rangeStart <= rangeEnd ? rangeEnd : rangeStart;
+      where.registered_at = { gte: start, lt: addDays(end, 1) };
+    }
 
     const visits = await prisma.patientVisit.findMany({
       where: Object.keys(where).length > 0 ? where : undefined,
