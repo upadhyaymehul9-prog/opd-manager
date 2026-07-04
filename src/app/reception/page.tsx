@@ -7,6 +7,8 @@ import { TodayCollectionPanel } from "@/components/TodayCollectionPanel";
 import { AppointmentsPanel } from "@/components/AppointmentsPanel";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { tokenRegisteredMessage } from "@/lib/whatsapp-messages";
+import { CONSENT_TEXT_V1 } from "@/lib/nabh";
+import { NATIONAL_ID_TYPES, POINT_OF_ORIGIN_OPTIONS } from "@/lib/nabh-cms";
 import { ConsultationBillReceipt } from "@/components/ConsultationBillReceipt";
 import { PrintActions } from "@/components/PrintActions";
 import type { Doctor, PatientType, PatientVisit } from "@/lib/types";
@@ -16,6 +18,7 @@ type PatientSearchHit = {
   patient_number: number;
   name: string;
   mobile: string | null;
+  abha_id: string | null;
   last_age: number | null;
 };
 
@@ -34,6 +37,24 @@ export default function ReceptionPage() {
   const [age, setAge] = useState("");
   const [mobile, setMobile] = useState("");
   const [address, setAddress] = useState("");
+  const [abhaId, setAbhaId] = useState("");
+  const [gender, setGender] = useState("");
+  const [emergencyContact, setEmergencyContact] = useState("");
+  const [medicoLegal, setMedicoLegal] = useState(false);
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [witnessName, setWitnessName] = useState("");
+  const [pointOfOrigin, setPointOfOrigin] = useState("walk_in");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [occupation, setOccupation] = useState("");
+  const [nationalIdType, setNationalIdType] = useState("");
+  const [nationalId, setNationalId] = useState("");
+  const [duplicateWarning, setDuplicateWarning] = useState<
+    { id: string; patient_number: number; name: string; mobile: string | null }[]
+  >([]);
+  const [duplicateConfirmed, setDuplicateConfirmed] = useState(false);
+  const [mobileVerifyCode, setMobileVerifyCode] = useState<string | null>(null);
+  const [mobileVerified, setMobileVerified] = useState(false);
+  const [verifyInput, setVerifyInput] = useState("");
   const [consultationFee, setConsultationFee] = useState("");
   const [paymentMode, setPaymentMode] = useState("cash");
   const [collectFee, setCollectFee] = useState(true);
@@ -58,6 +79,26 @@ export default function ReceptionPage() {
       })
       .catch(() => setError("Could not load doctors — check DATABASE_URL setup"));
   }, []);
+
+  useEffect(() => {
+    if (patientType !== "new" || patientName.trim().length < 2) {
+      setDuplicateWarning([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const params = new URLSearchParams({ name: patientName.trim() });
+      if (mobile.trim()) params.set("mobile", mobile.trim());
+      if (abhaId.trim()) params.set("abha_id", abhaId.trim());
+      if (nationalId.trim()) params.set("national_id", nationalId.trim());
+      const res = await fetch(`/api/patients/check-duplicate?${params}`);
+      if (res.ok) {
+        const hits = await res.json();
+        setDuplicateWarning(hits);
+        if (hits.length === 0) setDuplicateConfirmed(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [patientName, mobile, abhaId, nationalId, patientType]);
 
   useEffect(() => {
     const d = doctors.find((x) => x.id === doctorId);
@@ -85,19 +126,37 @@ export default function ReceptionPage() {
     setSelectedPatientNumber(p.patient_number);
     setPatientName(p.name);
     setMobile(p.mobile ?? "");
+    setAbhaId(p.abha_id ?? "");
     if (p.last_age) setAge(String(p.last_age));
     setSearchQuery("");
     setSearchResults([]);
   }
 
-  function resetPatientType(type: PatientType) {
-    setPatientType(type);
-    setSelectedPatientId(null);
-    setSelectedPatientNumber(null);
+  function clearRegistrationForm() {
     setPatientName("");
     setAge("");
     setMobile("");
     setAddress("");
+    setAbhaId("");
+    setGender("");
+    setEmergencyContact("");
+    setMedicoLegal(false);
+    setConsentAccepted(false);
+    setWitnessName("");
+    setPointOfOrigin("walk_in");
+    setDateOfBirth("");
+    setOccupation("");
+    setNationalIdType("");
+    setNationalId("");
+    setDuplicateConfirmed(false);
+    setDuplicateWarning([]);
+    setSelectedPatientId(null);
+    setSelectedPatientNumber(null);
+  }
+
+  function resetPatientType(type: PatientType) {
+    clearRegistrationForm();
+    setPatientType(type);
     setSearchQuery("");
     setSearchResults([]);
   }
@@ -107,6 +166,20 @@ export default function ReceptionPage() {
     if (!patientName.trim() || !doctorId) return;
     if (patientType === "old" && !selectedPatientId) {
       setError("Search and select an existing patient first");
+      return;
+    }
+    if (!consentAccepted) {
+      setError("Patient or attendant must accept informed consent (NABH requirement)");
+      return;
+    }
+    if (
+      patientType === "new" &&
+      duplicateWarning.length > 0 &&
+      !duplicateConfirmed
+    ) {
+      setError(
+        "Possible duplicate patient found — select existing patient or confirm new registration below",
+      );
       return;
     }
 
@@ -125,6 +198,18 @@ export default function ReceptionPage() {
           age: age ? Number(age) : null,
           mobile: mobile || null,
           address: address.trim() || null,
+          abha_id: abhaId.trim() || null,
+          gender: gender || null,
+          emergency_contact: emergencyContact.trim() || null,
+          medico_legal: medicoLegal,
+          consent_accepted: true,
+          witness_name: witnessName.trim() || null,
+          point_of_origin: pointOfOrigin,
+          date_of_birth: dateOfBirth || null,
+          occupation: occupation.trim() || null,
+          national_id_type: nationalIdType || null,
+          national_id: nationalId.trim() || null,
+          duplicate_confirmed: duplicateConfirmed || patientType === "old",
           consultation_fee:
             collectFee && consultationFee ? Number(consultationFee) : null,
           consultation_payment_mode: collectFee ? paymentMode : null,
@@ -134,13 +219,10 @@ export default function ReceptionPage() {
       if (!res.ok) throw new Error(data.error || "Registration failed");
 
       setLastVisit(data);
-      setPatientName("");
-      setAge("");
-      setMobile("");
-      setAddress("");
-      setSelectedPatientId(null);
-      setSelectedPatientNumber(null);
-      setPatientType("new");
+      setMobileVerifyCode(data.mobile_verify_code ?? null);
+      setMobileVerified(false);
+      setVerifyInput("");
+      clearRegistrationForm();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
@@ -194,7 +276,7 @@ export default function ReceptionPage() {
           {patientType === "old" && (
             <div className="mt-4">
               <label className="block text-sm font-medium text-slate-700">
-                Search by name, mobile, or P-number
+                Search by name, mobile, P-number, or ABHA
               </label>
               <input
                 type="text"
@@ -220,6 +302,7 @@ export default function ReceptionPage() {
                         <span className="font-semibold">P-{p.patient_number}</span>{" "}
                         {p.name}
                         {p.mobile ? ` · ${p.mobile}` : ""}
+                        {p.abha_id ? ` · ABHA ${p.abha_id}` : ""}
                       </button>
                     </li>
                   ))}
@@ -233,6 +316,58 @@ export default function ReceptionPage() {
               A new permanent patient ID (P-number) will be assigned on register.
             </p>
           )}
+
+          {patientType === "new" && duplicateWarning.length > 0 && (
+            <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <p className="font-semibold">Possible duplicate (NABH AAC.1g)</p>
+              <ul className="mt-1 list-inside list-disc">
+                {duplicateWarning.map((p) => (
+                  <li key={p.id ?? p.patient_number}>
+                    <button
+                      type="button"
+                      className="text-left underline hover:text-amber-950"
+                      onClick={() => {
+                        setPatientType("old");
+                        setSelectedPatientId(p.id);
+                        setSelectedPatientNumber(p.patient_number);
+                        setPatientName(p.name);
+                        setMobile(p.mobile ?? "");
+                        setDuplicateWarning([]);
+                        setDuplicateConfirmed(false);
+                      }}
+                    >
+                      P-{p.patient_number} {p.name}
+                      {p.mobile ? ` · ${p.mobile}` : ""}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <label className="mt-3 flex items-start gap-2 text-xs font-medium">
+                <input
+                  type="checkbox"
+                  checked={duplicateConfirmed}
+                  onChange={(e) => setDuplicateConfirmed(e.target.checked)}
+                  className="mt-0.5"
+                />
+                I confirm this is a genuinely new patient (not a duplicate)
+              </label>
+            </div>
+          )}
+
+          <label className="mt-4 block text-sm font-medium text-slate-700">
+            Point of origin (AAC.1c)
+          </label>
+          <select
+            value={pointOfOrigin}
+            onChange={(e) => setPointOfOrigin(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3"
+          >
+            {POINT_OF_ORIGIN_OPTIONS.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
 
           <label className="mt-4 block text-sm font-medium text-slate-700">
             Patient name
@@ -260,6 +395,75 @@ export default function ReceptionPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700">
+                Gender
+              </label>
+              <select
+                value={gender}
+                onChange={(e) => setGender(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3"
+              >
+                <option value="">Select</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Date of birth</label>
+              <input
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3"
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Occupation</label>
+              <input
+                type="text"
+                value={occupation}
+                onChange={(e) => setOccupation(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">National ID type</label>
+              <select
+                value={nationalIdType}
+                onChange={(e) => setNationalIdType(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3"
+              >
+                <option value="">None</option>
+                {NATIONAL_ID_TYPES.filter((t) => t.id !== "abha").map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {nationalIdType && nationalIdType !== "abha" && (
+            <label className="mt-4 block text-sm font-medium text-slate-700">
+              National ID number
+              <input
+                type="text"
+                value={nationalId}
+                onChange={(e) => setNationalId(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3"
+              />
+            </label>
+          )}
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
                 Mobile
               </label>
               <input
@@ -269,7 +473,39 @@ export default function ReceptionPage() {
                 className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                Emergency contact
+              </label>
+              <input
+                type="tel"
+                value={emergencyContact}
+                onChange={(e) => setEmergencyContact(e.target.value)}
+                placeholder="Relative mobile"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3"
+              />
+            </div>
           </div>
+
+          <label className="mt-4 flex items-center gap-2 text-sm font-medium text-amber-900">
+            <input
+              type="checkbox"
+              checked={medicoLegal}
+              onChange={(e) => setMedicoLegal(e.target.checked)}
+            />
+            Medico-legal case (assault, MLC, etc.)
+          </label>
+
+          <label className="mt-4 block text-sm font-medium text-slate-700">
+            ABHA ID (optional)
+          </label>
+          <input
+            type="text"
+            value={abhaId}
+            onChange={(e) => setAbhaId(e.target.value)}
+            placeholder="91-1234-5678-9012 (14 digits, ABDM)"
+            className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3"
+          />
 
           <label className="mt-4 block text-sm font-medium text-slate-700">
             Address
@@ -337,6 +573,33 @@ export default function ReceptionPage() {
             </p>
           )}
 
+          <div className="mt-6 rounded-lg border border-teal-200 bg-teal-50 p-4">
+            <h3 className="text-sm font-semibold text-teal-900">
+              Informed consent (NABH)
+            </h3>
+            <p className="mt-2 text-xs text-teal-800">{CONSENT_TEXT_V1}</p>
+            <label className="mt-3 flex items-start gap-2 text-sm font-medium text-teal-900">
+              <input
+                type="checkbox"
+                checked={consentAccepted}
+                onChange={(e) => setConsentAccepted(e.target.checked)}
+                className="mt-1"
+                required
+              />
+              Patient / attendant accepts treatment and data use
+            </label>
+            <label className="mt-3 block text-sm">
+              <span className="font-medium text-slate-700">Witness (optional)</span>
+              <input
+                type="text"
+                value={witnessName}
+                onChange={(e) => setWitnessName(e.target.value)}
+                placeholder="Name if signed by attendant"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+              />
+            </label>
+          </div>
+
           {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
           <button
@@ -366,9 +629,14 @@ export default function ReceptionPage() {
                   Patient ID: P-{lastVisit.patient_number}
                 </p>
               )}
+              {lastVisit.patient_abha_id && (
+                <p className="mt-1 text-sm font-medium text-indigo-700">
+                  ABHA: {lastVisit.patient_abha_id}
+                </p>
+              )}
               <p className="mt-2 text-xl font-semibold">{lastVisit.patient_name}</p>
               {lastVisit.mobile && lastVisit.doctors && (
-                <div className="mt-4">
+                <div className="mt-4 space-y-3">
                   <WhatsAppLink
                     mobile={lastVisit.mobile}
                     message={tokenRegisteredMessage({
@@ -380,6 +648,56 @@ export default function ReceptionPage() {
                     label="Send token on WhatsApp"
                     className="text-sm"
                   />
+                  {mobileVerifyCode && (
+                    <div className="rounded-lg border border-indigo-200 bg-white p-3 text-sm">
+                      <p className="font-medium text-indigo-900">
+                        Mobile verification (AAC.1b)
+                      </p>
+                      <p className="mt-1 text-slate-600">
+                        Share code <strong>{mobileVerifyCode}</strong> with patient via
+                        WhatsApp/SMS, then confirm below.
+                      </p>
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={verifyInput}
+                          onChange={(e) => setVerifyInput(e.target.value)}
+                          placeholder="Enter code"
+                          className="w-28 rounded border border-slate-300 px-2 py-1"
+                        />
+                        <button
+                          type="button"
+                          className="rounded bg-indigo-600 px-3 py-1 text-white"
+                          onClick={async () => {
+                            const res = await fetch(
+                              `/api/patients/${lastVisit.id}/verify-mobile`,
+                              {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ code: verifyInput }),
+                              },
+                            );
+                            if (res.ok) {
+                              setMobileVerifyCode(null);
+                              setVerifyInput("");
+                              setMobileVerified(true);
+                            } else {
+                              const d = await res.json();
+                              setError(d.error || "Invalid verification code");
+                            }
+                          }}
+                        >
+                          Verify
+                        </button>
+                      </div>
+                      {mobileVerified && (
+                        <p className="mt-2 text-xs font-medium text-emerald-700">
+                          Mobile verified successfully.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

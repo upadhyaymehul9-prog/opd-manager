@@ -6,6 +6,7 @@ import {
   sessionCookieOptions,
   verifyPassword,
 } from "@/lib/auth";
+import { AUDIT_ACTIONS, logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
@@ -23,6 +24,12 @@ export async function POST(request: Request) {
 
     const user = await prisma.user.findUnique({ where: { username } });
     if (!user || !(await verifyPassword(password, user.password_hash))) {
+      await logAudit({
+        action: AUDIT_ACTIONS.LOGIN_FAILED,
+        entity_type: "user",
+        summary: `Failed login attempt for ${username}`,
+        actor: { username, role: "unknown" },
+      });
       return NextResponse.json(
         { error: "Invalid username or password" },
         { status: 401 },
@@ -50,6 +57,21 @@ export async function POST(request: Request) {
     });
     const cookie = sessionCookieOptions(token, remember);
     response.cookies.set(cookie);
+
+    await logAudit({
+      action: AUDIT_ACTIONS.LOGIN,
+      entity_type: "user",
+      entity_id: user.id,
+      summary: `${user.username} logged in`,
+      session: {
+        userId: user.id,
+        username: user.username,
+        role,
+        displayName: user.display_name,
+        doctorId: user.doctor_id,
+      },
+    });
+
     return response;
   } catch (e) {
     const message = e instanceof Error ? e.message : "Login failed";

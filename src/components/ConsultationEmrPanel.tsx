@@ -15,9 +15,16 @@ export function ConsultationEmrPanel({
   initialAllergies,
 }: ConsultationEmrPanelProps) {
   const [chiefComplaint, setChiefComplaint] = useState("");
+  const [provisionalDiagnosis, setProvisionalDiagnosis] = useState("");
+  const [finalDiagnosis, setFinalDiagnosis] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
   const [examinationNotes, setExaminationNotes] = useState("");
   const [advice, setAdvice] = useState("");
+  const [lifestyleAdvice, setLifestyleAdvice] = useState("");
+  const [investigationsOrdered, setInvestigationsOrdered] = useState("");
+  const [followUpInstructions, setFollowUpInstructions] = useState("");
+  const [referralNotes, setReferralNotes] = useState("");
+  const [followUpDate, setFollowUpDate] = useState("");
   const [allergies, setAllergies] = useState(initialAllergies ?? "");
   const [bloodGroup, setBloodGroup] = useState("");
   const [vitalsBp, setVitalsBp] = useState("");
@@ -34,9 +41,16 @@ export function ConsultationEmrPanel({
 
   const applyEmr = useCallback((emr: VisitEmrView) => {
     setChiefComplaint(emr.chief_complaint ?? "");
+    setProvisionalDiagnosis(emr.provisional_diagnosis ?? "");
+    setFinalDiagnosis(emr.final_diagnosis ?? emr.diagnosis ?? "");
     setDiagnosis(emr.diagnosis ?? "");
     setExaminationNotes(emr.examination_notes ?? "");
     setAdvice(emr.advice ?? "");
+    setLifestyleAdvice(emr.lifestyle_advice ?? "");
+    setInvestigationsOrdered(emr.investigations_ordered ?? "");
+    setFollowUpInstructions(emr.follow_up_instructions ?? "");
+    setReferralNotes(emr.referral_notes ?? "");
+    setFollowUpDate(emr.follow_up_date ?? "");
     setAllergies(emr.patient.allergies ?? "");
     setBloodGroup(emr.patient.blood_group ?? "");
     setVitalsBp(emr.vitals.bp ?? "");
@@ -67,7 +81,11 @@ export function ConsultationEmrPanel({
 
   function applyTemplate(template: ConsultationTemplate) {
     if (template.chief_complaint) setChiefComplaint(template.chief_complaint);
-    if (template.diagnosis) setDiagnosis(template.diagnosis);
+    if (template.diagnosis) {
+      setProvisionalDiagnosis(template.diagnosis);
+      setFinalDiagnosis(template.diagnosis);
+      setDiagnosis(template.diagnosis);
+    }
     if (template.examination_notes) setExaminationNotes(template.examination_notes);
     if (template.advice) setAdvice(template.advice);
     setSaved(false);
@@ -84,9 +102,16 @@ export function ConsultationEmrPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chief_complaint: chiefComplaint,
-          diagnosis,
+          provisional_diagnosis: provisionalDiagnosis,
+          final_diagnosis: finalDiagnosis || diagnosis,
+          diagnosis: finalDiagnosis || diagnosis,
           examination_notes: examinationNotes,
           advice,
+          lifestyle_advice: lifestyleAdvice,
+          investigations_ordered: investigationsOrdered,
+          follow_up_instructions: followUpInstructions,
+          referral_notes: referralNotes,
+          follow_up_date: followUpDate || null,
           patient_allergies: allergies,
           patient_blood_group: bloodGroup,
           vitals_bp: vitalsBp,
@@ -280,11 +305,39 @@ export function ConsultationEmrPanel({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700">Diagnosis</label>
+              <label className="block text-xs font-medium text-slate-700">
+                Provisional diagnosis
+              </label>
               <textarea
-                value={diagnosis}
-                onChange={(e) => setDiagnosis(e.target.value)}
+                value={provisionalDiagnosis}
+                onChange={(e) => setProvisionalDiagnosis(e.target.value)}
                 rows={2}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700">
+                Final diagnosis (NABH COP.1i)
+              </label>
+              <textarea
+                value={finalDiagnosis}
+                onChange={(e) => {
+                  setFinalDiagnosis(e.target.value);
+                  setDiagnosis(e.target.value);
+                }}
+                rows={2}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700">
+                Investigations ordered
+              </label>
+              <textarea
+                value={investigationsOrdered}
+                onChange={(e) => setInvestigationsOrdered(e.target.value)}
+                rows={2}
+                placeholder="CBC, LFT, X-ray chest…"
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
             </div>
@@ -298,13 +351,54 @@ export function ConsultationEmrPanel({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700">Advice</label>
+              <label className="block text-xs font-medium text-slate-700">Treatment / advice</label>
               <textarea
                 value={advice}
                 onChange={(e) => setAdvice(e.target.value)}
                 rows={2}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700">Lifestyle advice</label>
+              <textarea
+                value={lifestyleAdvice}
+                onChange={(e) => setLifestyleAdvice(e.target.value)}
+                rows={2}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700">
+                Follow-up instructions
+              </label>
+              <textarea
+                value={followUpInstructions}
+                onChange={(e) => setFollowUpInstructions(e.target.value)}
+                rows={2}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Follow-up date</label>
+                <input
+                  type="date"
+                  value={followUpDate}
+                  onChange={(e) => setFollowUpDate(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Referral notes</label>
+                <input
+                  type="text"
+                  value={referralNotes}
+                  onChange={(e) => setReferralNotes(e.target.value)}
+                  placeholder="Referred to specialist…"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+              </div>
             </div>
           </div>
 

@@ -11,6 +11,7 @@ import type { PharmacyBillView } from "@/lib/billing-types";
 import type { Prescription } from "@/lib/prescription-types";
 import type { PatientVisit } from "@/lib/types";
 import { EmrSummary } from "@/components/EmrSummary";
+import { OpdVisitSummary } from "@/components/OpdVisitSummary";
 
 export default function RecordDetailPage({
   params,
@@ -120,6 +121,8 @@ export default function RecordDetailPage({
       </div>
 
       <EmrSummary visit={visit} />
+
+      <OpdVisitSummary visitId={visitId} />
 
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="font-semibold text-slate-900">Lab & radiology</h2>

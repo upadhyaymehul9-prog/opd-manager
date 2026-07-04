@@ -14,6 +14,8 @@ type VisitWithDoctor = {
   status: string;
   patient_type: string;
   age: number | null;
+  gender: string | null;
+  medico_legal: boolean;
   mobile: string | null;
   address: string | null;
   lab_referred: boolean;
@@ -28,9 +30,20 @@ type VisitWithDoctor = {
   consultation_paid_at: Date | null;
   updated_at: Date;
   chief_complaint: string | null;
+  provisional_diagnosis: string | null;
+  final_diagnosis: string | null;
   diagnosis: string | null;
   examination_notes: string | null;
   advice: string | null;
+  lifestyle_advice: string | null;
+  investigations_ordered: string | null;
+  follow_up_instructions: string | null;
+  referral_notes: string | null;
+  follow_up_date: Date | null;
+  signed_at: Date | null;
+  signed_by: string | null;
+  point_of_origin: string;
+  mlc_details: string | null;
   vitals_bp: string | null;
   vitals_pulse: number | null;
   vitals_temp: number | null;
@@ -43,7 +56,7 @@ type VisitWithDoctor = {
     specialty: string | null;
     opd_status: string;
   };
-  patient?: { id: string; patient_number: number; allergies: string | null; blood_group: string | null } | null;
+  patient?: { id: string; patient_number: number; allergies: string | null; blood_group: string | null; abha_id: string | null } | null;
 };
 
 export function serializeDoctor(doctor: {
@@ -82,6 +95,9 @@ export function serializeVisit(visit: VisitWithDoctor): PatientVisit {
     status: visit.status as PatientVisit["status"],
     patient_type: visit.patient_type as PatientType,
     age: visit.age,
+    gender: visit.gender ?? null,
+    medico_legal: visit.medico_legal ?? false,
+    mlc_details: visit.mlc_details ?? null,
     mobile: visit.mobile,
     address: visit.address ?? null,
     lab_referred: visit.lab_referred,
@@ -96,9 +112,19 @@ export function serializeVisit(visit: VisitWithDoctor): PatientVisit {
     consultation_paid_at: visit.consultation_paid_at?.toISOString() ?? null,
     updated_at: visit.updated_at.toISOString(),
     chief_complaint: visit.chief_complaint ?? null,
-    diagnosis: visit.diagnosis ?? null,
+    provisional_diagnosis: visit.provisional_diagnosis ?? null,
+    final_diagnosis: visit.final_diagnosis ?? null,
+    diagnosis: visit.final_diagnosis ?? visit.diagnosis ?? null,
     examination_notes: visit.examination_notes ?? null,
     advice: visit.advice ?? null,
+    lifestyle_advice: visit.lifestyle_advice ?? null,
+    investigations_ordered: visit.investigations_ordered ?? null,
+    follow_up_instructions: visit.follow_up_instructions ?? null,
+    referral_notes: visit.referral_notes ?? null,
+    follow_up_date: visit.follow_up_date?.toISOString().slice(0, 10) ?? null,
+    signed_at: visit.signed_at?.toISOString() ?? null,
+    signed_by: visit.signed_by ?? null,
+    point_of_origin: visit.point_of_origin ?? "walk_in",
     vitals_bp: visit.vitals_bp ?? null,
     vitals_pulse: visit.vitals_pulse ?? null,
     vitals_temp: visit.vitals_temp ?? null,
@@ -106,6 +132,7 @@ export function serializeVisit(visit: VisitWithDoctor): PatientVisit {
     vitals_spo2: visit.vitals_spo2 ?? null,
     patient_allergies: visit.patient?.allergies ?? null,
     patient_blood_group: visit.patient?.blood_group ?? null,
+    patient_abha_id: visit.patient?.abha_id ?? null,
     doctors: serializeDoctor(visit.doctors),
   };
 }

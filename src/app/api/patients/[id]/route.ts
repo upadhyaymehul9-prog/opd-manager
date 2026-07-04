@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { visitInclude } from "@/lib/db-includes";
 import { serializeVisit } from "@/lib/serialize";
+import { visitEmrCompleteForDischarge } from "@/lib/nabh";
+import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
 import type { PatientStatus, UpdatePatientInput } from "@/lib/types";
 
 export async function PATCH(
@@ -20,8 +22,21 @@ export async function PATCH(
     const existing = await prisma.patientVisit.findUnique({ where: { id } });
     const now = new Date();
 
+    if (status === "completed" && existing) {
+      if (!visitEmrCompleteForDischarge(existing)) {
+        return NextResponse.json(
+          {
+            error:
+              "NABH: complete EMR (chief complaint and diagnosis) before marking visit completed",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     const data: Record<string, unknown> = {
       ...(status !== undefined && { status }),
+      ...(body.medico_legal !== undefined && { medico_legal: body.medico_legal }),
       ...(body.room_number !== undefined && { room_number: body.room_number }),
       ...(body.lab_eta !== undefined && {
         lab_eta: body.lab_eta ? new Date(body.lab_eta) : null,
@@ -80,6 +95,17 @@ export async function PATCH(
       data,
       include: visitInclude,
     });
+
+    const session = await getSessionFromCookies();
+    if (status) {
+      await logAudit({
+        action: AUDIT_ACTIONS.VISIT_UPDATE,
+        entity_type: "visit",
+        entity_id: id,
+        summary: `Visit status → ${status} for ${visit.patient_name}`,
+        session,
+      });
+    }
 
     return NextResponse.json(serializeVisit(visit));
   } catch (e) {

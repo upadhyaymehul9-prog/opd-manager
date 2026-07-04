@@ -15,12 +15,23 @@ model Patient {
   address        String?
   allergies      String?
   blood_group    String?
+  abha_id        String?        @unique
+  gender         String?
+  emergency_contact String?
+  date_of_birth  DateTime?      @db.Date
+  occupation     String?
+  national_id_type String?
+  national_id    String?
+  mobile_verify_code String?
+  mobile_verified_at DateTime?  @db.Timestamptz(6)
   created_at     DateTime       @default(now()) @db.Timestamptz(6)
   visits         PatientVisit[]
   appointments   Appointment[]
+  consents       PatientConsent[]
 
   @@index([mobile])
   @@index([name])
+  @@index([abha_id])
   @@map("patients")
 }
 
@@ -74,8 +85,12 @@ model PatientVisit {
   status          String    @default("registered")
   patient_type    String    @default("new")
   age             Int?
+  gender          String?
   mobile          String?
   address         String?
+  medico_legal    Boolean   @default(false)
+  mlc_details     String?
+  point_of_origin String    @default("walk_in")
   lab_referred    Boolean   @default(false)
   radio_referred  Boolean   @default(false)
   lab_eta         DateTime? @db.Timestamptz(6)
@@ -91,9 +106,19 @@ model PatientVisit {
   consultation_bill_no      String?   @unique
   consultation_paid_at      DateTime? @db.Timestamptz(6)
   chief_complaint           String?
+  provisional_diagnosis     String?
+  final_diagnosis           String?
   diagnosis                 String?
   examination_notes         String?
   advice                    String?
+  lifestyle_advice          String?
+  investigations_ordered    String?
+  follow_up_instructions    String?
+  referral_notes            String?
+  follow_up_date            DateTime? @db.Date
+  signed_at                 DateTime? @db.Timestamptz(6)
+  signed_by                 String?
+  signed_by_role            String?
   vitals_bp                 String?
   vitals_pulse              Int?
   vitals_temp               Float?
@@ -106,6 +131,8 @@ model PatientVisit {
   pharmacy_bill   PharmacyBill?
   procedures      VisitProcedure[]
   appointment     Appointment?
+  consent         PatientConsent?
+  incidents       IncidentReport[]
 
   @@index([status])
   @@index([doctor_id])
@@ -321,4 +348,79 @@ model ConsultationTemplate {
 
   @@index([doctor_id])
   @@map("consultation_templates")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  user_id     String?  @db.Uuid
+  username    String
+  role        String
+  action      String
+  entity_type String
+  entity_id   String?
+  summary     String
+  details     String?
+  ip_address  String?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([created_at(sort: Desc)])
+  @@index([entity_type, entity_id])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model PatientConsent {
+  id               String       @id @default(uuid()) @db.Uuid
+  patient_visit_id String       @unique @db.Uuid
+  patient_id       String?      @db.Uuid
+  consent_type     String       @default("general_treatment")
+  accepted         Boolean
+  version          String       @default("1.0")
+  recorded_by      String
+  recorded_by_role String
+  witness_name     String?
+  consent_text     String?
+  created_at       DateTime     @default(now()) @db.Timestamptz(6)
+  visit            PatientVisit @relation(fields: [patient_visit_id], references: [id], onDelete: Cascade)
+  patient          Patient?     @relation(fields: [patient_id], references: [id], onDelete: SetNull)
+
+  @@index([patient_id])
+  @@map("patient_consents")
+}
+
+model IncidentReport {
+  id               String        @id @default(uuid()) @db.Uuid
+  patient_visit_id String?       @db.Uuid
+  patient_name     String
+  category         String
+  severity         String
+  description      String
+  immediate_action String?
+  status           String        @default("open")
+  reported_by      String
+  reported_by_role String
+  created_at       DateTime      @default(now()) @db.Timestamptz(6)
+  closed_at        DateTime?     @db.Timestamptz(6)
+  visit            PatientVisit? @relation(fields: [patient_visit_id], references: [id], onDelete: SetNull)
+
+  @@index([created_at(sort: Desc)])
+  @@index([status])
+  @@map("incident_reports")
+}
+
+model PatientFeedback {
+  id               String   @id @default(uuid()) @db.Uuid
+  patient_visit_id String?  @db.Uuid
+  patient_name     String
+  mobile           String?
+  q1_overall       Int
+  q2_care_quality  Int
+  q3_communication Int
+  q4_environment   Int
+  q5_registration  Int
+  comments         String?
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([created_at(sort: Desc)])
+  @@map("patient_feedback")
 }

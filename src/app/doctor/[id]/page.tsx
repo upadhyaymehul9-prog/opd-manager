@@ -6,6 +6,7 @@ import { ConsoleShell } from "@/components/ConsoleShell";
 import { DoctorStatusPanel } from "@/components/DoctorStatusPanel";
 import { PrescriptionForm } from "@/components/PrescriptionForm";
 import { ConsultationEmrPanel } from "@/components/ConsultationEmrPanel";
+import { MlcDetailsPanel } from "@/components/MlcDetailsPanel";
 import { ProcedurePanel } from "@/components/ProcedurePanel";
 import { TransferDoctorPanel } from "@/components/TransferDoctorPanel";
 import { PatientCard } from "@/components/PatientCard";
@@ -79,6 +80,9 @@ export default function DoctorConsolePage({
                   doctorId={doctorId}
                   initialAllergies={visit.patient_allergies}
                 />
+                {visit.medico_legal && (
+                  <MlcDetailsPanel visitId={visit.id} initialDetails={visit.mlc_details} />
+                )}
                 <ProcedurePanel visitId={visit.id} />
                 <PrescriptionForm visitId={visit.id} doctorId={doctorId} visit={visit} />
               </>

@@ -6,7 +6,7 @@ import {
   getSessionFromRequest,
 } from "@/lib/auth";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/login"];
+const PUBLIC_PATHS = ["/login", "/api/auth/login", "/feedback", "/api/feedback"];
 
 function isPublicBookingApi(pathname: string) {
   return pathname.startsWith("/api/public/booking/");

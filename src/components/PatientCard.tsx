@@ -30,11 +30,16 @@ export function PatientCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            {visit.patient_number != null && (
-              <span className="rounded-lg bg-indigo-700 px-2 py-1 text-sm font-bold text-white">
-                P-{visit.patient_number}
-              </span>
-            )}
+          {visit.patient_number != null && (
+            <span className="rounded-lg bg-indigo-700 px-2 py-1 text-sm font-bold text-white">
+              P-{visit.patient_number}
+            </span>
+          )}
+          {visit.patient_abha_id && (
+            <span className="rounded-lg bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-900">
+              ABHA {visit.patient_abha_id}
+            </span>
+          )}
             <span className="rounded-lg bg-slate-900 px-2 py-1 text-sm font-bold text-white">
               #{visit.token_number}
             </span>
@@ -58,6 +63,12 @@ export function PatientCard({
         </div>
         <StatusBadge status={visit.status} />
       </div>
+
+      {visit.medico_legal && (
+        <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900">
+          MLC — medico-legal case
+        </p>
+      )}
 
       {visit.patient_allergies && (
         <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-900">

@@ -50,6 +50,8 @@ export type PatientVisit = {
   status: PatientStatus;
   patient_type: PatientType;
   age: number | null;
+  gender: string | null;
+  medico_legal: boolean;
   mobile: string | null;
   address: string | null;
   lab_referred: boolean;
@@ -74,6 +76,18 @@ export type PatientVisit = {
   vitals_spo2: number | null;
   patient_allergies: string | null;
   patient_blood_group: string | null;
+  patient_abha_id: string | null;
+  point_of_origin: string | null;
+  provisional_diagnosis: string | null;
+  final_diagnosis: string | null;
+  lifestyle_advice: string | null;
+  investigations_ordered: string | null;
+  follow_up_instructions: string | null;
+  referral_notes: string | null;
+  follow_up_date: string | null;
+  signed_at: string | null;
+  signed_by: string | null;
+  mlc_details: string | null;
   doctors?: Doctor | null;
 };
 
@@ -85,6 +99,18 @@ export type CreatePatientInput = {
   age?: number | null;
   mobile?: string | null;
   address?: string | null;
+  abha_id?: string | null;
+  gender?: string | null;
+  emergency_contact?: string | null;
+  medico_legal?: boolean;
+  consent_accepted?: boolean;
+  witness_name?: string | null;
+  point_of_origin?: string | null;
+  date_of_birth?: string | null;
+  occupation?: string | null;
+  national_id_type?: string | null;
+  national_id?: string | null;
+  duplicate_confirmed?: boolean;
   consultation_fee?: number | null;
   consultation_payment_mode?: string | null;
 };
@@ -95,6 +121,8 @@ export type UpdatePatientInput = {
   lab_eta?: string | null;
   radio_eta?: string | null;
   room_number?: string;
+  medico_legal?: boolean;
+  mlc_details?: string | null;
 };
 
 export const PROCEDURE_TYPES = [

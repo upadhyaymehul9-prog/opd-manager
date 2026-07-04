@@ -5,8 +5,13 @@ import { visitInclude } from "@/lib/db-includes";
 import { nextConsultationBillNo } from "@/lib/consultation-billing";
 import { parseDateParam } from "@/lib/date-range";
 import { findOrCreatePatient } from "@/lib/patients";
+import { isValidAbhaInput, parseAbhaInput } from "@/lib/abha";
+import { findDuplicatePatients } from "@/lib/duplicate-patients";
 import { serializeVisit } from "@/lib/serialize";
 import { nextTokenNumber } from "@/lib/tokens";
+import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
+import { generateMobileVerifyCode } from "@/lib/nabh-cms";
+import { CONSENT_TEXT_V1 } from "@/lib/nabh";
 import type { CreatePatientInput } from "@/lib/types";
 
 export async function GET(request: Request) {
@@ -54,10 +59,22 @@ export async function POST(request: Request) {
       patient_type,
       patient_id,
       age,
+      gender,
       mobile,
       address,
+      emergency_contact,
+      medico_legal,
+      consent_accepted,
+      witness_name,
+      point_of_origin,
+      date_of_birth,
+      occupation,
+      national_id_type,
+      national_id,
+      duplicate_confirmed,
       consultation_fee,
       consultation_payment_mode,
+      abha_id,
     } = body;
 
     if (!patient_name?.trim() || !doctor_id) {
@@ -65,6 +82,57 @@ export async function POST(request: Request) {
         { error: "Patient name and doctor are required" },
         { status: 400 },
       );
+    }
+
+    if (!consent_accepted) {
+      return NextResponse.json(
+        { error: "Informed consent must be accepted before registration (NABH)" },
+        { status: 400 },
+      );
+    }
+
+    const session = await getSessionFromCookies();
+
+    if (!isValidAbhaInput(abha_id)) {
+      return NextResponse.json(
+        { error: "ABHA ID must be 14 digits (e.g. 91-1234-5678-9012)" },
+        { status: 400 },
+      );
+    }
+
+    const normalizedAbha = abha_id ? parseAbhaInput(abha_id) : null;
+
+    if (normalizedAbha) {
+      const abhaTaken = await prisma.patient.findFirst({
+        where: {
+          abha_id: normalizedAbha,
+          ...(patient_id ? { NOT: { id: patient_id } } : {}),
+        },
+      });
+      if (abhaTaken) {
+        return NextResponse.json(
+          { error: "This ABHA ID is already registered to another patient" },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (!patient_id && !duplicate_confirmed) {
+      const duplicates = await findDuplicatePatients({
+        name: patient_name.trim(),
+        mobile: mobile?.trim() || null,
+        abha_id: normalizedAbha,
+        national_id: national_id?.trim() || null,
+      });
+      if (duplicates.length > 0) {
+        return NextResponse.json(
+          {
+            error: "Possible duplicate patient — select existing patient or confirm new registration",
+            duplicates,
+          },
+          { status: 409 },
+        );
+      }
     }
 
     const doctor = await prisma.doctor.findUnique({
@@ -96,17 +164,75 @@ export async function POST(request: Request) {
           : null;
 
     const token_number = await nextTokenNumber();
+    const dob = date_of_birth ? new Date(date_of_birth) : null;
+    let mobileVerifyCode: string | null = null;
 
     const visit = await prisma.$transaction(async (tx) => {
       let patient;
       if (patient_id) {
         patient = await tx.patient.findUnique({ where: { id: patient_id } });
         if (!patient) throw new Error("Patient not found");
+        if (normalizedAbha && patient.abha_id !== normalizedAbha) {
+          patient = await tx.patient.update({
+            where: { id: patient_id },
+            data: {
+              abha_id: normalizedAbha,
+              ...(gender?.trim() && { gender: gender.trim() }),
+              ...(emergency_contact?.trim() && {
+                emergency_contact: emergency_contact.trim(),
+              }),
+              ...(dob && { date_of_birth: dob }),
+              ...(occupation?.trim() && { occupation: occupation.trim() }),
+              ...(national_id?.trim() && {
+                national_id: national_id.trim(),
+                national_id_type: national_id_type?.trim() || null,
+              }),
+            },
+          });
+        } else if (
+          gender?.trim() ||
+          emergency_contact?.trim() ||
+          dob ||
+          occupation?.trim() ||
+          national_id?.trim()
+        ) {
+          patient = await tx.patient.update({
+            where: { id: patient_id },
+            data: {
+              ...(gender?.trim() && { gender: gender.trim() }),
+              ...(emergency_contact?.trim() && {
+                emergency_contact: emergency_contact.trim(),
+              }),
+              ...(dob && { date_of_birth: dob }),
+              ...(occupation?.trim() && { occupation: occupation.trim() }),
+              ...(national_id?.trim() && {
+                national_id: national_id.trim(),
+                national_id_type: national_id_type?.trim() || null,
+              }),
+            },
+          });
+        }
+        if (mobile?.trim() && !patient.mobile_verified_at) {
+          mobileVerifyCode = generateMobileVerifyCode();
+          patient = await tx.patient.update({
+            where: { id: patient_id },
+            data: { mobile_verify_code: mobileVerifyCode, mobile: mobile.trim() },
+          });
+        }
       } else {
+        mobileVerifyCode = mobile?.trim() ? generateMobileVerifyCode() : null;
         patient = await findOrCreatePatient(tx, {
           name: patient_name.trim(),
           mobile: mobile?.trim() || null,
           address: address?.trim() || null,
+          abha_id: normalizedAbha,
+          gender: gender?.trim() || null,
+          emergency_contact: emergency_contact?.trim() || null,
+          date_of_birth: dob,
+          occupation: occupation?.trim() || null,
+          national_id_type: national_id_type?.trim() || null,
+          national_id: national_id?.trim() || null,
+          mobile_verify_code: mobileVerifyCode,
         });
       }
 
@@ -117,7 +243,7 @@ export async function POST(request: Request) {
         paidAt = new Date();
       }
 
-      return tx.patientVisit.create({
+      const created = await tx.patientVisit.create({
         data: {
           patient_name: patient_name.trim(),
           patient_id: patient.id,
@@ -127,6 +253,9 @@ export async function POST(request: Request) {
           status: "registered",
           patient_type: resolvedType,
           age: age != null && age > 0 ? Math.round(age) : null,
+          gender: gender?.trim() || patient.gender || null,
+          medico_legal: Boolean(medico_legal),
+          point_of_origin: point_of_origin?.trim() || "walk_in",
           mobile: mobile?.trim() || patient.mobile || null,
           address: address?.trim() || null,
           consultation_fee: fee,
@@ -139,9 +268,51 @@ export async function POST(request: Request) {
         },
         include: visitInclude,
       });
+
+      if (session) {
+        await tx.patientConsent.create({
+          data: {
+            patient_visit_id: created.id,
+            patient_id: patient.id,
+            accepted: true,
+            consent_text: CONSENT_TEXT_V1,
+            recorded_by: session.displayName || session.username,
+            recorded_by_role: session.role,
+            witness_name: witness_name?.trim() || null,
+          },
+        });
+      }
+
+      return created;
     });
 
-    return NextResponse.json(serializeVisit(visit), { status: 201 });
+    await logAudit({
+      action: AUDIT_ACTIONS.CONSENT_RECORD,
+      entity_type: "visit",
+      entity_id: visit.id,
+      summary: `Consent recorded for ${visit.patient_name}`,
+      session,
+    });
+
+    await logAudit({
+      action: AUDIT_ACTIONS.PATIENT_REGISTER,
+      entity_type: "visit",
+      entity_id: visit.id,
+      summary: `Registered ${visit.patient_name} · token #${visit.token_number}`,
+      details: {
+        patient_number: visit.patient?.patient_number,
+        medico_legal: Boolean(medico_legal),
+      },
+      session,
+    });
+
+    return NextResponse.json(
+      {
+        ...serializeVisit(visit),
+        mobile_verify_code: mobileVerifyCode,
+      },
+      { status: 201 },
+    );
   } catch (e) {
     const message = e instanceof Error ? e.message : "Database error";
     return NextResponse.json({ error: message }, { status: 500 });

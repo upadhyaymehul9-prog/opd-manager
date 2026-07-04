@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { parseAbhaInput } from "@/lib/abha";
 
 export async function GET(request: Request) {
   try {
@@ -11,6 +12,7 @@ export async function GET(request: Request) {
     }
 
     const num = /^\d+$/.test(q) ? Number(q) : null;
+    const abhaFormatted = parseAbhaInput(q);
 
     const patients = await prisma.patient.findMany({
       where: {
@@ -20,6 +22,7 @@ export async function GET(request: Request) {
             ? [{ mobile: { contains: q, mode: "insensitive" as const } }]
             : []),
           ...(num != null ? [{ patient_number: num }] : []),
+          ...(abhaFormatted ? [{ abha_id: abhaFormatted }] : []),
         ],
       },
       orderBy: [{ patient_number: "desc" }],
@@ -39,6 +42,7 @@ export async function GET(request: Request) {
         patient_number: p.patient_number,
         name: p.name,
         mobile: p.mobile,
+        abha_id: p.abha_id,
         last_age: p.visits[0]?.age ?? null,
         last_visit_name: p.visits[0]?.patient_name ?? p.name,
       })),

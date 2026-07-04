@@ -8,9 +8,18 @@ export type VisitVitals = {
 
 export type VisitEmr = {
   chief_complaint: string | null;
+  provisional_diagnosis: string | null;
+  final_diagnosis: string | null;
   diagnosis: string | null;
   examination_notes: string | null;
   advice: string | null;
+  lifestyle_advice: string | null;
+  investigations_ordered: string | null;
+  follow_up_instructions: string | null;
+  referral_notes: string | null;
+  follow_up_date: string | null;
+  signed_at: string | null;
+  signed_by: string | null;
   vitals: VisitVitals;
 };
 
@@ -28,9 +37,17 @@ export type VisitEmrView = VisitEmr & {
 
 export type UpdateVisitEmrInput = {
   chief_complaint?: string | null;
+  provisional_diagnosis?: string | null;
+  final_diagnosis?: string | null;
   diagnosis?: string | null;
   examination_notes?: string | null;
   advice?: string | null;
+  lifestyle_advice?: string | null;
+  investigations_ordered?: string | null;
+  follow_up_instructions?: string | null;
+  referral_notes?: string | null;
+  follow_up_date?: string | null;
+  mlc_details?: string | null;
   vitals_bp?: string | null;
   vitals_pulse?: number | null;
   vitals_temp?: number | null;

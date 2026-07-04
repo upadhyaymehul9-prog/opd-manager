@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+nabh-6th-guide.pdf
 
 # debug
 npm-debug.log*

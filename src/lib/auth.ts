@@ -29,6 +29,10 @@ const PAGE_ACCESS: Record<string, UserRole[]> = {
   "/manager": ["manager", "admin"],
   "/analytics": ["manager", "admin"],
   "/reports": ["manager", "admin", "pharmacy", "reception"],
+  "/reconciliation": ["manager", "admin", "pharmacy", "reception"],
+  "/nabh": ["manager", "admin", "doctor", "reception"],
+  "/incidents": ["manager", "admin", "doctor", "reception", "pharmacy", "lab", "radiology"],
+  "/feedback": ["manager", "admin", "reception"],
   "/records": ["pharmacy", "admin", "manager", "reception", "doctor"],
   "/appointments": ["reception", "admin", "manager", "doctor"],
   "/settings/doctors": ["admin", "manager", "doctor"],
@@ -162,6 +166,41 @@ export function canAccessApi(
     );
   }
 
+  if (pathname === "/api/reconciliation") {
+    return (
+      session.role === "admin" ||
+      session.role === "manager" ||
+      session.role === "pharmacy" ||
+      session.role === "reception"
+    );
+  }
+
+  if (pathname === "/api/nabh/compliance" || pathname === "/api/audit-logs") {
+    return (
+      session.role === "admin" ||
+      session.role === "manager" ||
+      session.role === "reception" ||
+      session.role === "doctor"
+    );
+  }
+
+  if (
+    pathname === "/api/incidents" ||
+    pathname.match(/^\/api\/incidents\/[^/]+$/)
+  ) {
+    return session.role !== "display";
+  }
+
+  if (pathname.match(/^\/api\/visits\/[^/]+\/opd-summary$/)) {
+    return (
+      session.role === "pharmacy" ||
+      session.role === "admin" ||
+      session.role === "manager" ||
+      session.role === "reception" ||
+      session.role === "doctor"
+    );
+  }
+
   if (pathname === "/api/collection/today") {
     return (
       session.role === "admin" ||
@@ -229,6 +268,26 @@ export function canAccessApi(
       session.role === "admin" ||
       session.role === "manager"
     );
+  }
+
+  if (pathname === "/api/patients/check-duplicate" && method === "GET") {
+    return (
+      session.role === "reception" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
+  if (pathname.match(/^\/api\/patients\/[^/]+\/verify-mobile$/) && method === "POST") {
+    return (
+      session.role === "reception" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
+  if (pathname === "/api/feedback" && method === "GET") {
+    return session.role === "admin" || session.role === "manager";
   }
 
   if (pathname.startsWith("/api/patients/") && method === "PATCH") {

@@ -17,6 +17,10 @@ const ADMIN_NAV = [
   { href: "/analytics", label: "Analytics", color: "bg-indigo-700" },
   { href: "/records", label: "Records", color: "bg-cyan-700" },
   { href: "/reports", label: "Reports", color: "bg-sky-700" },
+  { href: "/reconciliation", label: "Day-end", color: "bg-orange-700" },
+  { href: "/nabh", label: "NABH", color: "bg-teal-800" },
+  { href: "/feedback", label: "Feedback", color: "bg-violet-800" },
+  { href: "/incidents", label: "Incidents", color: "bg-red-700" },
   { href: "/settings/doctors", label: "My profile", color: "bg-violet-700" },
 ];
 
@@ -31,18 +35,30 @@ const STAFF_NAV = [
   { href: "/records", label: "Records", color: "bg-cyan-700" },
   { href: "/tv", label: "TV Display", color: "bg-rose-600" },
   { href: "/reports", label: "Reports", color: "bg-sky-700" },
+  { href: "/reconciliation", label: "Day-end", color: "bg-orange-700" },
+  { href: "/nabh", label: "NABH", color: "bg-teal-800" },
+  { href: "/feedback", label: "Feedback", color: "bg-violet-800" },
+  { href: "/incidents", label: "Incidents", color: "bg-red-700" },
   { href: "/settings/doctors", label: "My profile", color: "bg-violet-700" },
 ];
 
-export function ConsoleNav({ current }: { current?: string }) {
+export function ConsoleNav({
+  current,
+  publicMode = false,
+}: {
+  current?: string;
+  publicMode?: boolean;
+}) {
   const { session } = useSession();
   const isAdminView =
     session?.role === "admin" || session?.role === "manager";
   const navPool = isAdminView ? ADMIN_NAV : STAFF_NAV;
-  const visibleNav = session
-    ? navPool.filter((item) => session.navPaths.includes(item.href))
-    : navPool;
-  const homeHref = "/";
+  const visibleNav = publicMode
+    ? []
+    : session
+      ? navPool.filter((item) => session.navPaths.includes(item.href))
+      : [];
+  const homeHref = publicMode ? "/feedback" : "/";
 
   return (
     <nav className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
@@ -50,7 +66,7 @@ export function ConsoleNav({ current }: { current?: string }) {
         href={homeHref}
         className="mr-2 self-center text-sm font-bold text-slate-800"
       >
-        OPD Manager
+        {publicMode ? "Clinic feedback" : "OPD Manager"}
       </Link>
       {visibleNav.map((item) => (
         <Link
@@ -85,16 +101,18 @@ export function ConsoleShell({
   title,
   subtitle,
   current,
+  publicMode = false,
   children,
 }: {
   title: string;
   subtitle?: string;
   current?: string;
+  publicMode?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className="min-h-screen bg-slate-50">
-      <ConsoleNav current={current} />
+      <ConsoleNav current={current} publicMode={publicMode} />
       <header className="border-b border-slate-200 bg-white px-6 py-5">
         <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
         {subtitle && <p className="mt-1 text-slate-600">{subtitle}</p>}
