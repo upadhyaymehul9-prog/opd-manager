@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { SESSION_COOKIE, verifySessionToken, rolesForNav } from "@/lib/auth";
 import type { UserRole } from "@/lib/auth-types";
 
-const consoles = [
+const DEPARTMENT_CONSOLES = [
   {
     href: "/reception",
     title: "Reception",
@@ -13,7 +13,7 @@ const consoles = [
   },
   {
     href: "/doctor",
-    title: "Doctor Console",
+    title: "Doctor",
     desc: "Call, consult, send to lab / radiology / pharmacy",
     color: "border-blue-200 hover:border-blue-400 bg-blue-50",
   },
@@ -42,17 +42,14 @@ const consoles = [
     color: "border-amber-200 hover:border-amber-400 bg-amber-50",
   },
   {
-    href: "/records",
-    title: "Patient Records",
-    desc: "Today's visits — prescriptions, dispense history, bills, print & PDF",
-    color: "border-cyan-200 hover:border-cyan-400 bg-cyan-50",
-  },
-  {
     href: "/tv",
     title: "TV Display",
     desc: "Waiting room screen — calls, directions, report ETAs",
     color: "border-rose-200 hover:border-rose-400 bg-rose-50",
   },
+];
+
+const ADMIN_CONSOLES = [
   {
     href: "/manager",
     title: "OPD Manager",
@@ -62,22 +59,57 @@ const consoles = [
   {
     href: "/analytics",
     title: "Analytics",
-    desc: "Patients, doctors, lab, radiology, turnaround time & OPD prediction",
+    desc: "Performance, revenue, lab TAT, and OPD prediction",
     color: "border-indigo-300 hover:border-indigo-500 bg-indigo-50",
   },
   {
+    href: "/records",
+    title: "Records",
+    desc: "Visit history — prescriptions, bills, print & PDF",
+    color: "border-cyan-200 hover:border-cyan-400 bg-cyan-50",
+  },
+  {
     href: "/reports",
-    title: "Clinic Reports",
-    desc: "Department registers, revenue, medicine tracking by date range",
+    title: "Reports",
+    desc: "Department registers and medicine tracking by date",
     color: "border-sky-300 hover:border-sky-500 bg-sky-50",
   },
   {
     href: "/settings/doctors",
-    title: "Doctor Profiles",
-    desc: "Name, specialty, photo, consultation fee for TV display",
+    title: "My profile",
+    desc: "Doctor name, specialty, photo, consultation fee",
     color: "border-violet-300 hover:border-violet-500 bg-violet-50",
   },
 ];
+
+const consoles = [...DEPARTMENT_CONSOLES, ...ADMIN_CONSOLES];
+
+function ConsoleGrid({
+  items,
+  loginFirst = false,
+}: {
+  items: typeof consoles;
+  loginFirst?: boolean;
+}) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {items.map((c) => (
+        <Link
+          key={c.href}
+          href={
+            loginFirst
+              ? `/login?next=${encodeURIComponent(c.href)}`
+              : c.href
+          }
+          className={`rounded-2xl border-2 p-5 transition shadow-lg ${c.color}`}
+        >
+          <h2 className="text-lg font-bold text-slate-900">{c.title}</h2>
+          <p className="mt-2 text-sm text-slate-700">{c.desc}</p>
+        </Link>
+      ))}
+    </div>
+  );
+}
 
 export default async function Home() {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -119,12 +151,12 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900">
-      <div className="mx-auto max-w-5xl px-6 py-16">
-        <header className="mb-12 text-center text-white">
+      <div className="mx-auto max-w-6xl px-6 py-12">
+        <header className="mb-10 text-center text-white">
           <h1 className="text-4xl font-bold tracking-tight">OPD Manager</h1>
           <p className="mx-auto mt-3 max-w-2xl text-lg text-slate-300">
-            Guide every patient from reception to exit — doctor, lab, radiology,
-            pharmacy, and live TV updates.
+            Guide every patient from reception to exit — pick your department
+            below and sign in.
           </p>
           <Link
             href="/login"
@@ -133,6 +165,20 @@ export default async function Home() {
             Staff sign in
           </Link>
         </header>
+
+        <section className="mb-10">
+          <h2 className="mb-4 text-lg font-semibold text-white">
+            Departments
+          </h2>
+          <ConsoleGrid items={DEPARTMENT_CONSOLES} loginFirst />
+        </section>
+
+        <section className="mb-8">
+          <h2 className="mb-4 text-lg font-semibold text-white">
+            Management & reports
+          </h2>
+          <ConsoleGrid items={ADMIN_CONSOLES} loginFirst />
+        </section>
 
         <p className="text-center text-sm text-slate-400">
           Each department has its own login ID. Contact your clinic administrator.
