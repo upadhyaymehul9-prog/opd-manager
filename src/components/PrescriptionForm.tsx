@@ -7,7 +7,6 @@ import type {
   PrescriptionItemInput,
 } from "@/lib/prescription-types";
 import { ActionButton } from "./PatientCard";
-import { PrescriptionCompactQueue } from "./PrescriptionCompactQueue";
 import { formatMedicineLabel } from "@/lib/medicine";
 import type { PatientVisit } from "@/lib/types";
 
@@ -103,7 +102,6 @@ export function PrescriptionForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
   const [persistedIds, setPersistedIds] = useState<Set<string>>(new Set());
 
   const isSent =
@@ -162,10 +160,10 @@ export function PrescriptionForm({
   }, [loadPrescription]);
 
   useEffect(() => {
-    if (!isSent || expanded) return;
+    if (!isSent) return;
     const t = setInterval(loadPrescription, 15_000);
     return () => clearInterval(t);
-  }, [isSent, expanded, loadPrescription]);
+  }, [isSent, loadPrescription]);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -232,6 +230,17 @@ export function PrescriptionForm({
     setActiveLine(null);
   }
 
+  function confirmOutsideMedicine(lineKey: string) {
+    setQuery("");
+    setSuggestions([]);
+    setActiveLine(null);
+  }
+
+  function closeSuggestions() {
+    setActiveLine(null);
+    setSuggestions([]);
+  }
+
   async function savePrescription(): Promise<Prescription | null> {
     const validLines = lines.filter((line) => line.medicine_name.trim());
     if (validLines.length === 0) {
@@ -269,7 +278,6 @@ export function PrescriptionForm({
           : `Saved ${data.items.length} medicine(s)`,
       );
       await loadPrescription();
-      if (isSent) setExpanded(false);
       return data as Prescription;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
@@ -317,7 +325,6 @@ export function PrescriptionForm({
       if (!res.ok) throw new Error(data.error || "Send failed");
       setPrescription(data);
       setMessage(`Sent ${saved.items.length} medicine(s) to pharmacy`);
-      setExpanded(false);
       await loadPrescription();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Send failed");
@@ -330,29 +337,16 @@ export function PrescriptionForm({
     return null;
   }
 
-  if (isSent && prescription && !expanded) {
-    return (
-      <PrescriptionCompactQueue
-        visit={visit}
-        prescription={prescription}
-        onExpand={() => setExpanded(true)}
-      />
-    );
-  }
-
   return (
     <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4">
       <h3 className="font-semibold text-slate-900">
-        {isSent ? "Edit prescription (patient at pharmacy)" : "Write prescription"}
+        {isSent ? "Prescription (sent to pharmacy)" : "Write prescription"}
       </h3>
       {isSent && (
-        <button
-          type="button"
-          onClick={() => setExpanded(false)}
-          className="mt-1 text-xs font-medium text-teal-700 hover:underline"
-        >
-          ← Back to compact queue view
-        </button>
+        <p className="mt-1 rounded-lg bg-teal-100 px-3 py-2 text-xs text-teal-900">
+          Sent to pharmacy — you can still add or edit undispensed medicines below.
+          Dispensed lines are locked.
+        </p>
       )}
       <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-slate-700">
         <input
@@ -365,17 +359,12 @@ export function PrescriptionForm({
       </label>
       {stockOnly && (
         <p className="mt-1 text-xs text-slate-600">
-          Click the medicine box to see in-stock items. Add batches in{" "}
-          <strong>Stock</strong> if the list is empty.
-        </p>
-      )}
-      {isSent && (
-        <p className="mt-1 text-xs text-teal-800">
-          Add new lines or edit undispensed medicines. Dispensed lines are locked.
+          Click the medicine box to see in-stock items. Uncheck the filter to prescribe
+          outside medicines — type the name and use &quot;Use as outside medicine&quot;.
         </p>
       )}
 
-      <div className="mt-3 space-y-3">
+      <div className="mt-3 space-y-3 overflow-visible">
         {lines.map((line) => {
           const stock = line.medicine_id
             ? lineStock[line.key] ??
@@ -388,18 +377,25 @@ export function PrescriptionForm({
           return (
             <div
               key={line.key}
-              className={`rounded-lg border bg-white p-3 ${locked ? "border-teal-200 bg-teal-50/30" : "border-slate-200"}`}
+              className={`overflow-visible rounded-lg border bg-white p-3 ${
+                activeLine === line.key ? "relative z-30" : ""
+              } ${locked ? "border-teal-200 bg-teal-50/30" : "border-slate-200"}`}
             >
               {locked && (
                 <p className="mb-2 text-xs font-medium text-teal-800">
                   Dispensed at pharmacy — locked
                 </p>
               )}
-              <div className="relative">
+              <div
+                className={`relative ${activeLine === line.key && !locked ? "z-30" : ""}`}
+              >
                 <input
                   value={line.medicine_name}
                   disabled={locked}
                   onFocus={() => loadMedicineList(line.key)}
+                  onBlur={() => {
+                    window.setTimeout(closeSuggestions, 150);
+                  }}
                   onChange={(e) => {
                     updateLine(line.key, {
                       medicine_name: e.target.value,
@@ -415,18 +411,38 @@ export function PrescriptionForm({
                   }
                   className="w-full rounded border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
                 />
-                {stockInfo && (
+                {line.medicine_name.trim() && !line.medicine_id && (
+                  <p className="mt-1 text-xs font-medium text-amber-800">
+                    Outside pharmacy stock — patient buys elsewhere
+                  </p>
+                )}
+                {stockInfo && line.medicine_id && (
                   <p className={`mt-1 text-xs font-medium ${stockInfo.className}`}>
                     {stockInfo.text}
                   </p>
                 )}
                 {activeLine === line.key && !locked && (
-                  <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded border border-slate-200 bg-white shadow-lg">
+                  <ul className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded border border-slate-200 bg-white shadow-lg">
                     {suggestions.length === 0 ? (
-                      <li className="px-3 py-3 text-sm text-amber-900">
-                        {stockOnly
-                          ? "No medicines in stock right now. Add stock under Stock, or uncheck the filter above to prescribe any medicine."
-                          : "No matches — keep typing or pick from the list."}
+                      <li className="px-3 py-2 text-sm text-amber-900">
+                        {stockOnly ? (
+                          <>
+                            No in-stock match. Uncheck &quot;Show only medicines in
+                            stock&quot; to prescribe outside medicines.
+                          </>
+                        ) : line.medicine_name.trim() ? (
+                          <button
+                            type="button"
+                            className="w-full rounded bg-amber-50 px-2 py-2 text-left font-medium hover:bg-amber-100"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => confirmOutsideMedicine(line.key)}
+                          >
+                            Use &quot;{line.medicine_name.trim()}&quot; as outside
+                            medicine
+                          </button>
+                        ) : (
+                          "Type a medicine name or pick from the list."
+                        )}
                       </li>
                     ) : (
                       suggestions.map((med) => {
@@ -436,6 +452,7 @@ export function PrescriptionForm({
                             <button
                               type="button"
                               className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                              onMouseDown={(e) => e.preventDefault()}
                               onClick={() => pickMedicine(line.key, med)}
                             >
                               <span>{formatMedicineLabel(med)}</span>
@@ -454,7 +471,7 @@ export function PrescriptionForm({
                   </ul>
                 )}
               </div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-4">
+              <div className="relative z-0 mt-2 grid gap-2 sm:grid-cols-4">
                 <input
                   value={line.dose ?? ""}
                   disabled={locked}

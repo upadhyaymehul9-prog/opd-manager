@@ -26,6 +26,8 @@ export async function PATCH(
     }
 
     const dispensed = body.dispensed !== undefined ? Boolean(body.dispensed) : item.dispensed;
+    const skipped =
+      body.skipped !== undefined ? Boolean(body.skipped) : item.skipped ?? false;
     const substitutedNote =
       body.substituted_note != null
         ? String(body.substituted_note).trim() || null
@@ -47,6 +49,25 @@ export async function PATCH(
         return NextResponse.json({ error: "Quantity must be at least 1" }, { status: 400 });
       }
       quantity = nextQty;
+    }
+
+    if (item.skipped || skipped) {
+      if (dispensed && !item.dispensed) {
+        return NextResponse.json(
+          { error: "Skipped medicines cannot be dispensed — unskip first" },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (dispensed && !item.dispensed && !item.medicine_id) {
+      return NextResponse.json(
+        {
+          error:
+            "Outside pharmacy medicine — use Skip instead of dispense, or remove the line",
+        },
+        { status: 400 },
+      );
     }
 
     const qty = quantity;
@@ -72,6 +93,13 @@ export async function PATCH(
           dispensed,
           dispensed_at: dispensed ? new Date() : null,
           quantity,
+          skipped: body.skipped !== undefined ? skipped : undefined,
+          skip_reason:
+            body.skipped !== undefined
+              ? skipped
+                ? String(body.skip_reason ?? "outside_stock").trim() || "outside_stock"
+                : null
+              : undefined,
           ...(substitutedNote !== undefined
             ? { substituted_note: substitutedNote }
             : {}),
@@ -79,7 +107,13 @@ export async function PATCH(
       });
 
       const allItems = item.prescription.items.map((row) =>
-        row.id === id ? { ...row, dispensed } : row,
+        row.id === id
+          ? {
+              ...row,
+              dispensed,
+              skipped: body.skipped !== undefined ? skipped : row.skipped,
+            }
+          : row,
       );
 
       await tx.prescription.update({
@@ -128,6 +162,13 @@ export async function DELETE(
     if (item.dispensed) {
       return NextResponse.json(
         { error: "Cannot remove a medicine already dispensed — uncheck dispensed first" },
+        { status: 400 },
+      );
+    }
+
+    if (item.skipped) {
+      return NextResponse.json(
+        { error: "Use unskip instead of remove for skipped medicines" },
         { status: 400 },
       );
     }

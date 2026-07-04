@@ -52,7 +52,7 @@ export default function PharmacyPage() {
           .then((r) => (r.ok ? r.json() : null))
           .then((data: Prescription | null) => {
             if (!data?.items) return { id: v.id, total: 0, pending: 0 };
-            const pending = data.items.filter((i) => !i.dispensed).length;
+            const pending = data.items.filter((i) => !i.dispensed && !i.skipped).length;
             return { id: v.id, total: data.items.length, pending };
           }),
       ),

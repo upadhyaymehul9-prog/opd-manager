@@ -12,11 +12,15 @@ import {
 } from "@/lib/doctor-status";
 import {
   getLabReportStatusLabel,
+  getRadioReportStatusLabel,
   getTvTokenStatus,
   isLabPending,
   isLabReady,
+  isRadioPending,
+  isRadioReady,
   isTokenWaiting,
   LAB_REPORT_STATUSES,
+  RADIO_REPORT_STATUSES,
 } from "@/lib/tv-display";
 import type { Doctor, PatientVisit } from "@/lib/types";
 
@@ -28,10 +32,16 @@ export default function TVDisplayPage() {
     .filter((v) => LAB_REPORT_STATUSES.includes(v.status))
     .sort((a, b) => a.token_number - b.token_number);
 
+  const radioReports = visits
+    .filter((v) => RADIO_REPORT_STATUSES.includes(v.status))
+    .sort((a, b) => a.token_number - b.token_number);
+
   const tokens = [...visits].sort((a, b) => a.token_number - b.token_number);
 
   const labPending = visits.filter((v) => isLabPending(v.status)).length;
   const labReady = visits.filter((v) => isLabReady(v.status)).length;
+  const radioPending = visits.filter((v) => isRadioPending(v.status)).length;
+  const radioReady = visits.filter((v) => isRadioReady(v.status)).length;
   const tokensWaiting = visits.filter((v) => isTokenWaiting(v.status)).length;
   const doctorsAvailable = doctors.filter((d) =>
     isDoctorAvailable(d.opd_status),
@@ -54,9 +64,11 @@ export default function TVDisplayPage() {
         )}
 
         <div className="space-y-6 p-4 md:p-6">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
             <SummaryCard label="Lab Pending" value={labPending} />
             <SummaryCard label="Lab Ready" value={labReady} />
+            <SummaryCard label="Radiology Pending" value={radioPending} />
+            <SummaryCard label="Radiology Ready" value={radioReady} />
             <SummaryCard label="Tokens Waiting" value={tokensWaiting} />
             <SummaryCard label="Doctors Available" value={doctorsAvailable} />
           </div>
@@ -74,6 +86,24 @@ export default function TVDisplayPage() {
                   "—",
                   getLabReportStatusLabel(v.status),
                   v.lab_eta ? format(new Date(v.lab_eta), "hh:mm a") : "—",
+                ],
+              }))}
+            />
+          </TvSection>
+
+          <TvSection title="Radiology Reports">
+            <TvTable
+              headers={["Case No", "Name", "Study", "Status", "Ready Time"]}
+              emptyMessage="No radiology reports right now"
+              rows={radioReports.map((v) => ({
+                key: v.id,
+                highlight: v.status !== "radio_ready",
+                cells: [
+                  String(v.token_number),
+                  v.patient_name,
+                  "—",
+                  getRadioReportStatusLabel(v.status),
+                  v.radio_eta ? format(new Date(v.radio_eta), "hh:mm a") : "—",
                 ],
               }))}
             />

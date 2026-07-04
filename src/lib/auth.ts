@@ -363,6 +363,17 @@ export function canAccessApi(
     );
   }
 
+  if (
+    pathname === "/api/stock/audit" ||
+    pathname.startsWith("/api/stock/audit/")
+  ) {
+    return (
+      session.role === "pharmacy" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
   if (pathname === "/api/stock" && method === "POST") {
     return session.role === "admin" || session.role === "manager";
   }

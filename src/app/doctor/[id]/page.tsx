@@ -10,9 +10,15 @@ import { MlcDetailsPanel } from "@/components/MlcDetailsPanel";
 import { ProcedurePanel } from "@/components/ProcedurePanel";
 import { TransferDoctorPanel } from "@/components/TransferDoctorPanel";
 import { PatientCard } from "@/components/PatientCard";
+import { DoctorPatientQueueBar } from "@/components/DoctorPatientQueueBar";
 import { PatientActions } from "@/components/PatientActions";
 import { usePatientVisits } from "@/hooks/usePatientVisits";
 import { DOCTOR_ACTIONS, canWritePrescription, getRelevantPatients } from "@/lib/status";
+import type { PatientVisit } from "@/lib/types";
+
+function isAtPharmacy(status: PatientVisit["status"]) {
+  return status === "to_pharmacy" || status === "at_pharmacy";
+}
 
 export default function DoctorConsolePage({
   params,
@@ -53,37 +59,45 @@ export default function DoctorConsolePage({
             No patients in your queue right now.
           </p>
         )}
-        {myPatients.map((visit) => (
+        {myPatients.map((visit, idx) => (
           <div key={visit.id} className="space-y-3">
-            <PatientCard
-              visit={visit}
-              showDoctor={false}
-              actions={
-                <div className="space-y-3">
-                  <PatientActions
-                    visit={visit}
-                    actions={DOCTOR_ACTIONS}
-                    onUpdated={refresh}
-                  />
-                  <TransferDoctorPanel
-                    visitId={visit.id}
-                    currentDoctorId={doctorId}
-                    onTransferred={refresh}
-                  />
-                </div>
-              }
-            />
+            {isAtPharmacy(visit.status) ? (
+              <DoctorPatientQueueBar visit={visit} queueIndex={idx + 1} />
+            ) : (
+              <PatientCard
+                visit={visit}
+                showDoctor={false}
+                actions={
+                  <div className="space-y-3">
+                    <PatientActions
+                      visit={visit}
+                      actions={DOCTOR_ACTIONS}
+                      onUpdated={refresh}
+                    />
+                    <TransferDoctorPanel
+                      visitId={visit.id}
+                      currentDoctorId={doctorId}
+                      onTransferred={refresh}
+                    />
+                  </div>
+                }
+              />
+            )}
             {canWritePrescription(visit.status) && (
               <>
-                <ConsultationEmrPanel
-                  visitId={visit.id}
-                  doctorId={doctorId}
-                  initialAllergies={visit.patient_allergies}
-                />
-                {visit.medico_legal && (
-                  <MlcDetailsPanel visitId={visit.id} initialDetails={visit.mlc_details} />
+                {!isAtPharmacy(visit.status) && (
+                  <>
+                    <ConsultationEmrPanel
+                      visitId={visit.id}
+                      doctorId={doctorId}
+                      initialAllergies={visit.patient_allergies}
+                    />
+                    {visit.medico_legal && (
+                      <MlcDetailsPanel visitId={visit.id} initialDetails={visit.mlc_details} />
+                    )}
+                    <ProcedurePanel visitId={visit.id} />
+                  </>
                 )}
-                <ProcedurePanel visitId={visit.id} />
                 <PrescriptionForm visitId={visit.id} doctorId={doctorId} visit={visit} />
               </>
             )}

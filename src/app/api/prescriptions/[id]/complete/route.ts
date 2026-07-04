@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createPharmacyBill, isPaymentMode, serializeBill } from "@/lib/billing";
+import { createPharmacyBill, isPaymentMode, serializeBill, buildBillPreview } from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
 import { serializePrescription } from "@/lib/serialize";
 
@@ -30,10 +30,20 @@ export async function POST(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const pending = prescription.items.filter((i) => !i.dispensed);
+    const pending = prescription.items.filter((i) => !i.dispensed && !i.skipped);
     if (pending.length > 0) {
       return NextResponse.json(
-        { error: `${pending.length} medicine(s) still not dispensed` },
+        {
+          error: `${pending.length} medicine(s) still pending — dispense in-stock items or skip outside/unavailable medicines`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const dispensedCount = prescription.items.filter((i) => i.dispensed).length;
+    if (dispensedCount === 0) {
+      return NextResponse.json(
+        { error: "Dispense at least one medicine before generating bill" },
         { status: 400 },
       );
     }
@@ -52,27 +62,37 @@ export async function POST(
 
     const now = new Date();
 
-    const result = await prisma.$transaction(async (tx) => {
-      const bill = await createPharmacyBill(
-        tx,
-        id,
-        payment_mode,
-        priceOverrides.size > 0 ? priceOverrides : undefined,
-      );
+    const preview = await buildBillPreview(
+      prisma,
+      id,
+      priceOverrides.size > 0 ? priceOverrides : undefined,
+    );
 
-      await tx.patientVisit.update({
-        where: { id: prescription.patient_visit_id },
-        data: { status: "completed", completed_at: now },
-      });
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const bill = await createPharmacyBill(
+          tx,
+          id,
+          payment_mode,
+          priceOverrides.size > 0 ? priceOverrides : undefined,
+          preview,
+        );
 
-      const updatedRx = await tx.prescription.update({
-        where: { id },
-        data: { status: "dispensed" },
-        include: prescriptionInclude,
-      });
+        await tx.patientVisit.update({
+          where: { id: prescription.patient_visit_id },
+          data: { status: "completed", completed_at: now },
+        });
 
-      return { bill, prescription: updatedRx };
-    });
+        const updatedRx = await tx.prescription.update({
+          where: { id },
+          data: { status: "dispensed" },
+          include: prescriptionInclude,
+        });
+
+        return { bill, prescription: updatedRx };
+      },
+      { maxWait: 10_000, timeout: 20_000 },
+    );
 
     return NextResponse.json({
       bill: serializeBill(result.bill),

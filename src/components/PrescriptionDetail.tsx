@@ -78,11 +78,14 @@ export function PrescriptionDetail({
     }
   }, [load, visit.id, visit.status]);
 
-  const pending = prescription?.items.filter((i) => !i.dispensed).length ?? 0;
-  const allDispensed = prescription != null && pending === 0;
+  const pending =
+    prescription?.items.filter((i) => !i.dispensed && !i.skipped).length ?? 0;
+  const dispensedCount =
+    prescription?.items.filter((i) => i.dispensed).length ?? 0;
+  const readyToBill = prescription != null && pending === 0 && dispensedCount > 0;
 
   useEffect(() => {
-    if (!prescription || !allDispensed || completedBill) return;
+    if (!prescription || !readyToBill || completedBill) return;
     fetch(`/api/bills/preview?prescription_id=${prescription.id}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((preview: BillPreview | null) => {
@@ -97,10 +100,10 @@ export function PrescriptionDetail({
         setGstRates(rates);
       })
       .catch(() => {});
-  }, [prescription, allDispensed, completedBill]);
+  }, [prescription, readyToBill, completedBill]);
 
   const billTotals = useMemo(() => {
-    if (!prescription || !allDispensed) return null;
+    if (!prescription || !readyToBill) return null;
     const lines = prescription.items
       .filter((i) => i.dispensed)
       .map((item) => {
@@ -125,7 +128,7 @@ export function PrescriptionDetail({
       gst_total,
       grand_total: round2(subtotal + gst_total),
     };
-  }, [prescription, allDispensed, unitPrices, gstRates]);
+  }, [prescription, readyToBill, unitPrices, gstRates]);
 
   async function toggleDispensed(itemId: string, dispensed: boolean) {
     setBusy(true);
@@ -174,6 +177,34 @@ export function PrescriptionDetail({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function skipItem(itemId: string, reason: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/prescriptions/items/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ skipped: true, skip_reason: reason }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not skip medicine");
+      await load(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not skip medicine");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function canDispenseItem(item: Prescription["items"][number]) {
+    if (item.skipped) return false;
+    if (!item.medicine_id) return false;
+    const availability = stock[item.medicine_id];
+    if (!availability || availability.out_of_stock) return false;
+    const qty = Number(quantities[item.id] ?? item.quantity ?? 1);
+    return qty <= (availability.available ?? 0);
   }
 
   async function removeItem(itemId: string, medicineName: string) {
@@ -279,8 +310,8 @@ export function PrescriptionDetail({
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <p className="border-b border-slate-100 bg-amber-50 px-4 py-2 text-xs text-amber-900">
-          Change qty if patient wants more days (e.g. 10-day supply). Remove lines
-          that are out of stock before billing.
+          Dispense in-stock medicines, then <strong>Skip</strong> outside or unavailable
+          lines — you can bill without dispensing every medicine.
         </p>
         <table className="w-full min-w-[800px] text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50">
@@ -294,9 +325,24 @@ export function PrescriptionDetail({
           </thead>
           <tbody>
             {prescription.items.map((item) => (
-              <tr key={item.id} className="border-b border-slate-100">
+              <tr
+                key={item.id}
+                className={`border-b border-slate-100 ${
+                  item.skipped ? "bg-slate-50 opacity-80" : ""
+                }`}
+              >
                 <td className="px-4 py-3">
                   <p className="font-medium">{item.medicine_name}</p>
+                  {!item.medicine_id && (
+                    <p className="text-xs font-medium text-amber-800">
+                      Outside pharmacy stock
+                    </p>
+                  )}
+                  {item.skipped && (
+                    <p className="text-xs font-medium text-slate-600">
+                      Skipped — {item.skip_reason?.replace(/_/g, " ") ?? "not dispensed"}
+                    </p>
+                  )}
                   {item.dose && (
                     <p className="text-xs text-slate-500">
                       {item.dose}
@@ -320,6 +366,8 @@ export function PrescriptionDetail({
                 <td className="px-4 py-3">
                   {item.dispensed ? (
                     <span className="font-medium">{item.quantity ?? 1}</span>
+                  ) : item.skipped ? (
+                    <span className="text-slate-400">—</span>
                   ) : (
                     <div className="flex items-center gap-1">
                       <input
@@ -358,32 +406,59 @@ export function PrescriptionDetail({
                         : `${stock[item.medicine_id]?.available ?? 0} in stock`}
                     </span>
                   ) : (
-                    <span className="text-slate-400">—</span>
+                    <span className="font-medium text-amber-800">Outside stock</span>
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={item.dispensed}
-                      disabled={busy}
-                      onChange={(e) =>
-                        toggleDispensed(item.id, e.target.checked)
-                      }
-                    />
-                    <span>{item.dispensed ? "Yes" : "No"}</span>
-                  </label>
+                  {item.skipped ? (
+                    <span className="text-slate-500">Skipped</span>
+                  ) : (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={item.dispensed}
+                        disabled={busy || (!item.dispensed && !canDispenseItem(item))}
+                        title={
+                          !canDispenseItem(item) && !item.dispensed
+                            ? "Not in stock — use Skip for outside medicines"
+                            : undefined
+                        }
+                        onChange={(e) =>
+                          toggleDispensed(item.id, e.target.checked)
+                        }
+                      />
+                      <span>{item.dispensed ? "Yes" : "No"}</span>
+                    </label>
+                  )}
                 </td>
                 <td className="px-4 py-3">
-                  {!item.dispensed && (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => removeItem(item.id, item.medicine_name)}
-                      className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
-                    >
-                      Remove
-                    </button>
+                  {!item.dispensed && !item.skipped && (
+                    <div className="flex flex-col gap-1">
+                      {(!item.medicine_id ||
+                        stock[item.medicine_id]?.out_of_stock) && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            skipItem(
+                              item.id,
+                              !item.medicine_id ? "outside_stock" : "out_of_stock",
+                            )
+                          }
+                          className="text-xs font-medium text-amber-800 hover:underline disabled:opacity-50"
+                        >
+                          Skip
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => removeItem(item.id, item.medicine_name)}
+                        className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   )}
                 </td>
               </tr>
@@ -392,7 +467,7 @@ export function PrescriptionDetail({
         </table>
       </div>
 
-      {allDispensed && billTotals && (
+      {readyToBill && billTotals && (
         <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4">
           <h3 className="font-semibold text-slate-900">GST bill</h3>
           <p className="mt-1 text-xs text-slate-600">
@@ -478,13 +553,15 @@ export function PrescriptionDetail({
       <div className="flex flex-wrap items-center gap-3">
         <p className="text-sm text-slate-600">
           {pending > 0
-            ? `${pending} medicine(s) still pending`
-            : "All medicines dispensed — generate bill to exit"}
+            ? `${pending} medicine(s) still pending — dispense or skip each line`
+            : dispensedCount === 0
+              ? "Dispense at least one medicine, or skip all lines"
+              : "Ready to generate bill and exit"}
         </p>
         <ActionButton
           label="Generate bill & exit"
           variant="primary"
-          disabled={busy || pending > 0}
+          disabled={busy || !readyToBill}
           onClick={completeWithBill}
         />
       </div>

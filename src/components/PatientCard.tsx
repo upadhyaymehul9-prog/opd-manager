@@ -1,8 +1,6 @@
 import { format, formatDistanceToNow } from "date-fns";
 import type { PatientVisit } from "@/lib/types";
 import { STATUS_COLORS, STATUS_LABELS } from "@/lib/status";
-import { WhatsAppLink } from "@/components/WhatsAppLink";
-import { visitMessageForStatus } from "@/lib/whatsapp-messages";
 
 export function StatusBadge({ status }: { status: PatientVisit["status"] }) {
   return (
@@ -74,16 +72,6 @@ export function PatientCard({
         <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-900">
           Allergy: {visit.patient_allergies}
         </p>
-      )}
-
-      {visit.mobile && (
-        <div className="mt-2">
-          <WhatsAppLink
-            mobile={visit.mobile}
-            message={visitMessageForStatus(visit)}
-            label="WhatsApp patient"
-          />
-        </div>
       )}
 
       {(visit.lab_eta || visit.radio_eta) && (
