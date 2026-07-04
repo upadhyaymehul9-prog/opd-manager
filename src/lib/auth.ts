@@ -30,6 +30,7 @@ const PAGE_ACCESS: Record<string, UserRole[]> = {
   "/analytics": ["manager", "admin"],
   "/reports": ["manager", "admin", "pharmacy", "reception"],
   "/records": ["pharmacy", "admin", "manager", "reception", "doctor"],
+  "/appointments": ["reception", "admin", "manager", "doctor"],
   "/settings/doctors": ["admin", "manager", "doctor"],
 };
 
@@ -167,6 +168,20 @@ export function canAccessApi(
       session.role === "manager" ||
       session.role === "pharmacy" ||
       session.role === "reception"
+    );
+  }
+
+  if (
+    pathname === "/api/appointments" ||
+    pathname === "/api/appointments/slots" ||
+    pathname.match(/^\/api\/appointments\/[^/]+$/) ||
+    pathname.match(/^\/api\/appointments\/[^/]+\/arrive$/)
+  ) {
+    return (
+      session.role === "reception" ||
+      session.role === "admin" ||
+      session.role === "manager" ||
+      session.role === "doctor"
     );
   }
 

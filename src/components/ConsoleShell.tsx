@@ -7,6 +7,7 @@ import { logout, useSession } from "@/hooks/useSession";
 const ADMIN_NAV = [
   { href: "/manager", label: "OPD Manager", color: "bg-slate-700" },
   { href: "/reception", label: "Reception", color: "bg-emerald-600" },
+  { href: "/appointments", label: "Appointments", color: "bg-emerald-700" },
   { href: "/doctor", label: "Doctor", color: "bg-blue-600" },
   { href: "/lab", label: "Lab", color: "bg-purple-600" },
   { href: "/radiology", label: "Radiology", color: "bg-indigo-600" },
@@ -21,6 +22,7 @@ const ADMIN_NAV = [
 
 const STAFF_NAV = [
   { href: "/reception", label: "Reception", color: "bg-emerald-600" },
+  { href: "/appointments", label: "Appointments", color: "bg-emerald-700" },
   { href: "/doctor", label: "Doctor", color: "bg-blue-600" },
   { href: "/lab", label: "Lab", color: "bg-purple-600" },
   { href: "/radiology", label: "Radiology", color: "bg-indigo-600" },

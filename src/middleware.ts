@@ -8,11 +8,16 @@ import {
 
 const PUBLIC_PATHS = ["/login", "/api/auth/login"];
 
+function isPublicBookingApi(pathname: string) {
+  return pathname.startsWith("/api/public/booking/");
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
     PUBLIC_PATHS.includes(pathname) ||
+    isPublicBookingApi(pathname) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")
   ) {

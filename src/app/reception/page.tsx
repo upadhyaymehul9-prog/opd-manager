@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ConsoleShell, SetupBanner } from "@/components/ConsoleShell";
 import { TodayCollectionPanel } from "@/components/TodayCollectionPanel";
+import { AppointmentsPanel } from "@/components/AppointmentsPanel";
 import { ConsultationBillReceipt } from "@/components/ConsultationBillReceipt";
 import { PrintActions } from "@/components/PrintActions";
 import type { Doctor, PatientType, PatientVisit } from "@/lib/types";
@@ -156,6 +157,10 @@ export default function ReceptionPage() {
       {doctors.length === 0 && <SetupBanner />}
 
       <TodayCollectionPanel variant="reception" />
+
+      <div className="mb-8">
+        <AppointmentsPanel compact showBookForm={false} />
+      </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
         <form
