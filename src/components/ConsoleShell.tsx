@@ -6,6 +6,13 @@ import { logout, useSession } from "@/hooks/useSession";
 
 const ADMIN_NAV = [
   { href: "/manager", label: "OPD Manager", color: "bg-slate-700" },
+  { href: "/reception", label: "Reception", color: "bg-emerald-600" },
+  { href: "/doctor", label: "Doctor", color: "bg-blue-600" },
+  { href: "/lab", label: "Lab", color: "bg-purple-600" },
+  { href: "/radiology", label: "Radiology", color: "bg-indigo-600" },
+  { href: "/pharmacy", label: "Pharmacy", color: "bg-teal-600" },
+  { href: "/stock", label: "Stock", color: "bg-amber-600" },
+  { href: "/tv", label: "TV Display", color: "bg-rose-600" },
   { href: "/analytics", label: "Analytics", color: "bg-indigo-700" },
   { href: "/records", label: "Records", color: "bg-cyan-700" },
   { href: "/reports", label: "Reports", color: "bg-sky-700" },
@@ -33,7 +40,7 @@ export function ConsoleNav({ current }: { current?: string }) {
   const visibleNav = session
     ? navPool.filter((item) => session.navPaths.includes(item.href))
     : navPool;
-  const homeHref = isAdminView ? "/manager" : "/";
+  const homeHref = "/";
 
   return (
     <nav className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-3 shadow-sm">

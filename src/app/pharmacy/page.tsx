@@ -4,6 +4,7 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 import { ConsoleShell } from "@/components/ConsoleShell";
+import { TodayCollectionPanel } from "@/components/TodayCollectionPanel";
 import { StatusBadge } from "@/components/PatientCard";
 import { usePatientVisits } from "@/hooks/usePatientVisits";
 import { STATUS_LABELS } from "@/lib/status";
@@ -60,6 +61,8 @@ export default function PharmacyPage() {
       subtitle="Dispense prescriptions and send patients outside clinic"
       current="/pharmacy"
     >
+      <TodayCollectionPanel variant="pharmacy" />
+
       <div className="mb-4 flex gap-4 text-sm text-slate-600">
         <span>
           <strong>{queue.length}</strong> in pharmacy queue

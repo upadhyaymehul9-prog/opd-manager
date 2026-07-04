@@ -120,6 +120,7 @@ type ReportsDashboardProps = {
   fromDate?: string;
   toDate?: string;
   hideDateBar?: boolean;
+  todayOnly?: boolean;
 };
 
 export function ReportsDashboard({
@@ -128,11 +129,13 @@ export function ReportsDashboard({
   fromDate: controlledFrom,
   toDate: controlledTo,
   hideDateBar = false,
+  todayOnly = false,
 }: ReportsDashboardProps) {
   const [internalFrom, setInternalFrom] = useState(todayStr);
   const [internalTo, setInternalTo] = useState(todayStr);
-  const fromDate = controlledFrom ?? internalFrom;
-  const toDate = controlledTo ?? internalTo;
+  const lockedToday = todayOnly ? todayStr() : null;
+  const fromDate = lockedToday ?? controlledFrom ?? internalFrom;
+  const toDate = lockedToday ?? controlledTo ?? internalTo;
   const [tab, setTab] = useState<ReportTab>(initialTab);
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -172,7 +175,12 @@ export function ReportsDashboard({
 
   return (
     <div>
-      {!hideDateBar && (
+      {todayOnly && (
+        <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          Showing <strong>today&apos;s collection only</strong> ({todayStr()}).
+        </p>
+      )}
+      {!hideDateBar && !todayOnly && (
         <DateRangeBar
           fromDate={fromDate}
           toDate={toDate}

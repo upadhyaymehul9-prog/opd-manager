@@ -1,6 +1,8 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
+import { resolveRange, todayStr } from "@/lib/date-range";
 import { prisma } from "@/lib/prisma";
-import { resolveRange } from "@/lib/date-range";
 
 const LAB_STATUSES = new Set([
   "to_lab",
@@ -17,7 +19,15 @@ const RADIO_STATUSES = new Set([
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
+    const token = (await cookies()).get(SESSION_COOKIE)?.value;
+    const session = token ? await verifySessionToken(token) : null;
+
+    let { searchParams } = new URL(request.url);
+    if (session?.role === "pharmacy" || session?.role === "reception") {
+      const today = todayStr();
+      searchParams = new URLSearchParams({ from: today, to: today });
+    }
+
     const { rangeStart, rangeEndExclusive, from, to } =
       resolveRange(searchParams);
 
