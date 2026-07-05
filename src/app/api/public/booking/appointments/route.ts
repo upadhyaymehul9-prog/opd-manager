@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   assertSlotAvailable,
   getClinicSchedule,
+  runBookingTransaction,
   serializeAppointment,
 } from "@/lib/appointments";
 import { BOOKMYCLINIC_SOURCE, verifyBookMyClinicKey } from "@/lib/bookmyclinic";
@@ -48,9 +49,15 @@ export async function POST(request: Request) {
       }
     }
 
-    await assertSlotAvailable(doctor_id, when, schedule.slot_duration_minutes);
+    const appointment = await runBookingTransaction(async (tx) => {
+      await assertSlotAvailable(
+        doctor_id,
+        when,
+        schedule.slot_duration_minutes,
+        undefined,
+        tx,
+      );
 
-    const appointment = await prisma.$transaction(async (tx) => {
       const patient = await findOrCreatePatient(tx, {
         name: patient_name.trim(),
         mobile: mobile?.trim() || null,

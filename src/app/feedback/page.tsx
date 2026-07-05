@@ -44,7 +44,7 @@ export default function FeedbackPage() {
 
   if (done) {
     return (
-      <ConsoleShell title="Thank you" subtitle="Patient feedback (NABH AAC.6a)" publicMode>
+      <ConsoleShell title="Thank you" subtitle="Patient feedback (NABH PRE.7a)" publicMode>
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center">
           <p className="text-lg font-semibold text-emerald-900">
             Thank you for your feedback
@@ -60,7 +60,7 @@ export default function FeedbackPage() {
   return (
     <ConsoleShell
       title="Patient feedback"
-      subtitle="NABH AAC.6a · 5-point satisfaction survey"
+      subtitle="NABH PRE.7a · 5-point satisfaction survey"
       current="/feedback"
       publicMode
     >

@@ -317,7 +317,7 @@ export function ConsultationEmrPanel({
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700">
-                Final diagnosis (NABH COP.1i)
+                Final diagnosis (NABH IMS.4a)
               </label>
               <textarea
                 value={finalDiagnosis}

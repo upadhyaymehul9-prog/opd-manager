@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { startOfDay } from "date-fns";
+import { startOfDay } from "@/lib/date-range";
 import { prisma } from "@/lib/prisma";
 import { getNabhComplianceSnapshot } from "@/lib/nabh-compliance";
 

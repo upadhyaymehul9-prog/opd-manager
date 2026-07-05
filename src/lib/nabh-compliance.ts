@@ -1,4 +1,4 @@
-import { startOfDay } from "date-fns";
+import { startOfDay } from "@/lib/date-range";
 import { prisma } from "@/lib/prisma";
 import { buildNabhChecklist, visitHasEmr } from "@/lib/nabh";
 
@@ -25,9 +25,11 @@ export async function getNabhComplianceSnapshot() {
           medico_legal: true,
           mlc_details: true,
           signed_at: true,
+          age: true,
+          mobile: true,
           consent: { select: { id: true, consent_text: true } },
           patient: {
-            select: { abha_id: true, mobile_verified_at: true, mobile: true },
+            select: { abha_id: true },
           },
         },
       }),
@@ -53,13 +55,12 @@ export async function getNabhComplianceSnapshot() {
   const visitsWithEmr = visits.filter((v) => visitHasEmr(v)).length;
   const visitsCompleted = visits.filter((v) => v.status === "completed").length;
   const visitsWithAbhaToday = visits.filter((v) => v.patient?.abha_id).length;
-  const visitsWithMobile = visits.filter((v) => v.patient?.mobile).length;
-  const visitsMobileVerified = visits.filter(
-    (v) => v.patient?.mobile && v.patient.mobile_verified_at,
-  ).length;
   const mlcVisits = visits.filter((v) => v.medico_legal);
   const mlcDocumented = mlcVisits.filter((v) => v.mlc_details?.trim()).length;
   const visitsSigned = visits.filter((v) => v.signed_at).length;
+  const visitsWithTwoIdentifiers = visits.filter(
+    (v) => v.mobile && v.age != null,
+  ).length;
 
   const avgParts = [
     feedbackAvg._avg.q1_overall,
@@ -84,8 +85,7 @@ export async function getNabhComplianceSnapshot() {
       openIncidents,
       auditLogsToday: auditCount,
       visitsCompleted,
-      visitsWithMobile,
-      visitsMobileVerified,
+      visitsWithTwoIdentifiers,
       mlcVisits: mlcVisits.length,
       mlcDocumented,
       feedbackToday,

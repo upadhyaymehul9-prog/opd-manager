@@ -41,11 +41,21 @@ export async function PATCH(
 
     const existing = await prisma.patientVisit.findUnique({
       where: { id: visitId },
-      select: { id: true, patient_id: true, medico_legal: true },
+      select: { id: true, patient_id: true, medico_legal: true, status: true },
     });
 
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    // A completed/discharged visit's signed record is final. Only
+    // admin/manager can amend it afterwards (e.g. to correct an error),
+    // and doing so re-stamps the signature below so the change is traceable.
+    if (existing.status === "completed" && session?.role !== "admin" && session?.role !== "manager") {
+      return NextResponse.json(
+        { error: "Visit is completed — ask a manager/admin to amend a signed record" },
+        { status: 403 },
+      );
     }
 
     const visitData: Record<string, unknown> = {};

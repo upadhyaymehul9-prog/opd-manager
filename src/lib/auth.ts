@@ -278,14 +278,6 @@ export function canAccessApi(
     );
   }
 
-  if (pathname.match(/^\/api\/patients\/[^/]+\/verify-mobile$/) && method === "POST") {
-    return (
-      session.role === "reception" ||
-      session.role === "admin" ||
-      session.role === "manager"
-    );
-  }
-
   if (pathname === "/api/feedback" && method === "GET") {
     return session.role === "admin" || session.role === "manager";
   }

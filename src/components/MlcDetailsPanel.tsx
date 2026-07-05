@@ -46,7 +46,7 @@ export function MlcDetailsPanel({
 
   return (
     <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-4">
-      <h4 className="font-semibold text-amber-900">MLC checklist (NABH Annexure D / COP.3a)</h4>
+      <h4 className="font-semibold text-amber-900">MLC checklist (NABH Annexure D / COP.2c)</h4>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 text-sm">
         <label className="block">
           Brought by (name)

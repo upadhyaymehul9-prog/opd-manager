@@ -11,6 +11,12 @@ export async function PATCH(
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    if (session.role !== "admin" && session.role !== "manager") {
+      return NextResponse.json(
+        { error: "Only manager/admin can review or close incidents" },
+        { status: 403 },
+      );
+    }
 
     const { id } = await params;
     const body = await request.json();

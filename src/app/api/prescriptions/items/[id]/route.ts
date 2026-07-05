@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { computePrescriptionStatus } from "@/lib/prescription-status";
 import { prisma } from "@/lib/prisma";
@@ -7,6 +8,27 @@ import {
   restoreToStock,
 } from "@/lib/stock";
 import { serializePrescriptionItem } from "@/lib/serialize";
+
+/**
+ * Stock read+deduct runs at Serializable isolation so two concurrent
+ * dispenses of the same medicine can't both read the same available
+ * quantity and over-deduct. Postgres aborts the losing transaction with a
+ * P2034 serialization error, which we retry a few times before giving up.
+ */
+async function runSerializable<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await prisma.$transaction(fn, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    } catch (e) {
+      const isConflict =
+        e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2034";
+      if (!isConflict || attempt === 3) throw e;
+    }
+  }
+  throw new Error("Unreachable");
+}
 
 export async function PATCH(
   request: Request,
@@ -60,6 +82,16 @@ export async function PATCH(
       }
     }
 
+    if (dispensed && skipped) {
+      return NextResponse.json(
+        {
+          error:
+            "Cannot skip a dispensed medicine — un-dispense it first so stock is restored",
+        },
+        { status: 400 },
+      );
+    }
+
     if (dispensed && !item.dispensed && !item.medicine_id) {
       return NextResponse.json(
         {
@@ -72,7 +104,7 @@ export async function PATCH(
 
     const qty = quantity;
 
-    const updatedItem = await prisma.$transaction(async (tx) => {
+    const updatedItem = await runSerializable(async (tx) => {
       if (dispensed && !item.dispensed && item.medicine_id) {
         const available = await getAvailableQuantity(tx, item.medicine_id);
         if (available < qty) {

@@ -127,12 +127,33 @@ export async function restoreToStock(
     return;
   }
 
+  // No usable (non-expired) batch to restore into — fall back to the most
+  // recent batch of any age so the return stays traceable to a real
+  // batch/MRP instead of inventing one.
+  const anyBatch = await tx.stockBatch.findFirst({
+    where: { medicine_id: medicineId },
+    orderBy: { created_at: "desc" },
+  });
+
+  if (anyBatch) {
+    await tx.stockBatch.update({
+      where: { id: anyBatch.id },
+      data: { quantity: anyBatch.quantity + qty },
+    });
+    return;
+  }
+
+  // Medicine has no batch history at all. Create the return batch already
+  // expired (yesterday) so it can never be silently re-dispensed at a
+  // fabricated shelf-life/price — pharmacy must review and write it off or
+  // receive fresh stock instead.
+  const today = startOfDay(new Date());
   await tx.stockBatch.create({
     data: {
       medicine_id: medicineId,
       quantity: qty,
-      batch_no: "RETURN",
-      expiry_date: new Date("2099-12-31"),
+      batch_no: "RETURN-UNTRACKED",
+      expiry_date: new Date(today.getTime() - 24 * 60 * 60 * 1000),
     },
   });
 }

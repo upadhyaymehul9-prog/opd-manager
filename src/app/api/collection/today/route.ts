@@ -1,7 +1,7 @@
-import { addDays, startOfDay } from "date-fns";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
+import { addDays, dateStrIST, startOfDay } from "@/lib/date-range";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
@@ -15,7 +15,7 @@ export async function GET() {
 
     const todayStart = startOfDay(new Date());
     const todayEnd = addDays(todayStart, 1);
-    const date = todayStart.toISOString().slice(0, 10);
+    const date = dateStrIST(todayStart);
 
     const payload: {
       date: string;

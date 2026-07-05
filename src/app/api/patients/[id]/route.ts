@@ -13,10 +13,25 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = (await request.json()) as UpdatePatientInput;
+    const session = await getSessionFromCookies();
 
     let status: PatientStatus | undefined = body.status;
     if (status === "return_to_doctor") {
       status = "in_followup";
+    }
+
+    const clinicalRoles = ["doctor", "reception", "admin", "manager"];
+    if (status === "completed" && !clinicalRoles.includes(session?.role ?? "")) {
+      return NextResponse.json(
+        { error: "Only doctor/reception can mark a visit completed" },
+        { status: 403 },
+      );
+    }
+    if (body.doctor_id && !clinicalRoles.includes(session?.role ?? "")) {
+      return NextResponse.json(
+        { error: "Only doctor/reception can reassign a visit's doctor" },
+        { status: 403 },
+      );
     }
 
     const existing = await prisma.patientVisit.findUnique({ where: { id } });
@@ -96,7 +111,6 @@ export async function PATCH(
       include: visitInclude,
     });
 
-    const session = await getSessionFromCookies();
     if (status) {
       await logAudit({
         action: AUDIT_ACTIONS.VISIT_UPDATE,

@@ -41,8 +41,10 @@ export async function logAudit(input: {
         ip_address: await clientIp(),
       },
     });
-  } catch {
-    // Audit must not break clinical workflow
+  } catch (e) {
+    // Audit must not break clinical workflow — but a swallowed failure here
+    // means the audit trail silently has a hole, so at least surface it.
+    console.error("logAudit failed", { action: input.action, entity_type: input.entity_type }, e);
   }
 }
 

@@ -1,5 +1,8 @@
 import { addDays, addMinutes, format, startOfDay } from "date-fns";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+
+type Tx = Prisma.TransactionClient;
 
 export type ClinicSchedule = {
   slot_duration_minutes: number;
@@ -93,8 +96,9 @@ export async function getBookedAppointmentsForDoctor(
   doctorId: string,
   dayStart: Date,
   dayEnd: Date,
+  client: Tx | typeof prisma = prisma,
 ) {
-  return prisma.appointment.findMany({
+  return client.appointment.findMany({
     where: {
       doctor_id: doctorId,
       scheduled_at: { gte: dayStart, lt: dayEnd },
@@ -148,6 +152,7 @@ export async function assertSlotAvailable(
   scheduledAt: Date,
   durationMinutes: number,
   excludeId?: string,
+  client: Tx | typeof prisma = prisma,
 ) {
   const dayStart = startOfDay(scheduledAt);
   const dayEnd = addDays(dayStart, 1);
@@ -155,6 +160,7 @@ export async function assertSlotAvailable(
     doctorId,
     dayStart,
     dayEnd,
+    client,
   );
 
   const conflict = booked.find(
@@ -166,4 +172,27 @@ export async function assertSlotAvailable(
   if (conflict) {
     throw new Error("This time slot is already booked");
   }
+}
+
+/**
+ * Runs `fn` at Serializable isolation with a few retries. Used to wrap the
+ * "check slot is free, then create" sequence so two concurrent bookings for
+ * the same doctor/time can't both pass the check before either commits —
+ * Postgres aborts the losing transaction (P2034) and we retry it.
+ */
+export async function runBookingTransaction<T>(
+  fn: (tx: Tx) => Promise<T>,
+) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await prisma.$transaction(fn, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    } catch (e) {
+      const isConflict =
+        e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2034";
+      if (!isConflict || attempt === 3) throw e;
+    }
+  }
+  throw new Error("Unreachable");
 }
