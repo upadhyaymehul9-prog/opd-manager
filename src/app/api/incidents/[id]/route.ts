@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
+import { AUDIT_ACTIONS, diffFields, getSessionFromCookies, logAudit } from "@/lib/audit";
 
 export async function PATCH(
   request: Request,
@@ -26,6 +26,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
+    const existing = await prisma.incidentReport.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
     const incident = await prisma.incidentReport.update({
       where: { id },
       data: {
@@ -34,12 +39,14 @@ export async function PATCH(
       },
     });
 
-    if (status === "closed") {
+    const diff = diffFields(existing, incident, ["status", "closed_at"]);
+    if (Object.keys(diff).length > 0) {
       await logAudit({
-        action: AUDIT_ACTIONS.INCIDENT_CLOSE,
+        action: status === "closed" ? AUDIT_ACTIONS.INCIDENT_CLOSE : AUDIT_ACTIONS.INCIDENT_STATUS_CHANGE,
         entity_type: "incident",
         entity_id: id,
-        summary: `Incident closed for ${incident.patient_name}`,
+        summary: `Incident status → ${status} for ${incident.patient_name}`,
+        details: { changes: diff },
         session,
       });
     }

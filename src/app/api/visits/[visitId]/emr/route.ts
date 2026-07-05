@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { serializeVisitEmr, visitEmrSelect } from "@/lib/emr";
-import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
+import { AUDIT_ACTIONS, diffFields, getSessionFromCookies, logAudit } from "@/lib/audit";
 import type { UpdateVisitEmrInput } from "@/lib/emr-types";
 
 function trimOrNull(v: string | null | undefined) {
@@ -172,11 +172,31 @@ export async function PATCH(
       });
     });
 
+    const diff = diffFields(existing, result, [
+      "chief_complaint",
+      "provisional_diagnosis",
+      "final_diagnosis",
+      "diagnosis",
+      "examination_notes",
+      "advice",
+      "lifestyle_advice",
+      "investigations_ordered",
+      "follow_up_instructions",
+      "referral_notes",
+      "follow_up_date",
+      "vitals_bp",
+      "vitals_pulse",
+      "vitals_temp",
+      "vitals_weight",
+      "vitals_spo2",
+    ]);
+
     await logAudit({
       action: AUDIT_ACTIONS.EMR_UPDATE,
       entity_type: "visit",
       entity_id: visitId,
       summary: `EMR updated for visit ${visitId.slice(0, 8)}…`,
+      details: Object.keys(diff).length > 0 ? { changes: diff } : undefined,
       session,
     });
 

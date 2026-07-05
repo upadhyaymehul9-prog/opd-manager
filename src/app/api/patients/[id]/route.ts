@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { visitInclude } from "@/lib/db-includes";
 import { serializeVisit } from "@/lib/serialize";
 import { visitEmrCompleteForDischarge } from "@/lib/nabh";
-import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
+import { AUDIT_ACTIONS, diffFields, getSessionFromCookies, logAudit } from "@/lib/audit";
 import type { PatientStatus, UpdatePatientInput } from "@/lib/types";
 
 export async function PATCH(
@@ -111,12 +111,25 @@ export async function PATCH(
       include: visitInclude,
     });
 
-    if (status) {
+    const diff = existing
+      ? diffFields(existing, visit, [
+          "status",
+          "doctor_id",
+          "medico_legal",
+          "room_number",
+          "lab_eta",
+          "radio_eta",
+          "completed_at",
+        ])
+      : {};
+
+    if (Object.keys(diff).length > 0) {
       await logAudit({
         action: AUDIT_ACTIONS.VISIT_UPDATE,
         entity_type: "visit",
         entity_id: id,
-        summary: `Visit status → ${status} for ${visit.patient_name}`,
+        summary: `Visit updated for ${visit.patient_name}${status ? ` — status → ${status}` : ""}`,
+        details: { changes: diff },
         session,
       });
     }
