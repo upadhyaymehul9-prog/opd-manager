@@ -98,7 +98,11 @@ export default function DoctorConsolePage({
                     <ProcedurePanel visitId={visit.id} />
                   </>
                 )}
-                <PrescriptionForm visitId={visit.id} doctorId={doctorId} />
+                <PrescriptionForm
+                  visitId={visit.id}
+                  doctorId={doctorId}
+                  patientAllergies={visit.patient_allergies}
+                />
               </>
             )}
           </div>

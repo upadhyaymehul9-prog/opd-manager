@@ -1,15 +1,21 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { serializePrescription } from "@/lib/serialize";
+import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
 
 const prescriptionInclude = { items: true };
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
+    const session = await getSessionFromCookies();
+    const rawBody = await request.text();
+    const body = rawBody
+      ? (JSON.parse(rawBody) as { acknowledged_warnings?: unknown[] })
+      : {};
 
     const prescription = await prisma.prescription.findUnique({
       where: { id },
@@ -50,6 +56,18 @@ export async function POST(
         },
         include: prescriptionInclude,
       });
+    });
+
+    await logAudit({
+      action: AUDIT_ACTIONS.PRESCRIPTION_SEND,
+      entity_type: "prescription",
+      entity_id: id,
+      summary: `Prescription sent to pharmacy for visit ${prescription.patient_visit_id.slice(0, 8)}…`,
+      details:
+        body.acknowledged_warnings && body.acknowledged_warnings.length > 0
+          ? { acknowledged_safety_warnings: body.acknowledged_warnings }
+          : undefined,
+      session,
     });
 
     return NextResponse.json(serializePrescription(updated));

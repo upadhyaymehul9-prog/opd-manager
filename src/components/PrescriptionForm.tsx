@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   Medicine,
   Prescription,
@@ -8,6 +8,11 @@ import type {
 } from "@/lib/prescription-types";
 import { ActionButton } from "./PatientCard";
 import { formatMedicineLabel } from "@/lib/medicine";
+import {
+  checkDrugSafety,
+  DRUG_SAFETY_DISCLAIMER,
+  type SafetyWarning,
+} from "@/lib/drug-safety";
 
 const FREQUENCIES = ["OD", "BD", "TDS", "QID", "SOS", "HS"];
 
@@ -82,9 +87,11 @@ function stockLabel(stock?: MedicineWithStock["stock"]) {
 export function PrescriptionForm({
   visitId,
   doctorId,
+  patientAllergies,
 }: {
   visitId: string;
   doctorId: string;
+  patientAllergies?: string | null;
 }) {
   const [prescription, setPrescription] = useState<Prescription | null>(null);
   const [notes, setNotes] = useState("");
@@ -102,6 +109,19 @@ export function PrescriptionForm({
   const [persistedIds, setPersistedIds] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState(false);
   const collapseInitialized = useRef(false);
+  const [warningsAcknowledged, setWarningsAcknowledged] = useState(false);
+
+  const safetyWarnings = useMemo<SafetyWarning[]>(() => {
+    const medicineNames = lines
+      .filter((l) => !l.dispensed && l.medicine_name.trim())
+      .map((l) => l.medicine_name.trim());
+    return checkDrugSafety(medicineNames, patientAllergies);
+  }, [lines, patientAllergies]);
+  const safetyWarningsKey = JSON.stringify(safetyWarnings);
+
+  useEffect(() => {
+    setWarningsAcknowledged(false);
+  }, [safetyWarningsKey]);
 
   const isSent =
     prescription != null &&
@@ -296,6 +316,10 @@ export function PrescriptionForm({
       setError("Add at least one medicine");
       return;
     }
+    if (safetyWarnings.length > 0 && !warningsAcknowledged) {
+      setError("Please review and acknowledge the safety warning(s) above before sending");
+      return;
+    }
 
     const payloadItems = buildSaveItems(validLines, persistedIds);
 
@@ -323,6 +347,10 @@ export function PrescriptionForm({
 
       const res = await fetch(`/api/prescriptions/${saved.id}/send`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          acknowledged_warnings: safetyWarnings.length > 0 ? safetyWarnings : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Send failed");
@@ -384,6 +412,31 @@ export function PrescriptionForm({
           Dispensed lines are locked.
         </p>
       )}
+
+      {safetyWarnings.length > 0 && (
+        <div className="mt-3 rounded-lg border-2 border-red-400 bg-red-50 p-3">
+          <p className="font-semibold text-red-900">⚠ Safety warning</p>
+          <ul className="mt-1 list-inside list-disc text-sm text-red-900">
+            {safetyWarnings.map((w, i) => (
+              <li key={i}>
+                {w.type === "allergy"
+                  ? `${w.medicine}: ${w.note}`
+                  : `${w.medicineA} + ${w.medicineB}: ${w.description}`}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-red-700">{DRUG_SAFETY_DISCLAIMER}</p>
+          <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm font-medium text-red-900">
+            <input
+              type="checkbox"
+              checked={warningsAcknowledged}
+              onChange={(e) => setWarningsAcknowledged(e.target.checked)}
+            />
+            I&apos;ve reviewed this and choose to proceed
+          </label>
+        </div>
+      )}
+
       <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-slate-700">
         <input
           type="checkbox"
@@ -610,7 +663,7 @@ export function PrescriptionForm({
             label="Send to pharmacy"
             variant="pharmacy"
             onClick={sendToPharmacy}
-            disabled={busy}
+            disabled={busy || (safetyWarnings.length > 0 && !warningsAcknowledged)}
           />
         )}
       </div>
