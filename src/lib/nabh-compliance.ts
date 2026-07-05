@@ -1,6 +1,7 @@
 import { startOfDay } from "@/lib/date-range";
 import { prisma } from "@/lib/prisma";
 import { buildNabhChecklist, visitHasEmr } from "@/lib/nabh";
+import { isPoliceIntimationOverdue } from "@/lib/mlc";
 
 export async function getNabhComplianceSnapshot() {
   const todayStart = startOfDay(new Date());
@@ -23,7 +24,6 @@ export async function getNabhComplianceSnapshot() {
           vitals_spo2: true,
           status: true,
           medico_legal: true,
-          mlc_details: true,
           signed_at: true,
           age: true,
           mobile: true,
@@ -56,7 +56,16 @@ export async function getNabhComplianceSnapshot() {
   const visitsCompleted = visits.filter((v) => v.status === "completed").length;
   const visitsWithAbhaToday = visits.filter((v) => v.patient?.abha_id).length;
   const mlcVisits = visits.filter((v) => v.medico_legal);
-  const mlcDocumented = mlcVisits.filter((v) => v.mlc_details?.trim()).length;
+  const mlcRecords =
+    mlcVisits.length > 0
+      ? await prisma.mlcRecord.findMany({
+          where: { patient_visit_id: { in: mlcVisits.map((v) => v.id) } },
+          select: { arrival_at: true, police_intimated_at: true },
+        })
+      : [];
+  const mlcDocumented = mlcRecords.filter(
+    (r) => !isPoliceIntimationOverdue(r),
+  ).length;
   const visitsSigned = visits.filter((v) => v.signed_at).length;
   const visitsWithTwoIdentifiers = visits.filter(
     (v) => v.mobile && v.age != null,

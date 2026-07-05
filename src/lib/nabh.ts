@@ -141,7 +141,7 @@ export function buildNabhChecklist(input: {
       note:
         input.mlcVisits === 0
           ? "No MLC cases today."
-          : `${input.mlcDocumented}/${input.mlcVisits} MLC visits with Annexure D details.`,
+          : `${input.mlcDocumented}/${input.mlcVisits} MLC cases with police intimated (or still within the 24h window).`,
     },
     {
       id: "mom-allergy",

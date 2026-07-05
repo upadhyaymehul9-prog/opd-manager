@@ -42,6 +42,67 @@ model PatientRegistry {
   @@map("patient_registry")
 }
 
+model MlcRegistry {
+  id          String @id @default("default")
+  last_number Int    @default(0)
+
+  @@map("mlc_registry")
+}
+
+/// A medico-legal case is its own structured, permanent record (not a
+/// free-text blob on the visit) so it can carry the fields NABH/legal
+/// review actually requires: a casualty register number, identification
+/// marks, and — critically — proof that police were intimated, since that
+/// is mandatory regardless of patient consent. Corrections never overwrite
+/// (see MlcRecordRevision); the record itself is never deleted.
+model MlcRecord {
+  id                         String              @id @default(uuid()) @db.Uuid
+  patient_visit_id           String              @unique @db.Uuid
+  casualty_number             Int                @unique
+  arrival_at                 DateTime            @db.Timestamptz(6)
+  brought_by_name            String?
+  brought_by_relation        String?
+  history_own_words          String?
+  identification_mark_1      String?
+  identification_mark_2      String?
+  injury_description         String?
+  treatment_given            String?
+  patient_status             String?
+  dying_declaration_needed   Boolean             @default(false)
+  evidence_collected         String?
+  police_station             String?
+  police_officer_name        String?
+  fir_ddr_number              String?
+  police_intimated_at        DateTime?           @db.Timestamptz(6)
+  acknowledgment_receipt_ref String?
+  acknowledgment_received_at DateTime?           @db.Timestamptz(6)
+  created_by                 String
+  created_by_role            String
+  created_at                 DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime            @updatedAt @db.Timestamptz(6)
+  patient_visit               PatientVisit        @relation(fields: [patient_visit_id], references: [id], onDelete: Restrict)
+  revisions                  MlcRecordRevision[]
+
+  @@index([patient_visit_id])
+  @@index([police_intimated_at])
+  @@map("mlc_records")
+}
+
+/// Snapshot of an MlcRecord's fields taken before any correction overwrites
+/// them — same append-only pattern as VisitEmrRevision.
+model MlcRecordRevision {
+  id              String    @id @default(uuid()) @db.Uuid
+  mlc_record_id   String    @db.Uuid
+  snapshot        String
+  changed_by      String
+  changed_by_role String
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+  mlc_record      MlcRecord @relation(fields: [mlc_record_id], references: [id], onDelete: Restrict)
+
+  @@index([mlc_record_id])
+  @@map("mlc_record_revisions")
+}
+
 model Doctor {
   id             String         @id @default(uuid()) @db.Uuid
   name           String
@@ -136,6 +197,7 @@ model PatientVisit {
   consent         PatientConsent?
   incidents       IncidentReport[]
   emr_revisions   VisitEmrRevision[]
+  mlc_record      MlcRecord?
 
   @@index([status])
   @@index([doctor_id])

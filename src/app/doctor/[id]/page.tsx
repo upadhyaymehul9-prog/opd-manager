@@ -93,7 +93,7 @@ export default function DoctorConsolePage({
                       initialAllergies={visit.patient_allergies}
                     />
                     {visit.medico_legal && (
-                      <MlcDetailsPanel visitId={visit.id} initialDetails={visit.mlc_details} />
+                      <MlcDetailsPanel visitId={visit.id} />
                     )}
                     <ProcedurePanel visitId={visit.id} />
                   </>

@@ -234,7 +234,9 @@ export function canAccessApi(
 
   if (
     pathname.match(/^\/api\/visits\/[^/]+\/emr$/) ||
-    pathname.match(/^\/api\/visits\/[^/]+\/emr\/history$/)
+    pathname.match(/^\/api\/visits\/[^/]+\/emr\/history$/) ||
+    pathname.match(/^\/api\/visits\/[^/]+\/mlc$/) ||
+    pathname.match(/^\/api\/visits\/[^/]+\/mlc\/history$/)
   ) {
     if (method === "GET") {
       return (

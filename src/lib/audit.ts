@@ -62,4 +62,6 @@ export const AUDIT_ACTIONS = {
   DISPENSE: "dispense",
   INCIDENT_REPORT: "incident_report",
   INCIDENT_CLOSE: "incident_close",
+  MLC_RECORD_CREATE: "mlc_record_create",
+  MLC_RECORD_UPDATE: "mlc_record_update",
 } as const;
