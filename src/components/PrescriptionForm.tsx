@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   Medicine,
   Prescription,
@@ -100,6 +100,8 @@ export function PrescriptionForm({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [persistedIds, setPersistedIds] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState(false);
+  const collapseInitialized = useRef(false);
 
   const isSent =
     prescription != null &&
@@ -113,6 +115,10 @@ export function PrescriptionForm({
     const data = await res.json();
     if (!data) return;
     setPrescription(data);
+    if (!collapseInitialized.current) {
+      collapseInitialized.current = true;
+      setCollapsed(data.status !== "draft");
+    }
     setNotes(data.notes ?? "");
     setPersistedIds(new Set(data.items.map((i: Prescription["items"][number]) => i.id)));
     if (data.items.length > 0) {
@@ -334,11 +340,44 @@ export function PrescriptionForm({
     return null;
   }
 
+  if (isSent && collapsed) {
+    const pending = prescription?.items.filter((i) => !i.dispensed && !i.skipped).length ?? 0;
+    return (
+      <div className="flex items-center justify-between rounded-xl border border-teal-200/80 bg-teal-50/40 p-4 shadow-sm">
+        <div>
+          <h3 className="font-semibold text-slate-900">Prescription (sent to pharmacy)</h3>
+          <p className="mt-1 text-xs text-teal-900">
+            {prescription?.items.length ?? 0} medicine(s) sent
+            {pending > 0 ? ` — ${pending} pending` : " — all dispensed or skipped"}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          className="shrink-0 rounded-lg border border-teal-300 bg-white px-3 py-1.5 text-sm font-medium text-teal-800 hover:bg-teal-50"
+        >
+          Edit prescription
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-xl border border-blue-200/80 bg-gradient-to-br from-blue-50/80 to-white p-4 shadow-sm">
-      <h3 className="font-semibold text-slate-900">
-        {isSent ? "Prescription (sent to pharmacy)" : "Write prescription"}
-      </h3>
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-slate-900">
+          {isSent ? "Prescription (sent to pharmacy)" : "Write prescription"}
+        </h3>
+        {isSent && (
+          <button
+            type="button"
+            onClick={() => setCollapsed(true)}
+            className="shrink-0 text-xs font-medium text-slate-500 hover:text-slate-700"
+          >
+            Collapse
+          </button>
+        )}
+      </div>
       {isSent && (
         <p className="mt-1 rounded-lg bg-teal-100 px-3 py-2 text-xs text-teal-900">
           Sent to pharmacy — you can still add or edit undispensed medicines below.
