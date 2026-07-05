@@ -50,7 +50,7 @@ export default function TVDisplayPage() {
   const loading = visitsLoading || doctorsLoading;
 
   return (
-    <div className="flex min-h-screen bg-[#f3f4f6] text-slate-900">
+    <div className="flex min-h-screen flex-col bg-slate-100 text-slate-900 lg:flex-row">
       <div className="min-w-0 flex-1">
         <header className="border-b border-slate-300 bg-white px-6 py-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -167,7 +167,7 @@ function DoctorStatusSidebar({
   });
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-l-4 border-blue-600 bg-slate-900 text-white lg:w-80 xl:w-96">
+    <aside className="flex w-full shrink-0 flex-col border-t-4 border-blue-600 bg-slate-900 text-white lg:w-80 lg:border-l-4 lg:border-t-0 xl:w-96">
       <div className="border-b border-slate-700 bg-blue-700 px-4 py-4">
         <h2 className="text-xl font-bold tracking-wide">Doctor Status</h2>
         <p className="mt-1 text-sm text-blue-100">
@@ -194,7 +194,7 @@ function DoctorStatusSidebar({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={doctor.photo_url}
-                  alt=""
+                  alt={`${doctor.name} photo`}
                   className="h-14 w-14 shrink-0 rounded-full border-2 border-blue-400 object-cover"
                 />
               ) : (
@@ -256,7 +256,7 @@ function waitMinutes(visit: PatientVisit) {
 
 function SummaryCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-slate-300 bg-white px-4 py-5 text-center shadow-sm">
+    <div className="card px-4 py-5 text-center">
       <p className="text-3xl font-bold text-slate-900">{value}</p>
       <p className="mt-1 text-sm font-medium text-slate-600">{label}</p>
     </div>
@@ -271,8 +271,8 @@ function TvSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm">
-      <h2 className="border-b border-slate-300 bg-[#e9ecef] px-4 py-2 text-lg font-bold">
+    <section className="card overflow-hidden">
+      <h2 className="card-header text-lg font-bold text-slate-900">
         {title}
       </h2>
       {children}

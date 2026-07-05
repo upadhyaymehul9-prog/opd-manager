@@ -7,7 +7,7 @@ import { ConsoleShell } from "@/components/ConsoleShell";
 import { TodayCollectionPanel } from "@/components/TodayCollectionPanel";
 import { StatusBadge } from "@/components/PatientCard";
 import { usePatientVisits } from "@/hooks/usePatientVisits";
-import { STATUS_LABELS } from "@/lib/status";
+import { getRelevantPatients } from "@/lib/status";
 import type { Prescription } from "@/lib/prescription-types";
 import type { PatientVisit } from "@/lib/types";
 
@@ -96,9 +96,17 @@ export default function PharmacyPage() {
       {loading && <p className="text-slate-600">Loading…</p>}
       {error && <p className="text-red-600">{error}</p>}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      {queue.length === 0 && !loading ? (
+        <div className="card p-12 text-center">
+          <p className="text-lg font-medium text-slate-700">Pharmacy queue is empty</p>
+          <p className="mt-2 text-sm text-slate-500">
+            Patients appear here when the doctor sends them to pharmacy.
+          </p>
+        </div>
+      ) : (
+      <div className="card overflow-x-auto">
         <table className="w-full min-w-[900px] text-left text-sm">
-          <thead className="border-b border-slate-200 bg-teal-50">
+          <thead className="border-b border-slate-200 bg-teal-50/80">
             <tr>
               <th className="px-4 py-3 font-semibold">Queue</th>
               <th className="px-4 py-3 font-semibold">Token</th>
@@ -181,13 +189,8 @@ export default function PharmacyPage() {
             })}
           </tbody>
         </table>
-        {queue.length === 0 && !loading && (
-          <p className="p-10 text-center text-slate-500">
-            Pharmacy queue is empty — patients appear here when doctor sends to
-            pharmacy ({STATUS_LABELS.to_pharmacy} / {STATUS_LABELS.at_pharmacy})
-          </p>
-        )}
       </div>
+      )}
     </ConsoleShell>
   );
 }

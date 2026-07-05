@@ -4,7 +4,7 @@ import { ConsoleShell } from "@/components/ConsoleShell";
 import { PatientCard } from "@/components/PatientCard";
 import { PatientActions } from "@/components/PatientActions";
 import { usePatientVisits } from "@/hooks/usePatientVisits";
-import { RADIOLOGY_ACTIONS, getRelevantPatients } from "@/lib/status";
+import { getRelevantPatients } from "@/lib/status";
 
 export default function RadiologyPage() {
   const { visits, loading, error } = usePatientVisits({ activeOnly: true });
@@ -29,9 +29,7 @@ export default function RadiologyPage() {
           <PatientCard
             key={visit.id}
             visit={visit}
-            actions={
-              <PatientActions visit={visit} actions={RADIOLOGY_ACTIONS} />
-            }
+            actions={<PatientActions visit={visit} role="radiology" />}
           />
         ))}
       </div>

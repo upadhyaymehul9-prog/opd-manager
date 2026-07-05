@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { BillPreview, PaymentMode, PharmacyBillView } from "@/lib/billing-types";
 import { PAYMENT_MODES } from "@/lib/billing-types";
 import { calculateLine, round2 } from "@/lib/billing";
@@ -18,6 +19,7 @@ export function PrescriptionDetail({
   visit: PatientVisit;
   onComplete?: () => void;
 }) {
+  const router = useRouter();
   const [prescription, setPrescription] = useState<Prescription | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -283,8 +285,11 @@ export function PrescriptionDetail({
         <PrintActions label="Print receipt" pdfLabel="Save receipt as PDF" />
         <button
           type="button"
-          onClick={() => onComplete?.()}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 print:hidden"
+          onClick={() => {
+            onComplete?.();
+            router.push("/pharmacy");
+          }}
+          className="focus-ring rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 print:hidden"
         >
           Back to pharmacy queue
         </button>
@@ -294,7 +299,7 @@ export function PrescriptionDetail({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="card p-4">
         <p className="text-lg font-bold text-slate-900">{visit.patient_name}</p>
         <p className="text-sm text-slate-600">
           {visit.patient_number != null && (

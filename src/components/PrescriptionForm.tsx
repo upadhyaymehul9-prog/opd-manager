@@ -8,7 +8,6 @@ import type {
 } from "@/lib/prescription-types";
 import { ActionButton } from "./PatientCard";
 import { formatMedicineLabel } from "@/lib/medicine";
-import type { PatientVisit } from "@/lib/types";
 
 const FREQUENCIES = ["OD", "BD", "TDS", "QID", "SOS", "HS"];
 
@@ -83,11 +82,9 @@ function stockLabel(stock?: MedicineWithStock["stock"]) {
 export function PrescriptionForm({
   visitId,
   doctorId,
-  visit,
 }: {
   visitId: string;
   doctorId: string;
-  visit: PatientVisit;
 }) {
   const [prescription, setPrescription] = useState<Prescription | null>(null);
   const [notes, setNotes] = useState("");
@@ -338,7 +335,7 @@ export function PrescriptionForm({
   }
 
   return (
-    <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+    <div className="rounded-xl border border-blue-200/80 bg-gradient-to-br from-blue-50/80 to-white p-4 shadow-sm">
       <h3 className="font-semibold text-slate-900">
         {isSent ? "Prescription (sent to pharmacy)" : "Write prescription"}
       </h3>
@@ -564,7 +561,7 @@ export function PrescriptionForm({
 
       <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
         <ActionButton
-          label={isSent ? "Save medicines" : "Save medicines"}
+          label="Save medicines"
           onClick={savePrescription}
           disabled={busy}
           variant={isSent ? "secondary" : "primary"}

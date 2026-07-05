@@ -29,31 +29,34 @@ export function DoctorPatientQueueBar({
       .catch(() => setRx(null));
   }, [visit.id, visit.status]);
 
+  const hint =
+    visit.status === "at_pharmacy"
+      ? "At pharmacy — edit Rx below"
+      : "En route to pharmacy — edit Rx below";
+
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <table className="w-full min-w-[640px] text-left text-sm">
+    <div className="card overflow-x-auto">
+      <table className="w-full min-w-[560px] text-left text-sm">
         <tbody>
           <tr
             className={
               visit.status === "at_pharmacy"
                 ? "bg-teal-50/80"
-                : "bg-white"
+                : "bg-amber-50/50"
             }
           >
-            <td className="w-12 px-4 py-2.5 font-bold text-teal-800">
-              {queueIndex}
-            </td>
-            <td className="w-16 px-3 py-2.5 font-bold">#{visit.token_number}</td>
-            <td className="min-w-[120px] px-3 py-2.5">
+            <td className="w-12 px-4 py-3 font-bold text-teal-800">{queueIndex}</td>
+            <td className="w-16 px-3 py-3 font-bold">#{visit.token_number}</td>
+            <td className="min-w-[120px] px-3 py-3">
               <p className="font-medium">{visit.patient_name}</p>
               {visit.patient_number != null && (
                 <p className="text-xs text-indigo-700">P-{visit.patient_number}</p>
               )}
             </td>
-            <td className="px-3 py-2.5">
+            <td className="px-3 py-3">
               <StatusBadge status={visit.status} />
             </td>
-            <td className="px-3 py-2.5">
+            <td className="px-3 py-3">
               {rx ? (
                 rx.total > 0 ? (
                   <span
@@ -72,13 +75,13 @@ export function DoctorPatientQueueBar({
                 <span className="text-slate-400">…</span>
               )}
             </td>
-            <td className="px-3 py-2.5 text-xs text-slate-500">
+            <td className="px-3 py-3 text-xs text-slate-500">
               {formatDistanceToNow(new Date(visit.registered_at), {
                 addSuffix: true,
               })}
             </td>
-            <td className="px-4 py-2.5 text-right text-xs font-medium text-teal-800">
-              At pharmacy — edit Rx below
+            <td className="px-4 py-3 text-right text-xs font-medium text-teal-800">
+              {hint}
             </td>
           </tr>
         </tbody>

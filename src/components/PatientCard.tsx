@@ -24,72 +24,83 @@ export function PatientCard({
   const doctor = visit.doctors;
 
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-          {visit.patient_number != null && (
-            <span className="rounded-lg bg-indigo-700 px-2 py-1 text-sm font-bold text-white">
-              P-{visit.patient_number}
-            </span>
-          )}
-          {visit.patient_abha_id && (
-            <span className="rounded-lg bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-900">
-              ABHA {visit.patient_abha_id}
-            </span>
-          )}
-            <span className="rounded-lg bg-slate-900 px-2 py-1 text-sm font-bold text-white">
-              #{visit.token_number}
-            </span>
-            <h3 className="text-lg font-semibold text-slate-900">
-              {visit.patient_name}
-            </h3>
-          </div>
-          {showDoctor && doctor && (
-            <p className="mt-1 text-sm text-slate-600">
-              {doctor.name} · Room {visit.room_number}
-              {doctor.specialty ? ` · ${doctor.specialty}` : ""}
+    <article className="card overflow-hidden">
+      <div className="card-header">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              {visit.patient_number != null && (
+                <span className="rounded-md bg-indigo-600 px-2 py-0.5 text-xs font-bold text-white">
+                  P-{visit.patient_number}
+                </span>
+              )}
+              {visit.patient_abha_id && (
+                <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-900">
+                  ABHA {visit.patient_abha_id}
+                </span>
+              )}
+              <span className="rounded-md bg-slate-800 px-2 py-0.5 text-xs font-bold text-white">
+                #{visit.token_number}
+              </span>
+              <h3 className="text-lg font-semibold text-slate-900">
+                {visit.patient_name}
+              </h3>
+            </div>
+            {showDoctor && doctor && (
+              <p className="mt-1 text-sm text-slate-600">
+                {doctor.name} · Room {visit.room_number}
+                {doctor.specialty ? ` · ${doctor.specialty}` : ""}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-slate-500">
+              Registered {format(new Date(visit.registered_at), "h:mm a")} (
+              {formatDistanceToNow(new Date(visit.registered_at), {
+                addSuffix: true,
+              })}
+              )
             </p>
-          )}
-          <p className="mt-1 text-xs text-slate-500">
-            Registered {format(new Date(visit.registered_at), "h:mm a")} (
-            {formatDistanceToNow(new Date(visit.registered_at), {
-              addSuffix: true,
-            })}
-            )
-          </p>
+          </div>
+          <StatusBadge status={visit.status} />
         </div>
-        <StatusBadge status={visit.status} />
       </div>
 
-      {visit.medico_legal && (
-        <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900">
-          MLC — medico-legal case
-        </p>
-      )}
-
-      {visit.patient_allergies && (
-        <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-900">
-          Allergy: {visit.patient_allergies}
-        </p>
-      )}
-
-      {(visit.lab_eta || visit.radio_eta) && (
-        <div className="mt-3 flex flex-wrap gap-3 text-sm">
-          {visit.lab_eta && (
-            <span className="rounded-md bg-purple-50 px-2 py-1 text-purple-800">
-              Lab ETA: {format(new Date(visit.lab_eta), "h:mm a")}
-            </span>
+      {(visit.medico_legal ||
+        visit.patient_allergies ||
+        visit.lab_eta ||
+        visit.radio_eta) && (
+        <div className="space-y-2 border-b border-slate-100 px-4 py-3">
+          {visit.medico_legal && (
+            <p className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900">
+              MLC — medico-legal case
+            </p>
           )}
-          {visit.radio_eta && (
-            <span className="rounded-md bg-indigo-50 px-2 py-1 text-indigo-800">
-              Radiology ETA: {format(new Date(visit.radio_eta), "h:mm a")}
-            </span>
+          {visit.patient_allergies && (
+            <p className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-900">
+              Allergy: {visit.patient_allergies}
+            </p>
+          )}
+          {(visit.lab_eta || visit.radio_eta) && (
+            <div className="flex flex-wrap gap-2 text-sm">
+              {visit.lab_eta && (
+                <span className="rounded-md bg-purple-50 px-2 py-1 text-purple-800">
+                  Lab ETA: {format(new Date(visit.lab_eta), "h:mm a")}
+                </span>
+              )}
+              {visit.radio_eta && (
+                <span className="rounded-md bg-indigo-50 px-2 py-1 text-indigo-800">
+                  Radiology ETA: {format(new Date(visit.radio_eta), "h:mm a")}
+                </span>
+              )}
+            </div>
           )}
         </div>
       )}
 
-      {actions && <div className="mt-4 flex flex-wrap gap-2">{actions}</div>}
+      {actions && (
+        <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3">
+          {actions}
+        </div>
+      )}
     </article>
   );
 }
@@ -119,7 +130,7 @@ export function ActionButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-lg px-4 py-2.5 text-sm font-medium transition disabled:opacity-50 ${styles[variant]}`}
+      className={`focus-ring rounded-lg px-4 py-2.5 text-sm font-medium shadow-sm transition disabled:opacity-50 ${styles[variant]}`}
     >
       {label}
     </button>

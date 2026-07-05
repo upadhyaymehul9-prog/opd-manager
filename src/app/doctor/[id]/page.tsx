@@ -13,7 +13,7 @@ import { PatientCard } from "@/components/PatientCard";
 import { DoctorPatientQueueBar } from "@/components/DoctorPatientQueueBar";
 import { PatientActions } from "@/components/PatientActions";
 import { usePatientVisits } from "@/hooks/usePatientVisits";
-import { DOCTOR_ACTIONS, canWritePrescription, getRelevantPatients } from "@/lib/status";
+import { canWritePrescription, getRelevantPatients } from "@/lib/status";
 import type { PatientVisit } from "@/lib/types";
 
 function isAtPharmacy(status: PatientVisit["status"]) {
@@ -71,7 +71,7 @@ export default function DoctorConsolePage({
                   <div className="space-y-3">
                     <PatientActions
                       visit={visit}
-                      actions={DOCTOR_ACTIONS}
+                      role="doctor"
                       onUpdated={refresh}
                     />
                     <TransferDoctorPanel
@@ -98,7 +98,7 @@ export default function DoctorConsolePage({
                     <ProcedurePanel visitId={visit.id} />
                   </>
                 )}
-                <PrescriptionForm visitId={visit.id} doctorId={doctorId} visit={visit} />
+                <PrescriptionForm visitId={visit.id} doctorId={doctorId} />
               </>
             )}
           </div>
