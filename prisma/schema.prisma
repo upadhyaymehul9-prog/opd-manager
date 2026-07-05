@@ -63,14 +63,16 @@ model Doctor {
 }
 
 model User {
-  id            String   @id @default(uuid()) @db.Uuid
-  username      String   @unique
-  password_hash String
-  role          String
-  display_name  String?
-  doctor_id     String?  @db.Uuid
-  doctor        Doctor?  @relation(fields: [doctor_id], references: [id], onDelete: SetNull)
-  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  id                    String    @id @default(uuid()) @db.Uuid
+  username              String    @unique
+  password_hash         String
+  role                  String
+  display_name          String?
+  doctor_id             String?   @db.Uuid
+  doctor                Doctor?   @relation(fields: [doctor_id], references: [id], onDelete: SetNull)
+  failed_login_attempts Int       @default(0)
+  locked_until          DateTime? @db.Timestamptz(6)
+  created_at            DateTime  @default(now()) @db.Timestamptz(6)
 
   @@map("users")
 }
@@ -133,6 +135,7 @@ model PatientVisit {
   appointment     Appointment?
   consent         PatientConsent?
   incidents       IncidentReport[]
+  emr_revisions   VisitEmrRevision[]
 
   @@index([status])
   @@index([doctor_id])
@@ -140,6 +143,23 @@ model PatientVisit {
   @@index([registered_at(sort: Desc)])
   @@index([patient_name])
   @@map("patient_visits")
+}
+
+/// Snapshot of a visit's clinical fields taken immediately before an EMR
+/// edit overwrites them, so every prior version is retained permanently
+/// (append-only correction history — nothing is ever lost, only superseded).
+model VisitEmrRevision {
+  id               String       @id @default(uuid()) @db.Uuid
+  patient_visit_id String       @db.Uuid
+  snapshot         String
+  changed_by       String
+  changed_by_role  String
+  created_at       DateTime     @default(now()) @db.Timestamptz(6)
+  patient_visit    PatientVisit @relation(fields: [patient_visit_id], references: [id], onDelete: Restrict)
+
+  @@index([patient_visit_id])
+  @@index([created_at(sort: Desc)])
+  @@map("visit_emr_revisions")
 }
 
 model DailyToken {
@@ -275,6 +295,9 @@ model PrescriptionItem {
   skip_reason      String?
   substituted_note String?
   sort_order       Int          @default(0)
+  voided_at        DateTime?    @db.Timestamptz(6)
+  voided_by        String?
+  void_reason      String?
   prescription     Prescription @relation(fields: [prescription_id], references: [id], onDelete: Cascade)
   medicine         Medicine?    @relation(fields: [medicine_id], references: [id], onDelete: SetNull)
 

@@ -93,6 +93,12 @@ export function ConsoleNav({
             <span className="hidden text-xs text-slate-500 sm:inline">
               {session.displayName || session.username}
             </span>
+            <Link
+              href="/account/change-password"
+              className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:text-sm"
+            >
+              Change password
+            </Link>
             <button
               type="button"
               onClick={() => logout()}

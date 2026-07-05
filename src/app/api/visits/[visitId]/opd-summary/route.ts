@@ -25,7 +25,9 @@ export async function GET(
 
     const prescription = await prisma.prescription.findFirst({
       where: { patient_visit_id: visitId },
-      include: { items: { orderBy: { sort_order: "asc" } } },
+      include: {
+        items: { where: { voided_at: null }, orderBy: { sort_order: "asc" } },
+      },
     });
 
     return NextResponse.json({

@@ -41,7 +41,7 @@ export async function PATCH(
 
     const existing = await prisma.patientVisit.findUnique({
       where: { id: visitId },
-      select: { id: true, patient_id: true, medico_legal: true, status: true },
+      select: { ...visitEmrSelect, medico_legal: true, status: true },
     });
 
     if (!existing) {
@@ -125,13 +125,29 @@ export async function PATCH(
           : null;
     }
 
-    if (session && Object.keys(visitData).length > 0) {
+    const hasClinicalChanges = Object.keys(visitData).length > 0;
+
+    if (session && hasClinicalChanges) {
       visitData.signed_at = new Date();
       visitData.signed_by = session.displayName || session.username;
       visitData.signed_by_role = session.role;
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      // Snapshot the clinical fields as they stood before this edit so the
+      // prior version is retained forever — corrections append, they never
+      // overwrite history.
+      if (hasClinicalChanges) {
+        await tx.visitEmrRevision.create({
+          data: {
+            patient_visit_id: visitId,
+            snapshot: JSON.stringify(serializeVisitEmr(existing)),
+            changed_by: session?.displayName || session?.username || "unknown",
+            changed_by_role: session?.role ?? "unknown",
+          },
+        });
+      }
+
       if (
         existing.patient_id &&
         (body.patient_allergies !== undefined || body.patient_blood_group !== undefined)

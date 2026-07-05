@@ -52,6 +52,7 @@ export const AUDIT_ACTIONS = {
   LOGIN: "login",
   LOGIN_FAILED: "login_failed",
   LOGOUT: "logout",
+  PASSWORD_CHANGE: "password_change",
   PATIENT_REGISTER: "patient_register",
   VISIT_UPDATE: "visit_update",
   EMR_UPDATE: "emr_update",

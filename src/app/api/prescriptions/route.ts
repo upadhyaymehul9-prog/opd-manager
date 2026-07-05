@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { computePrescriptionStatus } from "@/lib/prescription-status";
 import { prisma } from "@/lib/prisma";
 import { serializePrescription } from "@/lib/serialize";
+import { getSessionFromCookies } from "@/lib/audit";
 import type { PrescriptionItemInput } from "@/lib/prescription-types";
 
 const prescriptionInclude = {
-  items: { orderBy: { sort_order: "asc" as const } },
+  items: {
+    where: { voided_at: null },
+    orderBy: { sort_order: "asc" as const },
+  },
 };
 
 const EDITABLE_RX_STATUSES = ["draft", "sent_to_pharmacy", "partially_dispensed"];
@@ -98,6 +102,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const session = await getSessionFromCookies();
+
     const prescription = await prisma.$transaction(async (tx) => {
       const rx = await tx.prescription.upsert({
         where: { patient_visit_id },
@@ -127,12 +133,20 @@ export async function POST(request: Request) {
           }
         }
 
+        // Once a prescription has been sent to pharmacy it's part of the
+        // operative clinical record, so a removed line is voided (kept
+        // forever, excluded from active views) rather than deleted.
         const toDelete = currentItems.filter(
           (c) => !c.dispensed && !incomingIds.has(c.id),
         );
         if (toDelete.length > 0) {
-          await tx.prescriptionItem.deleteMany({
+          await tx.prescriptionItem.updateMany({
             where: { id: { in: toDelete.map((d) => d.id) } },
+            data: {
+              voided_at: new Date(),
+              voided_by: session?.displayName || session?.username || "unknown",
+              void_reason: "removed_by_doctor_edit",
+            },
           });
         }
 
@@ -163,7 +177,7 @@ export async function POST(request: Request) {
         }
 
         const allItems = await tx.prescriptionItem.findMany({
-          where: { prescription_id: rx.id },
+          where: { prescription_id: rx.id, voided_at: null },
         });
 
         await tx.prescription.update({

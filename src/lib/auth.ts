@@ -1,11 +1,14 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import type { NextRequest } from "next/server";
+import { USER_ROLES } from "@/lib/auth-types";
 import type { SessionPayload, UserRole } from "@/lib/auth-types";
 
 export const SESSION_COOKIE = "opd_session";
 const SESSION_REMEMBER_SEC = 60 * 60 * 24 * 30;
 const SESSION_DEFAULT_SEC = 60 * 60 * 8;
+export const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+export const LOCKOUT_MINUTES = 15;
 
 const ROLE_HOME: Record<UserRole, string> = {
   admin: "/manager",
@@ -36,6 +39,7 @@ const PAGE_ACCESS: Record<string, UserRole[]> = {
   "/records": ["pharmacy", "admin", "manager", "reception", "doctor"],
   "/appointments": ["reception", "admin", "manager", "doctor"],
   "/settings/doctors": ["admin", "manager", "doctor"],
+  "/account/change-password": [...USER_ROLES],
 };
 
 function getSecret() {
@@ -149,7 +153,11 @@ export function canAccessApi(
   pathname: string,
   method: string,
 ) {
-  if (pathname === "/api/auth/logout" || pathname === "/api/auth/me") {
+  if (
+    pathname === "/api/auth/logout" ||
+    pathname === "/api/auth/me" ||
+    pathname === "/api/auth/change-password"
+  ) {
     return true;
   }
 
@@ -224,7 +232,10 @@ export function canAccessApi(
     );
   }
 
-  if (pathname.match(/^\/api\/visits\/[^/]+\/emr$/)) {
+  if (
+    pathname.match(/^\/api\/visits\/[^/]+\/emr$/) ||
+    pathname.match(/^\/api\/visits\/[^/]+\/emr\/history$/)
+  ) {
     if (method === "GET") {
       return (
         session.role === "doctor" ||

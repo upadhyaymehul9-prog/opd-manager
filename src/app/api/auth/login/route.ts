@@ -3,6 +3,8 @@ import type { UserRole } from "@/lib/auth-types";
 import {
   createSessionToken,
   getHomeForRole,
+  MAX_FAILED_LOGIN_ATTEMPTS,
+  LOCKOUT_MINUTES,
   sessionCookieOptions,
   verifyPassword,
 } from "@/lib/auth";
@@ -23,7 +25,33 @@ export async function POST(request: Request) {
     }
 
     const user = await prisma.user.findUnique({ where: { username } });
+
+    if (user?.locked_until && user.locked_until > new Date()) {
+      const minutesLeft = Math.ceil(
+        (user.locked_until.getTime() - Date.now()) / 60_000,
+      );
+      return NextResponse.json(
+        {
+          error: `Account locked after too many failed attempts. Try again in ${minutesLeft} minute(s).`,
+        },
+        { status: 423 },
+      );
+    }
+
     if (!user || !(await verifyPassword(password, user.password_hash))) {
+      if (user) {
+        const attempts = user.failed_login_attempts + 1;
+        const lockingNow = attempts >= MAX_FAILED_LOGIN_ATTEMPTS;
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            failed_login_attempts: lockingNow ? 0 : attempts,
+            locked_until: lockingNow
+              ? new Date(Date.now() + LOCKOUT_MINUTES * 60_000)
+              : null,
+          },
+        });
+      }
       await logAudit({
         action: AUDIT_ACTIONS.LOGIN_FAILED,
         entity_type: "user",
@@ -34,6 +62,13 @@ export async function POST(request: Request) {
         { error: "Invalid username or password" },
         { status: 401 },
       );
+    }
+
+    if (user.failed_login_attempts > 0 || user.locked_until) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { failed_login_attempts: 0, locked_until: null },
+      });
     }
 
     const role = user.role as UserRole;

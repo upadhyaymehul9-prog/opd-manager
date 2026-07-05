@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { computePrescriptionStatus } from "@/lib/prescription-status";
+import { getSessionFromCookies } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import {
   deductFromStock,
@@ -40,7 +41,9 @@ export async function PATCH(
 
     const item = await prisma.prescriptionItem.findUnique({
       where: { id },
-      include: { prescription: { include: { items: true } } },
+      include: {
+        prescription: { include: { items: { where: { voided_at: null } } } },
+      },
     });
 
     if (!item) {
@@ -184,7 +187,9 @@ export async function DELETE(
 
     const item = await prisma.prescriptionItem.findUnique({
       where: { id },
-      include: { prescription: { include: { items: true } } },
+      include: {
+        prescription: { include: { items: { where: { voided_at: null } } } },
+      },
     });
 
     if (!item) {
@@ -205,8 +210,20 @@ export async function DELETE(
       );
     }
 
+    const session = await getSessionFromCookies();
+
     await prisma.$transaction(async (tx) => {
-      await tx.prescriptionItem.delete({ where: { id } });
+      // Never hard-delete a prescribed medicine — void it so the fact it
+      // was once prescribed (and by whom it was removed) is retained
+      // permanently, just excluded from the active view.
+      await tx.prescriptionItem.update({
+        where: { id },
+        data: {
+          voided_at: new Date(),
+          voided_by: session?.displayName || session?.username || "unknown",
+          void_reason: "removed_by_doctor",
+        },
+      });
 
       const remaining = item.prescription.items.filter((row) => row.id !== id);
 
