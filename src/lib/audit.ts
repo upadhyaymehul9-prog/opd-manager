@@ -86,4 +86,5 @@ export const AUDIT_ACTIONS = {
   MLC_RECORD_CREATE: "mlc_record_create",
   MLC_RECORD_UPDATE: "mlc_record_update",
   PATIENT_MERGE: "patient_merge",
+  ROI_RELEASE_CREATE: "roi_release_create",
 } as const;

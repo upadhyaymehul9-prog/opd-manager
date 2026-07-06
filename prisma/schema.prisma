@@ -28,6 +28,7 @@ model Patient {
   visits         PatientVisit[]
   appointments   Appointment[]
   consents       PatientConsent[]
+  roi_releases   RoiRelease[]
   /// Set when this record has been identified as a duplicate and merged
   /// into another patient. The row (and its patient_number) is never
   /// deleted -- it becomes a permanent redirect/tombstone so old references
@@ -206,6 +207,7 @@ model PatientVisit {
   procedures      VisitProcedure[]
   appointment     Appointment?
   consent         PatientConsent?
+  roi_releases    RoiRelease[]
   incidents       IncidentReport[]
   emr_revisions   VisitEmrRevision[]
   mlc_record      MlcRecord?
@@ -216,6 +218,36 @@ model PatientVisit {
   @@index([registered_at(sort: Desc)])
   @@index([patient_name])
   @@map("patient_visits")
+}
+
+/// Logs each release/disclosure of patient information for legal traceability.
+model RoiRelease {
+  id                    String        @id @default(uuid()) @db.Uuid
+  patient_visit_id      String?       @db.Uuid
+  patient_id            String?       @db.Uuid
+  patient_name          String
+  patient_number        Int?
+  requested_by          String
+  requester_relation    String?
+  purpose               String
+  information_released  String
+  release_mode          String        @default("printed_copy")
+  identity_verified     Boolean       @default(false)
+  id_proof_type         String?
+  id_proof_ref          String?
+  approved_by           String?
+  released_by           String
+  released_by_role      String
+  released_at           DateTime      @db.Timestamptz(6)
+  remarks               String?
+  created_at            DateTime      @default(now()) @db.Timestamptz(6)
+  visit                 PatientVisit? @relation(fields: [patient_visit_id], references: [id], onDelete: SetNull)
+  patient               Patient?      @relation(fields: [patient_id], references: [id], onDelete: SetNull)
+
+  @@index([created_at(sort: Desc)])
+  @@index([patient_visit_id])
+  @@index([patient_id])
+  @@map("roi_releases")
 }
 
 /// Snapshot of a visit's clinical fields taken immediately before an EMR
