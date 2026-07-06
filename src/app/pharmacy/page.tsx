@@ -7,7 +7,6 @@ import { ConsoleShell } from "@/components/ConsoleShell";
 import { TodayCollectionPanel } from "@/components/TodayCollectionPanel";
 import { StatusBadge } from "@/components/PatientCard";
 import { usePatientVisits } from "@/hooks/usePatientVisits";
-import { getRelevantPatients } from "@/lib/status";
 import type { Prescription } from "@/lib/prescription-types";
 import type { PatientVisit } from "@/lib/types";
 

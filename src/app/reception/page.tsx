@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { format } from "date-fns";
 import { ConsoleShell, SetupBanner } from "@/components/ConsoleShell";
 import { TodayCollectionPanel } from "@/components/TodayCollectionPanel";
 import { AppointmentsPanel } from "@/components/AppointmentsPanel";
