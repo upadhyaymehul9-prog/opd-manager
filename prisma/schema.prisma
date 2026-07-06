@@ -28,10 +28,21 @@ model Patient {
   visits         PatientVisit[]
   appointments   Appointment[]
   consents       PatientConsent[]
+  /// Set when this record has been identified as a duplicate and merged
+  /// into another patient. The row (and its patient_number) is never
+  /// deleted -- it becomes a permanent redirect/tombstone so old references
+  /// (printed reports, old records) still resolve.
+  merged_into_patient_id String?   @db.Uuid
+  merged_into            Patient?  @relation("PatientMerge", fields: [merged_into_patient_id], references: [id], onDelete: SetNull)
+  merged_from            Patient[] @relation("PatientMerge")
+  merged_at              DateTime? @db.Timestamptz(6)
+  merge_reason           String?
+  merged_by              String?
 
   @@index([mobile])
   @@index([name])
   @@index([abha_id])
+  @@index([merged_into_patient_id])
   @@map("patients")
 }
 

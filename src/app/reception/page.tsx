@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { format } from "date-fns";
 import { ConsoleShell, SetupBanner } from "@/components/ConsoleShell";
 import { TodayCollectionPanel } from "@/components/TodayCollectionPanel";
@@ -345,6 +346,16 @@ export default function ReceptionPage() {
                 />
                 I confirm this is a genuinely new patient (not a duplicate)
               </label>
+              <p className="mt-2 text-xs text-amber-800">
+                Already registered under two IDs?{" "}
+                <Link
+                  href="/settings/patients/merge"
+                  className="font-semibold underline hover:text-amber-950"
+                >
+                  Merge duplicate records
+                </Link>{" "}
+                (manager/admin) instead of creating a third.
+              </p>
             </div>
           )}
 

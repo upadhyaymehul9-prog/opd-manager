@@ -22,6 +22,7 @@ const ADMIN_NAV = [
   { href: "/feedback", label: "Feedback", color: "bg-violet-800" },
   { href: "/incidents", label: "Incidents", color: "bg-red-700" },
   { href: "/settings/doctors", label: "My profile", color: "bg-violet-700" },
+  { href: "/settings/patients/merge", label: "Merge patients", color: "bg-fuchsia-700" },
 ];
 
 const STAFF_NAV = [

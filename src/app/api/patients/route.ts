@@ -122,6 +122,7 @@ export async function POST(request: Request) {
         mobile: mobile?.trim() || null,
         abha_id: normalizedAbha,
         national_id: national_id?.trim() || null,
+        date_of_birth: date_of_birth || null,
       });
       if (duplicates.length > 0) {
         return NextResponse.json(

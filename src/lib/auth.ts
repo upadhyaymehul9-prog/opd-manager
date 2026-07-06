@@ -39,6 +39,7 @@ const PAGE_ACCESS: Record<string, UserRole[]> = {
   "/records": ["pharmacy", "admin", "manager", "reception", "doctor"],
   "/appointments": ["reception", "admin", "manager", "doctor"],
   "/settings/doctors": ["admin", "manager", "doctor"],
+  "/settings/patients/merge": ["admin", "manager"],
   "/account/change-password": [...USER_ROLES],
 };
 
@@ -404,6 +405,10 @@ export function canAccessApi(
       session.role === "admin" ||
       session.role === "manager"
     );
+  }
+
+  if (pathname === "/api/patients/merge" && method === "POST") {
+    return session.role === "admin" || session.role === "manager";
   }
 
   if (pathname === "/api/doctors" && method === "POST") {

@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { parseAbhaInput } from "@/lib/abha";
+import { resolveCanonicalPatientIdTx } from "@/lib/patient-merge";
 
 type Tx = Prisma.TransactionClient;
 
@@ -41,24 +42,29 @@ export async function findOrCreatePatient(
   if (abha_id) {
     const byAbha = await tx.patient.findUnique({ where: { abha_id } });
     if (byAbha) {
+      const canonicalId = await resolveCanonicalPatientIdTx(tx, byAbha.id);
+      const patient =
+        canonicalId === byAbha.id
+          ? byAbha
+          : await tx.patient.findUniqueOrThrow({ where: { id: canonicalId } });
       const updates: { name?: string; mobile?: string | null; address?: string | null; gender?: string | null; emergency_contact?: string | null } = {};
-      if (!byAbha.name?.trim() && name) updates.name = name;
-      if (mobile && byAbha.mobile !== mobile) updates.mobile = mobile;
-      if (address && byAbha.address !== address) updates.address = address;
-      if (gender && byAbha.gender !== gender) updates.gender = gender;
-      if (emergency_contact && byAbha.emergency_contact !== emergency_contact) {
+      if (!patient.name?.trim() && name) updates.name = name;
+      if (mobile && patient.mobile !== mobile) updates.mobile = mobile;
+      if (address && patient.address !== address) updates.address = address;
+      if (gender && patient.gender !== gender) updates.gender = gender;
+      if (emergency_contact && patient.emergency_contact !== emergency_contact) {
         updates.emergency_contact = emergency_contact;
       }
       if (Object.keys(updates).length > 0) {
-        return tx.patient.update({ where: { id: byAbha.id }, data: updates });
+        return tx.patient.update({ where: { id: patient.id }, data: updates });
       }
-      return byAbha;
+      return patient;
     }
   }
 
   if (mobile) {
     const byMobile = await tx.patient.findFirst({
-      where: { mobile },
+      where: { mobile, merged_into_patient_id: null },
     });
     if (byMobile) {
       const updates: {
