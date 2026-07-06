@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
 import { visitInclude } from "@/lib/db-includes";
 import { nextConsultationBillNo } from "@/lib/consultation-billing";
+import { CONSENT_TEXT_V1 } from "@/lib/nabh";
 import { findOrCreatePatient } from "@/lib/patients";
 import { serializeVisit } from "@/lib/serialize";
 import { nextTokenNumber } from "@/lib/tokens";
@@ -13,6 +15,10 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    const session = await getSessionFromCookies();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const appointment = await prisma.appointment.findUnique({
       where: { id },
@@ -96,7 +102,26 @@ export async function POST(
         include: { doctor: { select: { name: true } } },
       });
 
+      await tx.patientConsent.create({
+        data: {
+          patient_visit_id: visit.id,
+          patient_id: patient.id,
+          accepted: true,
+          consent_text: CONSENT_TEXT_V1,
+          recorded_by: session.displayName || session.username,
+          recorded_by_role: session.role,
+        },
+      });
+
       return { visit, appointment: updatedAppointment };
+    });
+
+    await logAudit({
+      action: AUDIT_ACTIONS.CONSENT_RECORD,
+      entity_type: "visit",
+      entity_id: result.visit.id,
+      summary: `Consent recorded for appointment check-in: ${result.visit.patient_name}`,
+      session,
     });
 
     return NextResponse.json({

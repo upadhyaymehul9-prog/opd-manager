@@ -19,6 +19,7 @@ export type MergeSummary = {
   visitsMoved: number;
   appointmentsMoved: number;
   consentsMoved: number;
+  roiReleasesMoved: number;
   fieldsFilledOnTarget: string[];
   abhaMoved: boolean;
 };
@@ -87,20 +88,25 @@ export async function mergePatients(
     );
   }
 
-  const [visitsResult, appointmentsResult, consentsResult] = await Promise.all([
-    tx.patientVisit.updateMany({
-      where: { patient_id: sourceId },
-      data: { patient_id: targetId },
-    }),
-    tx.appointment.updateMany({
-      where: { patient_id: sourceId },
-      data: { patient_id: targetId },
-    }),
-    tx.patientConsent.updateMany({
-      where: { patient_id: sourceId },
-      data: { patient_id: targetId },
-    }),
-  ]);
+  const [visitsResult, appointmentsResult, consentsResult, roiResult] =
+    await Promise.all([
+      tx.patientVisit.updateMany({
+        where: { patient_id: sourceId },
+        data: { patient_id: targetId },
+      }),
+      tx.appointment.updateMany({
+        where: { patient_id: sourceId },
+        data: { patient_id: targetId },
+      }),
+      tx.patientConsent.updateMany({
+        where: { patient_id: sourceId },
+        data: { patient_id: targetId },
+      }),
+      tx.roiRelease.updateMany({
+        where: { patient_id: sourceId },
+        data: { patient_id: targetId },
+      }),
+    ]);
 
   const targetUpdates: Record<string, unknown> = {};
   const fieldsFilledOnTarget: string[] = [];
@@ -142,6 +148,7 @@ export async function mergePatients(
     visitsMoved: visitsResult.count,
     appointmentsMoved: appointmentsResult.count,
     consentsMoved: consentsResult.count,
+    roiReleasesMoved: roiResult.count,
     fieldsFilledOnTarget,
     abhaMoved,
   };

@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { createPharmacyBill, isPaymentMode, serializeBill, buildBillPreview } from "@/lib/billing";
+import { visitEmrCompleteForDischarge } from "@/lib/nabh";
+import {
+  hasDispensedForBilling,
+  pendingRxItems,
+} from "@/lib/prescription-status";
 import { prisma } from "@/lib/prisma";
 import { serializePrescription } from "@/lib/serialize";
 
-const prescriptionInclude = { items: true };
+const prescriptionInclude = {
+  items: { where: { voided_at: null }, orderBy: { sort_order: "asc" as const } },
+};
 
 export async function POST(
   request: Request,
@@ -30,7 +37,23 @@ export async function POST(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const pending = prescription.items.filter((i) => !i.dispensed && !i.skipped);
+    const visit = await prisma.patientVisit.findUnique({
+      where: { id: prescription.patient_visit_id },
+    });
+    if (!visit) {
+      return NextResponse.json({ error: "Visit not found" }, { status: 404 });
+    }
+    if (!visitEmrCompleteForDischarge(visit)) {
+      return NextResponse.json(
+        {
+          error:
+            "NABH: complete EMR (chief complaint and diagnosis) before marking visit completed",
+        },
+        { status: 400 },
+      );
+    }
+
+    const pending = pendingRxItems(prescription.items);
     if (pending.length > 0) {
       return NextResponse.json(
         {
@@ -40,8 +63,7 @@ export async function POST(
       );
     }
 
-    const dispensedCount = prescription.items.filter((i) => i.dispensed).length;
-    if (dispensedCount === 0) {
+    if (!hasDispensedForBilling(prescription.items)) {
       return NextResponse.json(
         { error: "Dispense at least one medicine before generating bill" },
         { status: 400 },

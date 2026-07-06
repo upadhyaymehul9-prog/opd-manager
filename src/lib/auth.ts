@@ -134,8 +134,14 @@ function pageKey(pathname: string) {
     return "/records/release";
   if (pathname === "/records" || pathname.startsWith("/records/"))
     return "/records";
-  if (pathname === "/settings/doctors" || pathname.startsWith("/settings/"))
+  if (
+    pathname === "/settings/patients/merge" ||
+    pathname.startsWith("/settings/patients/merge/")
+  )
+    return "/settings/patients/merge";
+  if (pathname === "/settings/doctors" || pathname.startsWith("/settings/doctors/"))
     return "/settings/doctors";
+  if (pathname.startsWith("/settings/")) return "/settings/doctors";
   return pathname;
 }
 

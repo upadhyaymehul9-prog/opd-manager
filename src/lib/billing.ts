@@ -59,7 +59,7 @@ export async function buildBillPreview(
     where: { id: prescriptionId },
     include: {
       items: {
-        where: { dispensed: true },
+        where: { dispensed: true, voided_at: null },
         orderBy: { sort_order: "asc" },
         include: { medicine: true },
       },

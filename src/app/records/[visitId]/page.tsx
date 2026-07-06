@@ -10,6 +10,7 @@ import { PrintActions } from "@/components/PrintActions";
 import type { PharmacyBillView } from "@/lib/billing-types";
 import type { Prescription } from "@/lib/prescription-types";
 import type { PatientVisit } from "@/lib/types";
+import { isReadyForPharmacyBill } from "@/lib/prescription-status";
 import { EmrSummary } from "@/components/EmrSummary";
 import { OpdVisitSummary } from "@/components/OpdVisitSummary";
 
@@ -81,10 +82,8 @@ export default function RecordDetailPage({
     );
   }
 
-  const allDispensed =
-    prescription &&
-    prescription.items.length > 0 &&
-    prescription.items.every((i) => i.dispensed);
+  const readyForBill =
+    prescription && isReadyForPharmacyBill(prescription.items);
 
   return (
     <ConsoleShell
@@ -188,7 +187,7 @@ export default function RecordDetailPage({
           <PharmacyBillReceipt bill={bill} visit={visit} />
           <PrintActions label="Print bill" pdfLabel="Save bill as PDF" />
         </section>
-      ) : allDispensed ? (
+      ) : readyForBill ? (
         <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
           <p className="font-medium text-amber-900">No bill on file</p>
           <p className="mt-1 text-sm text-amber-800">
