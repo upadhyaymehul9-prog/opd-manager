@@ -85,4 +85,5 @@ export const AUDIT_ACTIONS = {
   INCIDENT_STATUS_CHANGE: "incident_status_change",
   MLC_RECORD_CREATE: "mlc_record_create",
   MLC_RECORD_UPDATE: "mlc_record_update",
+  PATIENT_MERGE: "patient_merge",
 } as const;

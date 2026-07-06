@@ -97,6 +97,12 @@ export default function NabhPage() {
         >
           Patient feedback form
         </Link>
+        <Link
+          href="/records/completeness"
+          className="rounded-lg border border-cyan-300 bg-white px-4 py-2 text-sm font-medium text-cyan-900 hover:bg-cyan-50"
+        >
+          Record completeness
+        </Link>
       </div>
 
       <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

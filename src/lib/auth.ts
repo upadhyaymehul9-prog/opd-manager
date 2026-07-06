@@ -37,6 +37,7 @@ const PAGE_ACCESS: Record<string, UserRole[]> = {
   "/incidents": ["manager", "admin", "doctor", "reception", "pharmacy", "lab", "radiology"],
   "/feedback": ["manager", "admin", "reception"],
   "/records": ["pharmacy", "admin", "manager", "reception", "doctor"],
+  "/records/completeness": ["manager", "admin"],
   "/appointments": ["reception", "admin", "manager", "doctor"],
   "/settings/doctors": ["admin", "manager", "doctor"],
   "/settings/patients/merge": ["admin", "manager"],
@@ -123,6 +124,11 @@ function pageKey(pathname: string) {
   if (pathname === "/pharmacy" || pathname.startsWith("/pharmacy/"))
     return "/pharmacy";
   if (pathname === "/stock" || pathname.startsWith("/stock/")) return "/stock";
+  if (
+    pathname === "/records/completeness" ||
+    pathname.startsWith("/records/completeness/")
+  )
+    return "/records/completeness";
   if (pathname === "/records" || pathname.startsWith("/records/"))
     return "/records";
   if (pathname === "/settings/doctors" || pathname.startsWith("/settings/"))
@@ -441,6 +447,10 @@ export function canAccessApi(
       session.role === "admin" ||
       session.role === "manager"
     );
+  }
+
+  if (pathname === "/api/records/completeness") {
+    return session.role === "admin" || session.role === "manager";
   }
 
   if (

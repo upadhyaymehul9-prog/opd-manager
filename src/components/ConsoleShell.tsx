@@ -16,6 +16,7 @@ const ADMIN_NAV = [
   { href: "/tv", label: "TV Display", color: "bg-rose-600" },
   { href: "/analytics", label: "Analytics", color: "bg-indigo-700" },
   { href: "/records", label: "Records", color: "bg-cyan-700" },
+  { href: "/records/completeness", label: "Record gaps", color: "bg-cyan-900" },
   { href: "/reports", label: "Reports", color: "bg-sky-700" },
   { href: "/reconciliation", label: "Day-end", color: "bg-orange-700" },
   { href: "/nabh", label: "NABH", color: "bg-teal-800" },
