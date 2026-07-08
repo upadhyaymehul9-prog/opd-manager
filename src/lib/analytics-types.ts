@@ -83,9 +83,40 @@ export type AnalyticsRevenue = {
   procedures: number;
 };
 
+export type AnalyticsOperations = {
+  registration: { total: number; newPatients: number; returning: number };
+  opd: {
+    waiting: number;
+    inConsultation: number;
+    completed: number;
+    avgWaitMinutes: number | null;
+  };
+  lab: {
+    ordered: number;
+    pending: number;
+    processing: number;
+    ready: number;
+    avgTatMinutes: number | null;
+  };
+  radiology: {
+    ordered: number;
+    pending: number;
+    processing: number;
+    ready: number;
+    avgTatMinutes: number | null;
+  };
+  pharmacy: {
+    rxQueue: number;
+    atPharmacy: number;
+    billsToday: number;
+    revenue: number;
+  };
+};
+
 export type AnalyticsPayload = {
   summary: AnalyticsSummary;
   revenue: AnalyticsRevenue;
+  operations: AnalyticsOperations;
   ageGroups: AnalyticsAgeGroup[];
   byDoctor: AnalyticsDoctorRow[];
   lab: AnalyticsDept;

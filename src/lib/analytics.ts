@@ -1,9 +1,11 @@
 import { differenceInMinutes, startOfDay, subDays } from "date-fns";
+import { toDateStr } from "@/lib/date-range";
 import type {
   AnalyticsAgeGroup,
   AnalyticsDept,
   AnalyticsDoctorRow,
   AnalyticsHourly,
+  AnalyticsOperations,
   AnalyticsPayload,
   AnalyticsPharmacySales,
   AnalyticsPrediction,
@@ -83,8 +85,8 @@ export function buildAnalytics(
     rangeStart?: Date;
     rangeEndExclusive?: Date;
   } = {
-    from: now.toISOString().slice(0, 10),
-    to: now.toISOString().slice(0, 10),
+    from: toDateStr(now),
+    to: toDateStr(now),
     isToday: true,
   },
   procedureRevenue = 0,
@@ -163,9 +165,12 @@ export function buildAnalytics(
     revenue,
   );
 
+  const operations = buildOperations(periodVisits, summary, lab, radiology, pharmacy);
+
   return {
     summary,
     revenue,
+    operations,
     ageGroups,
     byDoctor,
     lab,
@@ -432,4 +437,57 @@ export function formatMinutes(mins: number | null): string {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return m ? `${h}h ${m}m` : `${h}h`;
+}
+
+const WAITING_STATUSES = new Set(["registered", "calling"]);
+const CONSULT_STATUSES = new Set([
+  "in_consultation",
+  "in_followup",
+  "return_to_doctor",
+]);
+const PHARMACY_QUEUE = new Set(["to_pharmacy", "at_pharmacy"]);
+
+function buildOperations(
+  visits: VisitForAnalytics[],
+  summary: AnalyticsSummary,
+  lab: AnalyticsDept,
+  radiology: AnalyticsDept,
+  pharmacy: AnalyticsPharmacySales,
+): AnalyticsOperations {
+  const labProcessing = visits.filter((v) => v.status === "lab_processing").length;
+  const radioProcessing = visits.filter((v) => v.status === "radio_processing").length;
+
+  return {
+    registration: {
+      total: summary.totalPatients,
+      newPatients: summary.newPatients,
+      returning: summary.oldPatients,
+    },
+    opd: {
+      waiting: visits.filter((v) => WAITING_STATUSES.has(v.status)).length,
+      inConsultation: visits.filter((v) => CONSULT_STATUSES.has(v.status)).length,
+      completed: summary.completed,
+      avgWaitMinutes: summary.avgTurnaroundMinutes,
+    },
+    lab: {
+      ordered: lab.totalReferred,
+      pending: lab.pending,
+      processing: labProcessing,
+      ready: lab.ready,
+      avgTatMinutes: lab.avgTatMinutes,
+    },
+    radiology: {
+      ordered: radiology.totalReferred,
+      pending: radiology.pending,
+      processing: radioProcessing,
+      ready: radiology.ready,
+      avgTatMinutes: radiology.avgTatMinutes,
+    },
+    pharmacy: {
+      rxQueue: visits.filter((v) => v.status === "to_pharmacy").length,
+      atPharmacy: visits.filter((v) => v.status === "at_pharmacy").length,
+      billsToday: pharmacy.billsCount,
+      revenue: pharmacy.revenue,
+    },
+  };
 }
