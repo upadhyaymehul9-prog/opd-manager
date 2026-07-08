@@ -1,5 +1,5 @@
 import { differenceInMinutes, startOfDay, subDays } from "date-fns";
-import { toDateStr } from "@/lib/date-range";
+import { dateStrIST } from "@/lib/date-range";
 import type {
   AnalyticsAgeGroup,
   AnalyticsDept,
@@ -85,8 +85,8 @@ export function buildAnalytics(
     rangeStart?: Date;
     rangeEndExclusive?: Date;
   } = {
-    from: toDateStr(now),
-    to: toDateStr(now),
+    from: dateStrIST(now),
+    to: dateStrIST(now),
     isToday: true,
   },
   procedureRevenue = 0,
