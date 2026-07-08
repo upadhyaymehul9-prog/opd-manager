@@ -162,3 +162,54 @@ export async function GET(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const session = await getSessionFromCookies();
+    const allowedRoles = ["doctor", "admin", "manager"];
+    if (!session || !allowedRoles.includes(session.role)) {
+      return NextResponse.json(
+        { error: "Only doctor/admin/manager can remove a patient visit" },
+        { status: 403 },
+      );
+    }
+
+    const { id } = await params;
+    const existing = await prisma.patientVisit.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        patient_name: true,
+        token_number: true,
+        status: true,
+      },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Visit not found" }, { status: 404 });
+    }
+
+    await prisma.patientVisit.delete({ where: { id } });
+
+    await logAudit({
+      action: "visit_delete",
+      entity_type: "visit",
+      entity_id: id,
+      summary: `Visit removed for ${existing.patient_name} (token ${existing.token_number})`,
+      details: {
+        status: existing.status,
+        removed_by: session.displayName || session.username,
+        removed_by_role: session.role,
+      },
+      session,
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Delete failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

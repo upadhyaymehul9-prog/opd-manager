@@ -1,6 +1,7 @@
 "use client";
 
 import { ConsoleShell } from "@/components/ConsoleShell";
+import { LabTestsPanel } from "@/components/LabTestsPanel";
 import { PatientCard } from "@/components/PatientCard";
 import { PatientActions } from "@/components/PatientActions";
 import { usePatientVisits } from "@/hooks/usePatientVisits";
@@ -26,11 +27,17 @@ export default function LabPage() {
           </p>
         )}
         {labPatients.map((visit) => (
-          <PatientCard
-            key={visit.id}
-            visit={visit}
-            actions={<PatientActions visit={visit} role="lab" />}
-          />
+          <div key={visit.id} className="space-y-3">
+            <PatientCard
+              visit={visit}
+              actions={<PatientActions visit={visit} role="lab" />}
+            />
+            <LabTestsPanel
+              visitId={visit.id}
+              canOrder
+              canEnterResults
+            />
+          </div>
         ))}
       </div>
     </ConsoleShell>

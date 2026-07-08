@@ -13,6 +13,7 @@ import type { PatientVisit } from "@/lib/types";
 import { isReadyForPharmacyBill } from "@/lib/prescription-status";
 import { EmrSummary } from "@/components/EmrSummary";
 import { OpdVisitSummary } from "@/components/OpdVisitSummary";
+import { LabTestsPanel } from "@/components/LabTestsPanel";
 
 export default function RecordDetailPage({
   params,
@@ -123,19 +124,11 @@ export default function RecordDetailPage({
 
       <OpdVisitSummary visitId={visitId} />
 
+      <LabTestsPanel visitId={visitId} compact />
+
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="font-semibold text-slate-900">Lab & radiology</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 text-sm">
-          <div className="rounded-lg bg-purple-50 p-3">
-            <p className="font-medium text-purple-900">Laboratory</p>
-            <p className="mt-1 text-purple-800">
-              {visit.lab_referred
-                ? visit.lab_eta
-                  ? `Referred · ETA ${format(new Date(visit.lab_eta), "h:mm a")}`
-                  : "Referred"
-                : "Not referred"}
-            </p>
-          </div>
+        <h2 className="font-semibold text-slate-900">Radiology workflow</h2>
+        <div className="mt-3 text-sm">
           <div className="rounded-lg bg-indigo-50 p-3">
             <p className="font-medium text-indigo-900">Radiology</p>
             <p className="mt-1 text-indigo-800">

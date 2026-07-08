@@ -70,3 +70,14 @@ export async function updatePatient(
   }
   return res.json();
 }
+
+export async function deletePatient(id: string) {
+  const res = await fetch(`/api/patients/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Delete failed");
+  }
+  return res.json();
+}

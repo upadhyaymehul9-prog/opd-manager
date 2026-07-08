@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { visitInclude } from "@/lib/db-includes";
 import { serializeVisit } from "@/lib/serialize";
+import { serializeVisitLabTest } from "@/lib/lab-tests";
 
 export async function GET(
   _request: Request,
@@ -30,6 +31,11 @@ export async function GET(
       },
     });
 
+    const labTests = await prisma.visitLabTest.findMany({
+      where: { patient_visit_id: visitId, status: { not: "cancelled" } },
+      orderBy: [{ sort_order: "asc" }, { ordered_at: "asc" }],
+    });
+
     return NextResponse.json({
       visit: serializeVisit(visit),
       consent: visit.consent,
@@ -45,6 +51,7 @@ export async function GET(
             })),
           }
         : null,
+      lab_tests: labTests.map(serializeVisitLabTest),
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to load summary";

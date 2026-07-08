@@ -11,6 +11,8 @@ import { CONSENT_TEXT_V1 } from "@/lib/nabh";
 import { NATIONAL_ID_TYPES, POINT_OF_ORIGIN_OPTIONS } from "@/lib/nabh-cms";
 import { ConsultationBillReceipt } from "@/components/ConsultationBillReceipt";
 import { PrintActions } from "@/components/PrintActions";
+import { StatusBadge } from "@/components/PatientCard";
+import { deletePatient, usePatientVisits } from "@/hooks/usePatientVisits";
 import type { Doctor, PatientType, PatientVisit } from "@/lib/types";
 
 type PatientSearchHit = {
@@ -59,6 +61,11 @@ export default function ReceptionPage() {
   const [submitting, setSubmitting] = useState(false);
   const [lastVisit, setLastVisit] = useState<PatientVisit | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { visits: activeVisits, refresh: refreshActive } = usePatientVisits({
+    activeOnly: true,
+  });
 
   useEffect(() => {
     fetch("/api/doctors")
@@ -225,6 +232,24 @@ export default function ReceptionPage() {
   }
 
   const selectedDoctor = doctors.find((d) => d.id === doctorId);
+
+  async function handleRemoveVisit(visit: PatientVisit) {
+    const ok = window.confirm(
+      `Remove ${visit.patient_name} (Token #${visit.token_number}) from workflow?\n\nThis will delete this OPD visit.`,
+    );
+    if (!ok) return;
+    setDeletingId(visit.id);
+    setActionError(null);
+    try {
+      await deletePatient(visit.id);
+      if (lastVisit?.id === visit.id) setLastVisit(null);
+      await refreshActive();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Could not remove visit");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <ConsoleShell
@@ -668,6 +693,73 @@ export default function ReceptionPage() {
           </div>
         )}
       </div>
+
+      {actionError && (
+        <p className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {actionError}
+        </p>
+      )}
+
+      <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900">Active patients in clinic</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Reception can remove visits when requested by doctor/admin.
+        </p>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="border-b border-slate-200 text-slate-600">
+              <tr>
+                <th className="py-2 pr-3">Token</th>
+                <th className="py-2 pr-3">Patient</th>
+                <th className="py-2 pr-3">Consultant</th>
+                <th className="py-2 pr-3">Status</th>
+                <th className="py-2 pr-3">Registered</th>
+                <th className="py-2">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeVisits.map((v) => (
+                <tr key={v.id} className="border-b border-slate-100">
+                  <td className="py-2 pr-3 font-semibold">#{v.token_number}</td>
+                  <td className="py-2 pr-3">
+                    {v.patient_name}
+                    {v.patient_number != null && (
+                      <span className="ml-2 text-xs text-indigo-700">P-{v.patient_number}</span>
+                    )}
+                  </td>
+                  <td className="py-2 pr-3">{v.doctors?.name ?? "—"}</td>
+                  <td className="py-2 pr-3">
+                    <StatusBadge status={v.status} />
+                  </td>
+                  <td className="py-2 pr-3 text-slate-600">
+                    {new Date(v.registered_at).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </td>
+                  <td className="py-2">
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveVisit(v)}
+                      disabled={deletingId === v.id}
+                      className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                    >
+                      {deletingId === v.id ? "Removing..." : "Remove"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {activeVisits.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-6 text-center text-slate-500">
+                    No active visits right now.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </ConsoleShell>
   );
 }

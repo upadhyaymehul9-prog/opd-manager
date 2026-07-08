@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ConsoleShell } from "@/components/ConsoleShell";
 import { DateRangeBar } from "@/components/DateRangeBar";
 import { StatusBadge } from "@/components/PatientCard";
-import { usePatientVisits } from "@/hooks/usePatientVisits";
+import { deletePatient, usePatientVisits } from "@/hooks/usePatientVisits";
 import { todayStr } from "@/lib/date-range";
 import type { PatientStatus } from "@/lib/types";
 
@@ -67,10 +67,12 @@ export default function ManagerPage() {
   const isToday =
     queryRange.from === todayStr() && queryRange.to === todayStr();
 
-  const { visits, loading, error } = usePatientVisits({
+  const { visits, loading, error, refresh } = usePatientVisits({
     from: queryRange.from,
     to: queryRange.to,
   });
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const active = visits.filter((v) => v.status !== "completed");
   const completedToday = visits.filter((v) => v.status === "completed");
@@ -84,6 +86,23 @@ export default function ManagerPage() {
         ? completedToday.length
         : active.filter((v) => stage.statuses.includes(v.status)).length,
   }));
+
+  async function handleRemoveVisit(visitId: string, patientName: string, token: number) {
+    const ok = window.confirm(
+      `Remove ${patientName} (Token #${token}) from workflow?\n\nThis will delete this OPD visit.`,
+    );
+    if (!ok) return;
+    setDeletingId(visitId);
+    setActionError(null);
+    try {
+      await deletePatient(visitId);
+      await refresh();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Could not remove visit");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <ConsoleShell
@@ -104,6 +123,11 @@ export default function ManagerPage() {
 
       {loading && <p className="text-slate-600">Loading…</p>}
       {error && <p className="text-red-600">{error}</p>}
+      {actionError && (
+        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {actionError}
+        </p>
+      )}
 
       <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {byStage.map((s) => (
@@ -156,6 +180,7 @@ export default function ManagerPage() {
               <th className="px-4 py-3 font-semibold">Registered</th>
               <th className="px-4 py-3 font-semibold">ETAs</th>
               <th className="px-4 py-3 font-semibold">Record</th>
+              <th className="px-4 py-3 font-semibold">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -193,6 +218,16 @@ export default function ManagerPage() {
                   >
                     View
                   </Link>
+                </td>
+                <td className="px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveVisit(v.id, v.patient_name, v.token_number)}
+                    disabled={deletingId === v.id}
+                    className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                  >
+                    {deletingId === v.id ? "Removing..." : "Remove"}
+                  </button>
                 </td>
               </tr>
             ))}

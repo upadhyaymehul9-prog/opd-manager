@@ -211,6 +211,7 @@ model PatientVisit {
   incidents       IncidentReport[]
   emr_revisions   VisitEmrRevision[]
   mlc_record      MlcRecord?
+  lab_tests       VisitLabTest[]
 
   @@index([status])
   @@index([doctor_id])
@@ -585,4 +586,45 @@ model PatientFeedback {
 
   @@index([created_at(sort: Desc)])
   @@map("patient_feedback")
+}
+
+model LabTestCatalog {
+  id          String         @id @default(uuid()) @db.Uuid
+  name        String
+  unit        String?
+  ref_range   String?
+  value_type  String         @default("numeric")
+  is_active   Boolean        @default(true)
+  created_at  DateTime       @default(now()) @db.Timestamptz(6)
+  visit_tests VisitLabTest[]
+
+  @@index([name])
+  @@map("lab_test_catalog")
+}
+
+model VisitLabTest {
+  id               String          @id @default(uuid()) @db.Uuid
+  patient_visit_id String          @db.Uuid
+  catalog_id       String?         @db.Uuid
+  test_name        String
+  unit             String?
+  ref_range        String?
+  value_type       String          @default("numeric")
+  value_numeric    Float?
+  value_text       String?
+  status           String          @default("ordered")
+  notes            String?
+  ordered_by       String?
+  ordered_by_role  String?
+  ordered_at       DateTime        @default(now()) @db.Timestamptz(6)
+  resulted_at      DateTime?       @db.Timestamptz(6)
+  resulted_by      String?
+  resulted_by_role String?
+  sort_order       Int             @default(0)
+  patient_visit    PatientVisit    @relation(fields: [patient_visit_id], references: [id], onDelete: Cascade)
+  catalog          LabTestCatalog? @relation(fields: [catalog_id], references: [id], onDelete: SetNull)
+
+  @@index([patient_visit_id])
+  @@index([status])
+  @@map("visit_lab_tests")
 }

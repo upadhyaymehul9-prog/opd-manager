@@ -4,6 +4,8 @@ import { format } from "date-fns";
 import { useEffect, useState } from "react";
 import { PrintActions } from "@/components/PrintActions";
 import { OPD_SUMMARY_HINDI, parseMlcDetails } from "@/lib/nabh-cms";
+import { formatLabValue } from "@/lib/lab-tests";
+import type { VisitLabTestItem } from "@/lib/lab-test-types";
 import type { PatientVisit } from "@/lib/types";
 
 type PrescriptionItem = {
@@ -18,6 +20,7 @@ type OpdSummaryData = {
   visit: PatientVisit;
   consent: { accepted: boolean; created_at: string; version: string } | null;
   prescription: { items: PrescriptionItem[] } | null;
+  lab_tests?: VisitLabTestItem[];
 };
 
 export function OpdVisitSummary({ visitId }: { visitId: string }) {
@@ -36,7 +39,7 @@ export function OpdVisitSummary({ visitId }: { visitId: string }) {
   if (loading) return <p className="text-sm text-slate-600">Loading OPD summary…</p>;
   if (!data) return null;
 
-  const { visit, consent, prescription } = data;
+  const { visit, consent, prescription, lab_tests: labTests = [] } = data;
   const hi = OPD_SUMMARY_HINDI;
   const mlc = parseMlcDetails(
     (visit as PatientVisit & { mlc_details?: string }).mlc_details,
@@ -180,6 +183,32 @@ export function OpdVisitSummary({ visitId }: { visitId: string }) {
           </p>
         )}
       </div>
+
+      {labTests.length > 0 && (
+        <div className="mt-4">
+          <p className="text-sm font-medium text-slate-900">
+            {lang === "hi" ? "प्रयोगशाला परिणाम" : "Lab results"}
+          </p>
+          <table className="mt-2 w-full text-sm text-slate-700">
+            <thead>
+              <tr className="border-b text-left text-xs text-slate-500">
+                <th className="py-1 pr-3">Test</th>
+                <th className="py-1 pr-3">Result</th>
+                <th className="py-1">Reference</th>
+              </tr>
+            </thead>
+            <tbody>
+              {labTests.map((test) => (
+                <tr key={test.id} className="border-b border-slate-100">
+                  <td className="py-1.5 pr-3 font-medium">{test.test_name}</td>
+                  <td className="py-1.5 pr-3">{formatLabValue(test)}</td>
+                  <td className="py-1.5 text-slate-500">{test.ref_range || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {prescription && prescription.items.length > 0 && (
         <div className="mt-4">

@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { ConsoleShell } from "@/components/ConsoleShell";
 import { DoctorStatusPanel } from "@/components/DoctorStatusPanel";
@@ -8,11 +8,12 @@ import { PrescriptionForm } from "@/components/PrescriptionForm";
 import { ConsultationEmrPanel } from "@/components/ConsultationEmrPanel";
 import { MlcDetailsPanel } from "@/components/MlcDetailsPanel";
 import { ProcedurePanel } from "@/components/ProcedurePanel";
+import { LabTestsPanel } from "@/components/LabTestsPanel";
 import { TransferDoctorPanel } from "@/components/TransferDoctorPanel";
 import { PatientCard } from "@/components/PatientCard";
 import { DoctorPatientQueueBar } from "@/components/DoctorPatientQueueBar";
 import { PatientActions } from "@/components/PatientActions";
-import { usePatientVisits } from "@/hooks/usePatientVisits";
+import { deletePatient, usePatientVisits } from "@/hooks/usePatientVisits";
 import { canWritePrescription, getRelevantPatients } from "@/lib/status";
 import type { PatientVisit } from "@/lib/types";
 
@@ -27,6 +28,9 @@ export default function DoctorConsolePage({
 }) {
   const { id: doctorId } = use(params);
   const { visits, loading, error, refresh } = usePatientVisits({ activeOnly: true });
+  const [workspaceOpen, setWorkspaceOpen] = useState<Record<string, boolean>>({});
+  const [busyDeleteId, setBusyDeleteId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const myPatients = getRelevantPatients(visits, "doctor", doctorId).sort(
     (a, b) => a.token_number - b.token_number,
@@ -34,6 +38,31 @@ export default function DoctorConsolePage({
 
   const doctorName =
     visits.find((v) => v.doctor_id === doctorId)?.doctors?.name ?? "Doctor";
+
+  function isWorkspaceOpen(visitId: string) {
+    return workspaceOpen[visitId] ?? false;
+  }
+
+  function toggleWorkspace(visitId: string) {
+    setWorkspaceOpen((prev) => ({ ...prev, [visitId]: !isWorkspaceOpen(visitId) }));
+  }
+
+  async function handleDeleteVisit(visit: PatientVisit) {
+    const ok = window.confirm(
+      `Remove ${visit.patient_name} (Token #${visit.token_number}) from workflow?\n\nThis deletes the visit and related entries for this OPD encounter.`,
+    );
+    if (!ok) return;
+    setBusyDeleteId(visit.id);
+    setActionError(null);
+    try {
+      await deletePatient(visit.id);
+      await refresh();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Could not remove patient visit");
+    } finally {
+      setBusyDeleteId(null);
+    }
+  }
 
   return (
     <ConsoleShell
@@ -50,6 +79,11 @@ export default function DoctorConsolePage({
 
       {loading && <p className="text-slate-600">Loading patients…</p>}
       {error && <p className="text-red-600">{error}</p>}
+      {actionError && (
+        <p className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {actionError}
+        </p>
+      )}
 
       <DoctorStatusPanel doctorId={doctorId} />
 
@@ -79,31 +113,68 @@ export default function DoctorConsolePage({
                       currentDoctorId={doctorId}
                       onTransferred={refresh}
                     />
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteVisit(visit)}
+                      disabled={busyDeleteId === visit.id}
+                      className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                    >
+                      {busyDeleteId === visit.id ? "Removing..." : "Remove patient"}
+                    </button>
                   </div>
                 }
               />
             )}
             {canWritePrescription(visit.status) && (
-              <>
-                {!isAtPharmacy(visit.status) && (
-                  <>
-                    <ConsultationEmrPanel
+              <section className="rounded-xl border border-blue-200 bg-blue-50/40 p-3">
+                <button
+                  type="button"
+                  onClick={() => toggleWorkspace(visit.id)}
+                  className="flex w-full items-center justify-between rounded-lg bg-white px-3 py-2 text-left"
+                >
+                  <span className="text-sm font-semibold text-blue-900">
+                    Doctor workspace (EMR, Procedure, Lab tests, Prescription)
+                  </span>
+                  <span className="text-xs text-blue-700">
+                    {isWorkspaceOpen(visit.id) ? "Collapse ▴" : "Expand ▾"}
+                  </span>
+                </button>
+                {isWorkspaceOpen(visit.id) && (
+                  <div className="mt-3 space-y-3">
+                    {!isAtPharmacy(visit.status) && (
+                      <>
+                        <ConsultationEmrPanel
+                          visitId={visit.id}
+                          doctorId={doctorId}
+                          initialAllergies={visit.patient_allergies}
+                        />
+                        {visit.medico_legal && (
+                          <MlcDetailsPanel visitId={visit.id} />
+                        )}
+                        <ProcedurePanel visitId={visit.id} />
+                        <LabTestsPanel visitId={visit.id} canOrder />
+                      </>
+                    )}
+                    <PrescriptionForm
                       visitId={visit.id}
                       doctorId={doctorId}
-                      initialAllergies={visit.patient_allergies}
+                      patientAllergies={visit.patient_allergies}
                     />
-                    {visit.medico_legal && (
-                      <MlcDetailsPanel visitId={visit.id} />
-                    )}
-                    <ProcedurePanel visitId={visit.id} />
-                  </>
+                  </div>
                 )}
-                <PrescriptionForm
-                  visitId={visit.id}
-                  doctorId={doctorId}
-                  patientAllergies={visit.patient_allergies}
-                />
-              </>
+              </section>
+            )}
+            {isAtPharmacy(visit.status) && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => handleDeleteVisit(visit)}
+                  disabled={busyDeleteId === visit.id}
+                  className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                >
+                  {busyDeleteId === visit.id ? "Removing..." : "Remove patient"}
+                </button>
+              </div>
             )}
           </div>
         ))}
