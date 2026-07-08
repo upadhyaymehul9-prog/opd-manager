@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { DateRangeBar } from "@/components/DateRangeBar";
+import { PrintActions } from "@/components/PrintActions";
 import { todayStr } from "@/lib/date-range";
 
 export type ReportTab =
@@ -151,6 +152,16 @@ export function ReportsDashboard({
     return { from: toDate, to: fromDate };
   }, [fromDate, toDate]);
 
+  const rangeLabel = useMemo(() => {
+    if (queryRange.from === queryRange.to) {
+      return format(new Date(queryRange.from), "d MMM yyyy");
+    }
+    return `${format(new Date(queryRange.from), "d MMM yyyy")} – ${format(new Date(queryRange.to), "d MMM yyyy")}`;
+  }, [queryRange]);
+
+  const activeTabLabel =
+    visibleTabs.find((t) => t.id === tab)?.label ?? tab;
+
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -174,23 +185,39 @@ export function ReportsDashboard({
   }
 
   return (
-    <div>
+    <div className="reports-print">
+      <div className="mb-4 hidden border-b border-slate-300 pb-3 print:block">
+        <h1 className="text-xl font-bold text-black">Clinic reports — {activeTabLabel}</h1>
+        <p className="mt-1 text-sm text-black">Period: {rangeLabel}</p>
+        <p className="text-xs text-slate-600">
+          Printed {format(new Date(), "d MMM yyyy, h:mm a")}
+        </p>
+      </div>
+
       {todayOnly && (
-        <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+        <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 print:hidden">
           Showing <strong>today&apos;s collection only</strong> ({todayStr()}).
         </p>
       )}
       {!hideDateBar && !todayOnly && (
-        <DateRangeBar
-          fromDate={fromDate}
-          toDate={toDate}
-          onFromChange={setInternalFrom}
-          onToChange={setInternalTo}
-          onPreset={setPreset}
-        />
+        <div className="print:hidden">
+          <DateRangeBar
+            fromDate={fromDate}
+            toDate={toDate}
+            onFromChange={setInternalFrom}
+            onToChange={setInternalTo}
+            onPreset={setPreset}
+          />
+        </div>
       )}
 
-      <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+      {data && !loading && (
+        <div className="mb-4 flex justify-end print:hidden">
+          <PrintActions label="Print report" pdfLabel="Save as PDF" />
+        </div>
+      )}
+
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-2 print:hidden">
         {visibleTabs.map((t) => (
           <button
             key={t.id}
@@ -207,8 +234,8 @@ export function ReportsDashboard({
         ))}
       </div>
 
-      {loading && <p className="text-slate-600">Loading reports…</p>}
-      {error && <p className="text-red-600">{error}</p>}
+      {loading && <p className="text-slate-600 print:hidden">Loading reports…</p>}
+      {error && <p className="text-red-600 print:hidden">{error}</p>}
 
       {data && tab === "overview" && (
         <OverviewTab data={data} onTab={setTab} />
@@ -490,113 +517,347 @@ function MedicinesTab({
   expandedMedicine: string | null;
   onExpand: (name: string | null) => void;
 }) {
+  const [selectedMedicine, setSelectedMedicine] = useState("");
+
+  const filteredWise = useMemo(
+    () =>
+      selectedMedicine
+        ? data.medicine_wise.filter((m) => m.medicine_name === selectedMedicine)
+        : data.medicine_wise,
+    [data.medicine_wise, selectedMedicine],
+  );
+
+  const filteredPatientRows = useMemo(
+    () =>
+      selectedMedicine
+        ? data.patient_medicine.filter((r) => r.medicine_name === selectedMedicine)
+        : data.patient_medicine,
+    [data.patient_medicine, selectedMedicine],
+  );
+
+  const selectedRow = filteredWise[0] ?? null;
+
+  function handleMedicineChange(name: string) {
+    setSelectedMedicine(name);
+    onExpand(name || null);
+  }
+
   return (
     <div className="space-y-8">
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="font-semibold">Medicine-wise summary</h2>
-        <p className="text-xs text-slate-500">
-          Total quantity used — click a row to see patient-wise breakdown
-        </p>
-        <table className="mt-3 w-full text-sm">
-          <thead>
-            <tr className="border-b text-left text-slate-600">
-              <th className="pb-2">Medicine</th>
-              <th className="pb-2">Patients</th>
-              <th className="pb-2">Total qty</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.medicine_wise.map((row) => (
-              <Fragment key={row.medicine_name}>
-                <tr
-                  className="cursor-pointer border-b border-slate-100 hover:bg-slate-50"
-                  onClick={() =>
-                    onExpand(
-                      expandedMedicine === row.medicine_name
-                        ? null
-                        : row.medicine_name,
-                    )
-                  }
-                >
-                  <td className="py-2 font-medium">
-                    {expandedMedicine === row.medicine_name ? "▾ " : "▸ "}
-                    {row.medicine_name}
-                  </td>
-                  <td className="py-2">{row.patients}</td>
-                  <td className="py-2 font-semibold">{row.total_qty}</td>
-                </tr>
-                {expandedMedicine === row.medicine_name && (
-                  <tr>
-                    <td colSpan={3} className="bg-slate-50 px-4 py-3">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="text-slate-600">
-                            <th className="pb-1 text-left">Patient</th>
-                            <th className="pb-1 text-left">P#</th>
-                            <th className="pb-1 text-left">Token</th>
-                            <th className="pb-1 text-left">Qty</th>
-                            <th className="pb-1 text-left">Doctor</th>
-                            <th className="pb-1 text-left">Dispensed</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {row.patient_rows.map((p, i) => (
-                            <tr key={i} className="border-t border-slate-200">
-                              <td className="py-1">{p.patient_name}</td>
-                              <td className="py-1">
-                                {p.patient_number ? `P${p.patient_number}` : "—"}
-                              </td>
-                              <td className="py-1">#{p.token_number}</td>
-                              <td className="py-1 font-semibold">{p.quantity}</td>
-                              <td className="py-1">{p.doctor_name}</td>
-                              <td className="py-1">
-                                {p.dispensed_at
-                                  ? format(new Date(p.dispensed_at), "d MMM h:mm a")
-                                  : "—"}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
+      <div className="flex flex-wrap items-end justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 print:hidden">
+        <label className="block min-w-[240px] flex-1 text-sm">
+          <span className="mb-1 block font-medium text-slate-700">
+            Select medicine
+          </span>
+          <select
+            value={selectedMedicine}
+            onChange={(e) => handleMedicineChange(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          >
+            <option value="">All medicines</option>
+            {data.medicine_wise.map((m) => (
+              <option key={m.medicine_name} value={m.medicine_name}>
+                {m.medicine_name}
+              </option>
             ))}
-          </tbody>
-        </table>
-        {data.medicine_wise.length === 0 && (
-          <p className="mt-2 text-sm text-slate-500">
-            No dispensed medicines in this period.
-          </p>
+          </select>
+        </label>
+        {selectedMedicine && selectedRow && (
+          <div className="text-sm text-slate-600">
+            <strong>{selectedRow.patients}</strong> patient(s) · qty{" "}
+            <strong>{selectedRow.total_qty}</strong>
+          </div>
         )}
-      </section>
+      </div>
+
+      {selectedMedicine && selectedRow && (
+        <div className="hidden print:block">
+          <p className="text-lg font-bold text-black">{selectedMedicine}</p>
+          <p className="text-sm text-black">
+            {selectedRow.patients} patient(s) · total qty {selectedRow.total_qty}
+          </p>
+        </div>
+      )}
+
+      {!selectedMedicine && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 print:break-inside-avoid">
+          <h2 className="font-semibold">Medicine-wise summary</h2>
+          <p className="text-xs text-slate-500 print:hidden">
+            Total quantity used — pick a medicine above or click a row for
+            breakdown
+          </p>
+          <MedicineSummaryTable
+            rows={filteredWise}
+            expandedMedicine={expandedMedicine}
+            onExpand={onExpand}
+            collapsible
+          />
+        </section>
+      )}
+
+      {selectedMedicine && selectedRow && (
+        <section className="rounded-xl border border-teal-200 bg-teal-50/40 p-4 print:border-black print:bg-white">
+          <h2 className="font-semibold">{selectedMedicine}</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {selectedRow.patients} patient(s) received this medicine · total qty{" "}
+            {selectedRow.total_qty}
+          </p>
+          <PatientBreakdownTable rows={selectedRow.patient_rows} />
+        </section>
+      )}
+
+      {!selectedMedicine && (
+        <div className="hidden print:block print:break-before-page">
+          <h2 className="mb-3 font-semibold text-black">
+            Patient breakdown by medicine
+          </h2>
+          {filteredWise.map((row) => (
+            <MedicinePrintBlock key={row.medicine_name} row={row} />
+          ))}
+        </div>
+      )}
+
+      {selectedMedicine && (
+        <div className="hidden print:block">
+          <h2 className="mb-2 font-semibold text-black">Patient list</h2>
+          {selectedRow ? (
+            <PatientBreakdownTable rows={selectedRow.patient_rows} compact />
+          ) : (
+            <p className="text-sm">No dispensing for this medicine in period.</p>
+          )}
+        </div>
+      )}
 
       <DataTable
-        title="Patient-wise medicine register (itemwise)"
-        columns={[
-          "Patient",
-          "P#",
-          "Token",
-          "Medicine",
-          "Qty",
-          "Doctor",
-          "Dispensed",
-        ]}
-        rows={data.patient_medicine.map((r) => [
-          r.patient_name,
-          r.patient_number ? `P${r.patient_number}` : "—",
-          `#${r.token_number}`,
-          r.medicine_name,
-          String(r.quantity),
-          r.doctor_name,
-          r.dispensed_at
-            ? format(new Date(r.dispensed_at), "d MMM h:mm a")
-            : "—",
-        ])}
-        empty="No medicine dispensing in this period."
+        title={
+          selectedMedicine
+            ? `Dispensing register — ${selectedMedicine}`
+            : "Patient-wise medicine register (itemwise)"
+        }
+        columns={
+          selectedMedicine
+            ? ["Patient", "P#", "Token", "Qty", "Doctor", "Dispensed"]
+            : ["Patient", "P#", "Token", "Medicine", "Qty", "Doctor", "Dispensed"]
+        }
+        rows={filteredPatientRows.map((r) =>
+          selectedMedicine
+            ? [
+                r.patient_name,
+                r.patient_number ? `P${r.patient_number}` : "—",
+                `#${r.token_number}`,
+                String(r.quantity),
+                r.doctor_name,
+                r.dispensed_at
+                  ? format(new Date(r.dispensed_at), "d MMM h:mm a")
+                  : "—",
+              ]
+            : [
+                r.patient_name,
+                r.patient_number ? `P${r.patient_number}` : "—",
+                `#${r.token_number}`,
+                r.medicine_name,
+                String(r.quantity),
+                r.doctor_name,
+                r.dispensed_at
+                  ? format(new Date(r.dispensed_at), "d MMM h:mm a")
+                  : "—",
+              ],
+        )}
+        footerRow={buildRegisterFooter(
+          filteredPatientRows,
+          selectedMedicine ? 6 : 7,
+          selectedMedicine ? 3 : 4,
+          Boolean(selectedMedicine),
+        )}
+        empty={
+          selectedMedicine
+            ? "No dispensing for this medicine in the selected period."
+            : "No medicine dispensing in this period."
+        }
       />
     </div>
+  );
+}
+
+type MedicineRow = ReportData["medicine_wise"][number];
+type PatientRow = MedicineRow["patient_rows"][number];
+
+function countUniquePatients(
+  rows: { patient_name: string; token_number: number }[],
+) {
+  return new Set(rows.map((r) => `${r.patient_name}|${r.token_number}`)).size;
+}
+
+function sumQty(rows: { quantity: number }[]) {
+  return rows.reduce((sum, r) => sum + (r.quantity ?? 0), 0);
+}
+
+function buildRegisterFooter(
+  rows: ReportData["patient_medicine"],
+  columnCount: number,
+  qtyColumnIndex: number,
+  singleMedicine: boolean,
+): string[] | undefined {
+  if (rows.length === 0) return undefined;
+  const patients = countUniquePatients(rows);
+  const totalQty = sumQty(rows);
+  const label = singleMedicine
+    ? `Total (${patients} patient${patients !== 1 ? "s" : ""})`
+    : `Total (${rows.length} line${rows.length !== 1 ? "s" : ""} · ${patients} patient${patients !== 1 ? "s" : ""})`;
+  const cells = Array(columnCount).fill("");
+  cells[0] = label;
+  cells[qtyColumnIndex] = String(totalQty);
+  return cells;
+}
+
+function MedicineSummaryTable({
+  rows,
+  expandedMedicine,
+  onExpand,
+  collapsible,
+}: {
+  rows: MedicineRow[];
+  expandedMedicine: string | null;
+  onExpand: (name: string | null) => void;
+  collapsible: boolean;
+}) {
+  const grandQty = rows.reduce((sum, row) => sum + row.total_qty, 0);
+
+  return (
+    <>
+      <table className="mt-3 w-full text-sm">
+        <thead>
+          <tr className="border-b text-left text-slate-600">
+            <th className="pb-2">Medicine</th>
+            <th className="pb-2">Patients</th>
+            <th className="pb-2">Total qty</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <Fragment key={row.medicine_name}>
+              <tr
+                className={`border-b border-slate-100 ${
+                  collapsible
+                    ? "cursor-pointer hover:bg-slate-50 print:cursor-auto"
+                    : ""
+                }`}
+                onClick={
+                  collapsible
+                    ? () =>
+                        onExpand(
+                          expandedMedicine === row.medicine_name
+                            ? null
+                            : row.medicine_name,
+                        )
+                    : undefined
+                }
+              >
+                <td className="py-2 font-medium">
+                  {collapsible && (
+                    <span className="print:hidden">
+                      {expandedMedicine === row.medicine_name ? "▾ " : "▸ "}
+                    </span>
+                  )}
+                  {row.medicine_name}
+                </td>
+                <td className="py-2">{row.patients}</td>
+                <td className="py-2 font-semibold">{row.total_qty}</td>
+              </tr>
+              {collapsible && expandedMedicine === row.medicine_name && (
+                <tr className="print:hidden">
+                  <td colSpan={3} className="bg-slate-50 px-4 py-3">
+                    <PatientBreakdownTable rows={row.patient_rows} compact />
+                  </td>
+                </tr>
+              )}
+            </Fragment>
+          ))}
+        </tbody>
+        {rows.length > 0 && (
+          <tfoot>
+            <tr className="border-t-2 border-slate-300 bg-slate-100 font-bold text-slate-900">
+              <td className="py-2">
+                Total ({rows.length} medicine{rows.length !== 1 ? "s" : ""})
+              </td>
+              <td className="py-2">—</td>
+              <td className="py-2">{grandQty}</td>
+            </tr>
+          </tfoot>
+        )}
+      </table>
+      {rows.length === 0 && (
+        <p className="mt-2 text-sm text-slate-500">
+          No dispensed medicines in this period.
+        </p>
+      )}
+    </>
+  );
+}
+
+function PatientBreakdownTable({
+  rows,
+  compact,
+}: {
+  rows: PatientRow[];
+  compact?: boolean;
+}) {
+  const totalQty = sumQty(rows);
+  const patientCount = countUniquePatients(rows);
+
+  return (
+    <table className={`mt-3 w-full ${compact ? "text-xs" : "text-sm"}`}>
+      <thead>
+        <tr className="border-b text-left text-slate-600">
+          <th className="pb-2 pr-3">Patient</th>
+          <th className="pb-2 pr-3">P#</th>
+          <th className="pb-2 pr-3">Token</th>
+          <th className="pb-2 pr-3">Qty</th>
+          <th className="pb-2 pr-3">Doctor</th>
+          <th className="pb-2">Dispensed</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((p, i) => (
+          <tr key={i} className="border-b border-slate-100">
+            <td className="py-2 pr-3">{p.patient_name}</td>
+            <td className="py-2 pr-3">
+              {p.patient_number ? `P${p.patient_number}` : "—"}
+            </td>
+            <td className="py-2 pr-3">#{p.token_number}</td>
+            <td className="py-2 pr-3 font-semibold">{p.quantity}</td>
+            <td className="py-2 pr-3">{p.doctor_name}</td>
+            <td className="py-2">
+              {p.dispensed_at
+                ? format(new Date(p.dispensed_at), "d MMM h:mm a")
+                : "—"}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+      {rows.length > 0 && (
+        <tfoot>
+          <tr className="border-t-2 border-teal-300 bg-teal-100/80 font-bold text-slate-900 print:border-black print:bg-slate-100">
+            <td className="py-2 pr-3" colSpan={3}>
+              Total ({patientCount} patient{patientCount !== 1 ? "s" : ""})
+            </td>
+            <td className="py-2 pr-3">{totalQty}</td>
+            <td className="py-2 pr-3" colSpan={2} />
+          </tr>
+        </tfoot>
+      )}
+    </table>
+  );
+}
+
+function MedicinePrintBlock({ row }: { row: MedicineRow }) {
+  return (
+    <section className="mb-4 break-inside-avoid">
+      <h3 className="text-sm font-bold text-black">
+        {row.medicine_name} — {row.patients} patient(s), qty {row.total_qty}
+      </h3>
+      <PatientBreakdownTable rows={row.patient_rows} compact />
+    </section>
   );
 }
 
@@ -641,15 +902,17 @@ function DataTable({
   title,
   columns,
   rows,
+  footerRow,
   empty,
 }: {
   title: string;
   columns: string[];
   rows: string[][];
+  footerRow?: string[];
   empty: string;
 }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4">
+    <section className="rounded-xl border border-slate-200 bg-white p-4 print:break-inside-avoid">
       <h2 className="font-semibold">{title}</h2>
       {rows.length === 0 ? (
         <p className="mt-2 text-sm text-slate-500">{empty}</p>
@@ -676,6 +939,17 @@ function DataTable({
                 </tr>
               ))}
             </tbody>
+            {footerRow && (
+              <tfoot>
+                <tr className="border-t-2 border-slate-300 bg-slate-100 font-bold text-slate-900">
+                  {columns.map((_, j) => (
+                    <td key={j} className="py-2 pr-4">
+                      {footerRow[j] ?? ""}
+                    </td>
+                  ))}
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       )}

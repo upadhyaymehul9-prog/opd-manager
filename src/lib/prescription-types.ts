@@ -25,6 +25,8 @@ export type PrescriptionItem = {
   instructions: string | null;
   dispensed: boolean;
   dispensed_at: string | null;
+  skipped: boolean;
+  skip_reason: string | null;
   substituted_note: string | null;
   sort_order: number;
 };

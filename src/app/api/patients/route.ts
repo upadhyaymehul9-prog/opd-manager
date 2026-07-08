@@ -10,7 +10,6 @@ import { findDuplicatePatients } from "@/lib/duplicate-patients";
 import { serializeVisit } from "@/lib/serialize";
 import { nextTokenNumber } from "@/lib/tokens";
 import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
-import { generateMobileVerifyCode } from "@/lib/nabh-cms";
 import { CONSENT_TEXT_V1 } from "@/lib/nabh";
 import type { CreatePatientInput } from "@/lib/types";
 
@@ -123,6 +122,7 @@ export async function POST(request: Request) {
         mobile: mobile?.trim() || null,
         abha_id: normalizedAbha,
         national_id: national_id?.trim() || null,
+        date_of_birth: date_of_birth || null,
       });
       if (duplicates.length > 0) {
         return NextResponse.json(
@@ -165,7 +165,6 @@ export async function POST(request: Request) {
 
     const token_number = await nextTokenNumber();
     const dob = date_of_birth ? new Date(date_of_birth) : null;
-    let mobileVerifyCode: string | null = null;
 
     const visit = await prisma.$transaction(async (tx) => {
       let patient;
@@ -213,14 +212,12 @@ export async function POST(request: Request) {
           });
         }
         if (mobile?.trim() && !patient.mobile_verified_at) {
-          mobileVerifyCode = generateMobileVerifyCode();
           patient = await tx.patient.update({
             where: { id: patient_id },
-            data: { mobile_verify_code: mobileVerifyCode, mobile: mobile.trim() },
+            data: { mobile: mobile.trim(), mobile_verified_at: new Date() },
           });
         }
       } else {
-        mobileVerifyCode = mobile?.trim() ? generateMobileVerifyCode() : null;
         patient = await findOrCreatePatient(tx, {
           name: patient_name.trim(),
           mobile: mobile?.trim() || null,
@@ -232,7 +229,6 @@ export async function POST(request: Request) {
           occupation: occupation?.trim() || null,
           national_id_type: national_id_type?.trim() || null,
           national_id: national_id?.trim() || null,
-          mobile_verify_code: mobileVerifyCode,
         });
       }
 
@@ -306,13 +302,7 @@ export async function POST(request: Request) {
       session,
     });
 
-    return NextResponse.json(
-      {
-        ...serializeVisit(visit),
-        mobile_verify_code: mobileVerifyCode,
-      },
-      { status: 201 },
-    );
+    return NextResponse.json(serializeVisit(visit), { status: 201 });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Database error";
     return NextResponse.json({ error: message }, { status: 500 });

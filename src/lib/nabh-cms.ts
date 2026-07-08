@@ -38,10 +38,6 @@ export function parseMlcDetails(raw: string | null | undefined): MlcDetails | nu
   }
 }
 
-export function generateMobileVerifyCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
-
 export const FEEDBACK_QUESTIONS = [
   { id: "q1_overall", label: "Overall experience at the clinic" },
   { id: "q2_care_quality", label: "Quality of care (consultation, nursing, etc.)" },
@@ -50,7 +46,7 @@ export const FEEDBACK_QUESTIONS = [
   { id: "q5_registration", label: "Ease of registration / discharge process" },
 ] as const;
 
-/** Hindi labels for COP.1k multilingual OPD summary */
+/** Hindi labels for the printable, multilingual OPD summary */
 export const OPD_SUMMARY_HINDI = {
   title: "ओपीडी परामर्श सारांश",
   patient: "रोगी",

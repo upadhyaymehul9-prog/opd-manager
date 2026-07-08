@@ -3,6 +3,7 @@ import { addDays, startOfDay } from "date-fns";
 import {
   assertSlotAvailable,
   getClinicSchedule,
+  runBookingTransaction,
   serializeAppointment,
 } from "@/lib/appointments";
 import { prisma } from "@/lib/prisma";
@@ -62,8 +63,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid scheduled time" }, { status: 400 });
     }
 
-    await assertSlotAvailable(doctor_id, when, schedule.slot_duration_minutes);
-
     if (external_ref) {
       const dup = await prisma.appointment.findUnique({
         where: { external_ref },
@@ -79,21 +78,31 @@ export async function POST(request: Request) {
       }
     }
 
-    const appointment = await prisma.appointment.create({
-      data: {
+    const appointment = await runBookingTransaction(async (tx) => {
+      await assertSlotAvailable(
         doctor_id,
-        patient_id: patient_id ?? null,
-        patient_name: patient_name.trim(),
-        mobile: mobile?.trim() || null,
-        age: age != null && age > 0 ? Math.round(age) : null,
-        scheduled_at: when,
-        duration_minutes: schedule.slot_duration_minutes,
-        status: "booked",
-        source: source?.trim() || "reception",
-        external_ref: external_ref?.trim() || null,
-        notes: notes?.trim() || null,
-      },
-      include: { doctor: { select: { name: true } } },
+        when,
+        schedule.slot_duration_minutes,
+        undefined,
+        tx,
+      );
+
+      return tx.appointment.create({
+        data: {
+          doctor_id,
+          patient_id: patient_id ?? null,
+          patient_name: patient_name.trim(),
+          mobile: mobile?.trim() || null,
+          age: age != null && age > 0 ? Math.round(age) : null,
+          scheduled_at: when,
+          duration_minutes: schedule.slot_duration_minutes,
+          status: "booked",
+          source: source?.trim() || "reception",
+          external_ref: external_ref?.trim() || null,
+          notes: notes?.trim() || null,
+        },
+        include: { doctor: { select: { name: true } } },
+      });
     });
 
     return NextResponse.json(serializeAppointment(appointment), { status: 201 });

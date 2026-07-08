@@ -12,11 +12,15 @@ import {
 } from "@/lib/doctor-status";
 import {
   getLabReportStatusLabel,
+  getRadioReportStatusLabel,
   getTvTokenStatus,
   isLabPending,
   isLabReady,
+  isRadioPending,
+  isRadioReady,
   isTokenWaiting,
   LAB_REPORT_STATUSES,
+  RADIO_REPORT_STATUSES,
 } from "@/lib/tv-display";
 import type { Doctor, PatientVisit } from "@/lib/types";
 
@@ -28,10 +32,16 @@ export default function TVDisplayPage() {
     .filter((v) => LAB_REPORT_STATUSES.includes(v.status))
     .sort((a, b) => a.token_number - b.token_number);
 
+  const radioReports = visits
+    .filter((v) => RADIO_REPORT_STATUSES.includes(v.status))
+    .sort((a, b) => a.token_number - b.token_number);
+
   const tokens = [...visits].sort((a, b) => a.token_number - b.token_number);
 
   const labPending = visits.filter((v) => isLabPending(v.status)).length;
   const labReady = visits.filter((v) => isLabReady(v.status)).length;
+  const radioPending = visits.filter((v) => isRadioPending(v.status)).length;
+  const radioReady = visits.filter((v) => isRadioReady(v.status)).length;
   const tokensWaiting = visits.filter((v) => isTokenWaiting(v.status)).length;
   const doctorsAvailable = doctors.filter((d) =>
     isDoctorAvailable(d.opd_status),
@@ -40,7 +50,7 @@ export default function TVDisplayPage() {
   const loading = visitsLoading || doctorsLoading;
 
   return (
-    <div className="flex min-h-screen bg-[#f3f4f6] text-slate-900">
+    <div className="flex min-h-screen flex-col bg-slate-100 text-slate-900 lg:flex-row">
       <div className="min-w-0 flex-1">
         <header className="border-b border-slate-300 bg-white px-6 py-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -54,9 +64,11 @@ export default function TVDisplayPage() {
         )}
 
         <div className="space-y-6 p-4 md:p-6">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
             <SummaryCard label="Lab Pending" value={labPending} />
             <SummaryCard label="Lab Ready" value={labReady} />
+            <SummaryCard label="Radiology Pending" value={radioPending} />
+            <SummaryCard label="Radiology Ready" value={radioReady} />
             <SummaryCard label="Tokens Waiting" value={tokensWaiting} />
             <SummaryCard label="Doctors Available" value={doctorsAvailable} />
           </div>
@@ -74,6 +86,24 @@ export default function TVDisplayPage() {
                   "—",
                   getLabReportStatusLabel(v.status),
                   v.lab_eta ? format(new Date(v.lab_eta), "hh:mm a") : "—",
+                ],
+              }))}
+            />
+          </TvSection>
+
+          <TvSection title="Radiology Reports">
+            <TvTable
+              headers={["Case No", "Name", "Study", "Status", "Ready Time"]}
+              emptyMessage="No radiology reports right now"
+              rows={radioReports.map((v) => ({
+                key: v.id,
+                highlight: v.status !== "radio_ready",
+                cells: [
+                  String(v.token_number),
+                  v.patient_name,
+                  "—",
+                  getRadioReportStatusLabel(v.status),
+                  v.radio_eta ? format(new Date(v.radio_eta), "hh:mm a") : "—",
                 ],
               }))}
             />
@@ -137,7 +167,7 @@ function DoctorStatusSidebar({
   });
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-l-4 border-blue-600 bg-slate-900 text-white lg:w-80 xl:w-96">
+    <aside className="flex w-full shrink-0 flex-col border-t-4 border-blue-600 bg-slate-900 text-white lg:w-80 lg:border-l-4 lg:border-t-0 xl:w-96">
       <div className="border-b border-slate-700 bg-blue-700 px-4 py-4">
         <h2 className="text-xl font-bold tracking-wide">Doctor Status</h2>
         <p className="mt-1 text-sm text-blue-100">
@@ -164,7 +194,7 @@ function DoctorStatusSidebar({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={doctor.photo_url}
-                  alt=""
+                  alt={`${doctor.name} photo`}
                   className="h-14 w-14 shrink-0 rounded-full border-2 border-blue-400 object-cover"
                 />
               ) : (
@@ -226,7 +256,7 @@ function waitMinutes(visit: PatientVisit) {
 
 function SummaryCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-slate-300 bg-white px-4 py-5 text-center shadow-sm">
+    <div className="card px-4 py-5 text-center">
       <p className="text-3xl font-bold text-slate-900">{value}</p>
       <p className="mt-1 text-sm font-medium text-slate-600">{label}</p>
     </div>
@@ -241,8 +271,8 @@ function TvSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm">
-      <h2 className="border-b border-slate-300 bg-[#e9ecef] px-4 py-2 text-lg font-bold">
+    <section className="card overflow-hidden">
+      <h2 className="card-header text-lg font-bold text-slate-900">
         {title}
       </h2>
       {children}

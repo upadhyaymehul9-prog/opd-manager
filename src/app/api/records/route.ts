@@ -24,7 +24,7 @@ export async function GET(request: Request) {
         patient: true,
         prescription: {
           include: {
-            items: { orderBy: { sort_order: "asc" } },
+            items: { where: { voided_at: null }, orderBy: { sort_order: "asc" } },
           },
         },
         pharmacy_bill: { include: { items: true } },

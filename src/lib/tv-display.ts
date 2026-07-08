@@ -46,6 +46,26 @@ export function isTokenWaiting(status: PatientStatus) {
   );
 }
 
+export const RADIO_REPORT_STATUSES: PatientStatus[] = [
+  "to_radiology",
+  "at_radiology",
+  "radio_processing",
+  "radio_ready",
+];
+
+export function getRadioReportStatusLabel(status: PatientStatus): string {
+  if (status === "radio_ready") return "READY";
+  return "PENDING";
+}
+
+export function isRadioPending(status: PatientStatus) {
+  return ["to_radiology", "at_radiology", "radio_processing"].includes(status);
+}
+
+export function isRadioReady(status: PatientStatus) {
+  return status === "radio_ready";
+}
+
 const QUEUE_STATUSES: PatientStatus[] = [
   "registered",
   "calling",

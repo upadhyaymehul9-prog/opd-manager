@@ -16,12 +16,15 @@ const ADMIN_NAV = [
   { href: "/tv", label: "TV Display", color: "bg-rose-600" },
   { href: "/analytics", label: "Analytics", color: "bg-indigo-700" },
   { href: "/records", label: "Records", color: "bg-cyan-700" },
+  { href: "/records/completeness", label: "Record gaps", color: "bg-cyan-900" },
+  { href: "/records/release", label: "ROI log", color: "bg-cyan-800" },
   { href: "/reports", label: "Reports", color: "bg-sky-700" },
   { href: "/reconciliation", label: "Day-end", color: "bg-orange-700" },
   { href: "/nabh", label: "NABH", color: "bg-teal-800" },
   { href: "/feedback", label: "Feedback", color: "bg-violet-800" },
   { href: "/incidents", label: "Incidents", color: "bg-red-700" },
   { href: "/settings/doctors", label: "My profile", color: "bg-violet-700" },
+  { href: "/settings/patients/merge", label: "Merge patients", color: "bg-fuchsia-700" },
 ];
 
 const STAFF_NAV = [
@@ -33,6 +36,7 @@ const STAFF_NAV = [
   { href: "/pharmacy", label: "Pharmacy", color: "bg-teal-600" },
   { href: "/stock", label: "Stock", color: "bg-amber-600" },
   { href: "/records", label: "Records", color: "bg-cyan-700" },
+  { href: "/records/release", label: "ROI log", color: "bg-cyan-800" },
   { href: "/tv", label: "TV Display", color: "bg-rose-600" },
   { href: "/reports", label: "Reports", color: "bg-sky-700" },
   { href: "/reconciliation", label: "Day-end", color: "bg-orange-700" },
@@ -61,38 +65,54 @@ export function ConsoleNav({
   const homeHref = publicMode ? "/feedback" : "/";
 
   return (
-    <nav className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <Link
-        href={homeHref}
-        className="mr-2 self-center text-sm font-bold text-slate-800"
-      >
-        {publicMode ? "Clinic feedback" : "OPD Manager"}
-      </Link>
-      {visibleNav.map((item) => (
+    <nav className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 px-4 py-2.5 shadow-sm backdrop-blur-sm">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2">
         <Link
-          key={item.href}
-          href={item.href}
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90 ${
-            current === item.href ? "ring-2 ring-offset-2 ring-slate-400" : ""
-          } ${item.color}`}
+          href={homeHref}
+          className="mr-1 shrink-0 text-sm font-bold tracking-tight text-slate-900"
         >
-          {item.label}
+          {publicMode ? "Clinic feedback" : "OPD Manager"}
         </Link>
-      ))}
-      {session && (
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-xs text-slate-500">
-            {session.displayName || session.username}
-          </span>
-          <button
-            type="button"
-            onClick={() => logout()}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-          >
-            Log out
-          </button>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          {visibleNav.map((item) => {
+            const active = current === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={`focus-ring rounded-lg px-2.5 py-1.5 text-xs font-semibold transition sm:text-sm ${
+                  active
+                    ? `${item.color} text-white shadow-sm`
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </div>
-      )}
+        {session && (
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <span className="hidden text-xs text-slate-500 sm:inline">
+              {session.displayName || session.username}
+            </span>
+            <Link
+              href="/account/change-password"
+              className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:text-sm"
+            >
+              Change password
+            </Link>
+            <button
+              type="button"
+              onClick={() => logout()}
+              className="focus-ring rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:text-sm"
+            >
+              Log out
+            </button>
+          </div>
+        )}
+      </div>
     </nav>
   );
 }
@@ -111,13 +131,19 @@ export function ConsoleShell({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[var(--color-clinic-bg)]">
       <ConsoleNav current={current} publicMode={publicMode} />
-      <header className="border-b border-slate-200 bg-white px-6 py-5">
-        <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-        {subtitle && <p className="mt-1 text-slate-600">{subtitle}</p>}
+      <header className="border-b border-slate-200/80 bg-gradient-to-r from-white via-slate-50/80 to-white">
+        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="mt-1 text-sm text-slate-600 sm:text-base">{subtitle}</p>
+          )}
+        </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">{children}</main>
     </div>
   );
 }

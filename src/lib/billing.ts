@@ -59,7 +59,7 @@ export async function buildBillPreview(
     where: { id: prescriptionId },
     include: {
       items: {
-        where: { dispensed: true },
+        where: { dispensed: true, voided_at: null },
         orderBy: { sort_order: "asc" },
         include: { medicine: true },
       },
@@ -166,6 +166,7 @@ export async function createPharmacyBill(
   prescriptionId: string,
   paymentMode: PaymentMode,
   priceOverrides?: Map<string, number>,
+  previewOverride?: BillPreview,
 ) {
   const existing = await tx.pharmacyBill.findUnique({
     where: { prescription_id: prescriptionId },
@@ -182,7 +183,9 @@ export async function createPharmacyBill(
   });
   if (!prescription) throw new Error("Prescription not found");
 
-  const preview = await buildBillPreview(tx, prescriptionId, priceOverrides);
+  const preview =
+    previewOverride ??
+    (await buildBillPreview(tx, prescriptionId, priceOverrides));
   const bill_no = await generateBillNo(tx);
 
   return tx.pharmacyBill.create({

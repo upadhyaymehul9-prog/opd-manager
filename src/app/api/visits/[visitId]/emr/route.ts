@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { serializeVisitEmr, visitEmrSelect } from "@/lib/emr";
-import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
+import { AUDIT_ACTIONS, diffFields, getSessionFromCookies, logAudit } from "@/lib/audit";
 import type { UpdateVisitEmrInput } from "@/lib/emr-types";
 
 function trimOrNull(v: string | null | undefined) {
@@ -41,11 +41,21 @@ export async function PATCH(
 
     const existing = await prisma.patientVisit.findUnique({
       where: { id: visitId },
-      select: { id: true, patient_id: true, medico_legal: true },
+      select: { ...visitEmrSelect, medico_legal: true, status: true },
     });
 
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    // A completed/discharged visit's signed record is final. Only
+    // admin/manager can amend it afterwards (e.g. to correct an error),
+    // and doing so re-stamps the signature below so the change is traceable.
+    if (existing.status === "completed" && session?.role !== "admin" && session?.role !== "manager") {
+      return NextResponse.json(
+        { error: "Visit is completed — ask a manager/admin to amend a signed record" },
+        { status: 403 },
+      );
     }
 
     const visitData: Record<string, unknown> = {};
@@ -115,13 +125,29 @@ export async function PATCH(
           : null;
     }
 
-    if (session && Object.keys(visitData).length > 0) {
+    const hasClinicalChanges = Object.keys(visitData).length > 0;
+
+    if (session && hasClinicalChanges) {
       visitData.signed_at = new Date();
       visitData.signed_by = session.displayName || session.username;
       visitData.signed_by_role = session.role;
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      // Snapshot the clinical fields as they stood before this edit so the
+      // prior version is retained forever — corrections append, they never
+      // overwrite history.
+      if (hasClinicalChanges) {
+        await tx.visitEmrRevision.create({
+          data: {
+            patient_visit_id: visitId,
+            snapshot: JSON.stringify(serializeVisitEmr(existing)),
+            changed_by: session?.displayName || session?.username || "unknown",
+            changed_by_role: session?.role ?? "unknown",
+          },
+        });
+      }
+
       if (
         existing.patient_id &&
         (body.patient_allergies !== undefined || body.patient_blood_group !== undefined)
@@ -146,11 +172,31 @@ export async function PATCH(
       });
     });
 
+    const diff = diffFields(existing, result, [
+      "chief_complaint",
+      "provisional_diagnosis",
+      "final_diagnosis",
+      "diagnosis",
+      "examination_notes",
+      "advice",
+      "lifestyle_advice",
+      "investigations_ordered",
+      "follow_up_instructions",
+      "referral_notes",
+      "follow_up_date",
+      "vitals_bp",
+      "vitals_pulse",
+      "vitals_temp",
+      "vitals_weight",
+      "vitals_spo2",
+    ]);
+
     await logAudit({
       action: AUDIT_ACTIONS.EMR_UPDATE,
       entity_type: "visit",
       entity_id: visitId,
       summary: `EMR updated for visit ${visitId.slice(0, 8)}…`,
+      details: Object.keys(diff).length > 0 ? { changes: diff } : undefined,
       session,
     });
 

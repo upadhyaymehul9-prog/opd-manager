@@ -126,12 +126,20 @@ export default function ManagerPage() {
             <strong>{completedToday.length}</strong> completed
           </span>
         </div>
-        <Link
-          href="/records"
-          className="text-sm font-medium text-indigo-700 hover:underline"
-        >
-          Patient records & bills →
-        </Link>
+        <div className="flex flex-wrap gap-4">
+          <Link
+            href="/records/completeness"
+            className="text-sm font-medium text-amber-800 hover:underline"
+          >
+            Record completeness →
+          </Link>
+          <Link
+            href="/records"
+            className="text-sm font-medium text-indigo-700 hover:underline"
+          >
+            Patient records & bills →
+          </Link>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">

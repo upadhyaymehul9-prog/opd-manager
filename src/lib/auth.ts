@@ -1,11 +1,14 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import type { NextRequest } from "next/server";
+import { USER_ROLES } from "@/lib/auth-types";
 import type { SessionPayload, UserRole } from "@/lib/auth-types";
 
 export const SESSION_COOKIE = "opd_session";
 const SESSION_REMEMBER_SEC = 60 * 60 * 24 * 30;
 const SESSION_DEFAULT_SEC = 60 * 60 * 8;
+export const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+export const LOCKOUT_MINUTES = 15;
 
 const ROLE_HOME: Record<UserRole, string> = {
   admin: "/manager",
@@ -34,8 +37,12 @@ const PAGE_ACCESS: Record<string, UserRole[]> = {
   "/incidents": ["manager", "admin", "doctor", "reception", "pharmacy", "lab", "radiology"],
   "/feedback": ["manager", "admin", "reception"],
   "/records": ["pharmacy", "admin", "manager", "reception", "doctor"],
+  "/records/completeness": ["manager", "admin"],
+  "/records/release": ["reception", "manager", "admin"],
   "/appointments": ["reception", "admin", "manager", "doctor"],
   "/settings/doctors": ["admin", "manager", "doctor"],
+  "/settings/patients/merge": ["admin", "manager"],
+  "/account/change-password": [...USER_ROLES],
 };
 
 function getSecret() {
@@ -118,10 +125,23 @@ function pageKey(pathname: string) {
   if (pathname === "/pharmacy" || pathname.startsWith("/pharmacy/"))
     return "/pharmacy";
   if (pathname === "/stock" || pathname.startsWith("/stock/")) return "/stock";
+  if (
+    pathname === "/records/completeness" ||
+    pathname.startsWith("/records/completeness/")
+  )
+    return "/records/completeness";
+  if (pathname === "/records/release" || pathname.startsWith("/records/release/"))
+    return "/records/release";
   if (pathname === "/records" || pathname.startsWith("/records/"))
     return "/records";
-  if (pathname === "/settings/doctors" || pathname.startsWith("/settings/"))
+  if (
+    pathname === "/settings/patients/merge" ||
+    pathname.startsWith("/settings/patients/merge/")
+  )
+    return "/settings/patients/merge";
+  if (pathname === "/settings/doctors" || pathname.startsWith("/settings/doctors/"))
     return "/settings/doctors";
+  if (pathname.startsWith("/settings/")) return "/settings/doctors";
   return pathname;
 }
 
@@ -149,7 +169,11 @@ export function canAccessApi(
   pathname: string,
   method: string,
 ) {
-  if (pathname === "/api/auth/logout" || pathname === "/api/auth/me") {
+  if (
+    pathname === "/api/auth/logout" ||
+    pathname === "/api/auth/me" ||
+    pathname === "/api/auth/change-password"
+  ) {
     return true;
   }
 
@@ -224,7 +248,12 @@ export function canAccessApi(
     );
   }
 
-  if (pathname.match(/^\/api\/visits\/[^/]+\/emr$/)) {
+  if (
+    pathname.match(/^\/api\/visits\/[^/]+\/emr$/) ||
+    pathname.match(/^\/api\/visits\/[^/]+\/emr\/history$/) ||
+    pathname.match(/^\/api\/visits\/[^/]+\/mlc$/) ||
+    pathname.match(/^\/api\/visits\/[^/]+\/mlc\/history$/)
+  ) {
     if (method === "GET") {
       return (
         session.role === "doctor" ||
@@ -271,14 +300,6 @@ export function canAccessApi(
   }
 
   if (pathname === "/api/patients/check-duplicate" && method === "GET") {
-    return (
-      session.role === "reception" ||
-      session.role === "admin" ||
-      session.role === "manager"
-    );
-  }
-
-  if (pathname.match(/^\/api\/patients\/[^/]+\/verify-mobile$/) && method === "POST") {
     return (
       session.role === "reception" ||
       session.role === "admin" ||
@@ -363,6 +384,17 @@ export function canAccessApi(
     );
   }
 
+  if (
+    pathname === "/api/stock/audit" ||
+    pathname.startsWith("/api/stock/audit/")
+  ) {
+    return (
+      session.role === "pharmacy" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
   if (pathname === "/api/stock" && method === "POST") {
     return session.role === "admin" || session.role === "manager";
   }
@@ -388,6 +420,10 @@ export function canAccessApi(
       session.role === "admin" ||
       session.role === "manager"
     );
+  }
+
+  if (pathname === "/api/patients/merge" && method === "POST") {
+    return session.role === "admin" || session.role === "manager";
   }
 
   if (pathname === "/api/doctors" && method === "POST") {
@@ -420,6 +456,18 @@ export function canAccessApi(
       session.role === "admin" ||
       session.role === "manager"
     );
+  }
+
+  if (pathname === "/api/records/release") {
+    return (
+      session.role === "admin" ||
+      session.role === "manager" ||
+      session.role === "reception"
+    );
+  }
+
+  if (pathname === "/api/records/completeness") {
+    return session.role === "admin" || session.role === "manager";
   }
 
   if (

@@ -5,6 +5,10 @@ import {
   isPaymentMode,
   serializeBill,
 } from "@/lib/billing";
+import {
+  hasDispensedForBilling,
+  pendingRxItems,
+} from "@/lib/prescription-status";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
@@ -67,7 +71,11 @@ export async function POST(request: Request) {
     const visit = await prisma.patientVisit.findUnique({
       where: { id: visit_id },
       include: {
-        prescription: { include: { items: true } },
+        prescription: {
+          include: {
+            items: { where: { voided_at: null }, orderBy: { sort_order: "asc" } },
+          },
+        },
         pharmacy_bill: true,
       },
     });
@@ -84,10 +92,19 @@ export async function POST(request: Request) {
       return NextResponse.json(serializeBill(bill));
     }
 
-    const pending = visit.prescription.items.filter((i) => !i.dispensed);
+    const pending = pendingRxItems(visit.prescription.items);
     if (pending.length > 0) {
       return NextResponse.json(
-        { error: `${pending.length} medicine(s) not yet dispensed` },
+        {
+          error: `${pending.length} medicine(s) still pending — dispense or skip before billing`,
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!hasDispensedForBilling(visit.prescription.items)) {
+      return NextResponse.json(
+        { error: "Dispense at least one medicine before generating bill" },
         { status: 400 },
       );
     }

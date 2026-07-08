@@ -49,9 +49,9 @@ export function OpdVisitSummary({ visitId }: { visitId: string }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="font-semibold text-teal-900">
-            {lang === "hi" ? hi.title : "OPD visit summary"} (NABH COP.1i)
+            {lang === "hi" ? hi.title : "OPD visit summary"}
           </h2>
-          <p className="text-xs text-teal-700">COP.1k multilingual · print / PDF</p>
+          <p className="text-xs text-teal-700">Multilingual (IMS.4f) · print / PDF</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select

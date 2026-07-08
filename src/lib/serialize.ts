@@ -167,6 +167,8 @@ export function serializePrescriptionItem(i: {
   instructions: string | null;
   dispensed: boolean;
   dispensed_at: Date | null;
+  skipped?: boolean;
+  skip_reason?: string | null;
   substituted_note: string | null;
   sort_order: number;
 }): PrescriptionItem {
@@ -182,6 +184,8 @@ export function serializePrescriptionItem(i: {
     instructions: i.instructions,
     dispensed: i.dispensed,
     dispensed_at: i.dispensed_at?.toISOString() ?? null,
+    skipped: i.skipped ?? false,
+    skip_reason: i.skip_reason ?? null,
     substituted_note: i.substituted_note,
     sort_order: i.sort_order,
   };

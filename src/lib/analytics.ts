@@ -328,10 +328,10 @@ function buildPrediction(
         v.registered_at >= startOfDay(day) &&
         v.registered_at < startOfDay(subDays(day, -1)),
     ).length;
-    if (count > 0) pastWeekdayCounts.push(count);
+    pastWeekdayCounts.push(count);
   }
   const recentWeekdayAvg =
-    pastWeekdayCounts.length > 0 ? Math.round(avg(pastWeekdayCounts)!) : null;
+    pastWeekdayCounts.length > 0 ? avg(pastWeekdayCounts) : null;
 
   let busyness: AnalyticsPrediction["busyness"] = "low";
   if (currentCount >= 40 || avgPerHour >= 8) busyness = "high";

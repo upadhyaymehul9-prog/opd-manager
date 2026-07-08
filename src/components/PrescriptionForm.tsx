@@ -1,15 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   Medicine,
   Prescription,
   PrescriptionItemInput,
 } from "@/lib/prescription-types";
 import { ActionButton } from "./PatientCard";
-import { PrescriptionCompactQueue } from "./PrescriptionCompactQueue";
 import { formatMedicineLabel } from "@/lib/medicine";
-import type { PatientVisit } from "@/lib/types";
+import {
+  checkDrugSafety,
+  DRUG_SAFETY_DISCLAIMER,
+  type SafetyWarning,
+} from "@/lib/drug-safety";
 
 const FREQUENCIES = ["OD", "BD", "TDS", "QID", "SOS", "HS"];
 
@@ -84,11 +87,11 @@ function stockLabel(stock?: MedicineWithStock["stock"]) {
 export function PrescriptionForm({
   visitId,
   doctorId,
-  visit,
+  patientAllergies,
 }: {
   visitId: string;
   doctorId: string;
-  visit: PatientVisit;
+  patientAllergies?: string | null;
 }) {
   const [prescription, setPrescription] = useState<Prescription | null>(null);
   const [notes, setNotes] = useState("");
@@ -103,8 +106,22 @@ export function PrescriptionForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
   const [persistedIds, setPersistedIds] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState(false);
+  const collapseInitialized = useRef(false);
+  const [warningsAcknowledged, setWarningsAcknowledged] = useState(false);
+
+  const safetyWarnings = useMemo<SafetyWarning[]>(() => {
+    const medicineNames = lines
+      .filter((l) => !l.dispensed && l.medicine_name.trim())
+      .map((l) => l.medicine_name.trim());
+    return checkDrugSafety(medicineNames, patientAllergies);
+  }, [lines, patientAllergies]);
+  const safetyWarningsKey = JSON.stringify(safetyWarnings);
+
+  useEffect(() => {
+    setWarningsAcknowledged(false);
+  }, [safetyWarningsKey]);
 
   const isSent =
     prescription != null &&
@@ -118,6 +135,10 @@ export function PrescriptionForm({
     const data = await res.json();
     if (!data) return;
     setPrescription(data);
+    if (!collapseInitialized.current) {
+      collapseInitialized.current = true;
+      setCollapsed(data.status !== "draft");
+    }
     setNotes(data.notes ?? "");
     setPersistedIds(new Set(data.items.map((i: Prescription["items"][number]) => i.id)));
     if (data.items.length > 0) {
@@ -162,10 +183,10 @@ export function PrescriptionForm({
   }, [loadPrescription]);
 
   useEffect(() => {
-    if (!isSent || expanded) return;
+    if (!isSent) return;
     const t = setInterval(loadPrescription, 15_000);
     return () => clearInterval(t);
-  }, [isSent, expanded, loadPrescription]);
+  }, [isSent, loadPrescription]);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -232,6 +253,17 @@ export function PrescriptionForm({
     setActiveLine(null);
   }
 
+  function confirmOutsideMedicine(lineKey: string) {
+    setQuery("");
+    setSuggestions([]);
+    setActiveLine(null);
+  }
+
+  function closeSuggestions() {
+    setActiveLine(null);
+    setSuggestions([]);
+  }
+
   async function savePrescription(): Promise<Prescription | null> {
     const validLines = lines.filter((line) => line.medicine_name.trim());
     if (validLines.length === 0) {
@@ -269,7 +301,6 @@ export function PrescriptionForm({
           : `Saved ${data.items.length} medicine(s)`,
       );
       await loadPrescription();
-      if (isSent) setExpanded(false);
       return data as Prescription;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
@@ -283,6 +314,10 @@ export function PrescriptionForm({
     const validLines = lines.filter((line) => line.medicine_name.trim());
     if (validLines.length === 0) {
       setError("Add at least one medicine");
+      return;
+    }
+    if (safetyWarnings.length > 0 && !warningsAcknowledged) {
+      setError("Please review and acknowledge the safety warning(s) above before sending");
       return;
     }
 
@@ -312,12 +347,15 @@ export function PrescriptionForm({
 
       const res = await fetch(`/api/prescriptions/${saved.id}/send`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          acknowledged_warnings: safetyWarnings.length > 0 ? safetyWarnings : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Send failed");
       setPrescription(data);
       setMessage(`Sent ${saved.items.length} medicine(s) to pharmacy`);
-      setExpanded(false);
       await loadPrescription();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Send failed");
@@ -330,30 +368,75 @@ export function PrescriptionForm({
     return null;
   }
 
-  if (isSent && prescription && !expanded) {
+  if (isSent && collapsed) {
+    const pending = prescription?.items.filter((i) => !i.dispensed && !i.skipped).length ?? 0;
     return (
-      <PrescriptionCompactQueue
-        visit={visit}
-        prescription={prescription}
-        onExpand={() => setExpanded(true)}
-      />
+      <div className="flex items-center justify-between rounded-xl border border-teal-200/80 bg-teal-50/40 p-4 shadow-sm">
+        <div>
+          <h3 className="font-semibold text-slate-900">Prescription (sent to pharmacy)</h3>
+          <p className="mt-1 text-xs text-teal-900">
+            {prescription?.items.length ?? 0} medicine(s) sent
+            {pending > 0 ? ` — ${pending} pending` : " — all dispensed or skipped"}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          className="shrink-0 rounded-lg border border-teal-300 bg-white px-3 py-1.5 text-sm font-medium text-teal-800 hover:bg-teal-50"
+        >
+          Edit prescription
+        </button>
+      </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4">
-      <h3 className="font-semibold text-slate-900">
-        {isSent ? "Edit prescription (patient at pharmacy)" : "Write prescription"}
-      </h3>
+    <div className="rounded-xl border border-blue-200/80 bg-gradient-to-br from-blue-50/80 to-white p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-slate-900">
+          {isSent ? "Prescription (sent to pharmacy)" : "Write prescription"}
+        </h3>
+        {isSent && (
+          <button
+            type="button"
+            onClick={() => setCollapsed(true)}
+            className="shrink-0 text-xs font-medium text-slate-500 hover:text-slate-700"
+          >
+            Collapse
+          </button>
+        )}
+      </div>
       {isSent && (
-        <button
-          type="button"
-          onClick={() => setExpanded(false)}
-          className="mt-1 text-xs font-medium text-teal-700 hover:underline"
-        >
-          ← Back to compact queue view
-        </button>
+        <p className="mt-1 rounded-lg bg-teal-100 px-3 py-2 text-xs text-teal-900">
+          Sent to pharmacy — you can still add or edit undispensed medicines below.
+          Dispensed lines are locked.
+        </p>
       )}
+
+      {safetyWarnings.length > 0 && (
+        <div className="mt-3 rounded-lg border-2 border-red-400 bg-red-50 p-3">
+          <p className="font-semibold text-red-900">⚠ Safety warning</p>
+          <ul className="mt-1 list-inside list-disc text-sm text-red-900">
+            {safetyWarnings.map((w, i) => (
+              <li key={i}>
+                {w.type === "allergy"
+                  ? `${w.medicine}: ${w.note}`
+                  : `${w.medicineA} + ${w.medicineB}: ${w.description}`}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-red-700">{DRUG_SAFETY_DISCLAIMER}</p>
+          <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm font-medium text-red-900">
+            <input
+              type="checkbox"
+              checked={warningsAcknowledged}
+              onChange={(e) => setWarningsAcknowledged(e.target.checked)}
+            />
+            I&apos;ve reviewed this and choose to proceed
+          </label>
+        </div>
+      )}
+
       <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-slate-700">
         <input
           type="checkbox"
@@ -365,17 +448,12 @@ export function PrescriptionForm({
       </label>
       {stockOnly && (
         <p className="mt-1 text-xs text-slate-600">
-          Click the medicine box to see in-stock items. Add batches in{" "}
-          <strong>Stock</strong> if the list is empty.
-        </p>
-      )}
-      {isSent && (
-        <p className="mt-1 text-xs text-teal-800">
-          Add new lines or edit undispensed medicines. Dispensed lines are locked.
+          Click the medicine box to see in-stock items. Uncheck the filter to prescribe
+          outside medicines — type the name and use &quot;Use as outside medicine&quot;.
         </p>
       )}
 
-      <div className="mt-3 space-y-3">
+      <div className="mt-3 space-y-3 overflow-visible">
         {lines.map((line) => {
           const stock = line.medicine_id
             ? lineStock[line.key] ??
@@ -388,18 +466,25 @@ export function PrescriptionForm({
           return (
             <div
               key={line.key}
-              className={`rounded-lg border bg-white p-3 ${locked ? "border-teal-200 bg-teal-50/30" : "border-slate-200"}`}
+              className={`overflow-visible rounded-lg border bg-white p-3 ${
+                activeLine === line.key ? "relative z-30" : ""
+              } ${locked ? "border-teal-200 bg-teal-50/30" : "border-slate-200"}`}
             >
               {locked && (
                 <p className="mb-2 text-xs font-medium text-teal-800">
                   Dispensed at pharmacy — locked
                 </p>
               )}
-              <div className="relative">
+              <div
+                className={`relative ${activeLine === line.key && !locked ? "z-30" : ""}`}
+              >
                 <input
                   value={line.medicine_name}
                   disabled={locked}
                   onFocus={() => loadMedicineList(line.key)}
+                  onBlur={() => {
+                    window.setTimeout(closeSuggestions, 150);
+                  }}
                   onChange={(e) => {
                     updateLine(line.key, {
                       medicine_name: e.target.value,
@@ -415,18 +500,38 @@ export function PrescriptionForm({
                   }
                   className="w-full rounded border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
                 />
-                {stockInfo && (
+                {line.medicine_name.trim() && !line.medicine_id && (
+                  <p className="mt-1 text-xs font-medium text-amber-800">
+                    Outside pharmacy stock — patient buys elsewhere
+                  </p>
+                )}
+                {stockInfo && line.medicine_id && (
                   <p className={`mt-1 text-xs font-medium ${stockInfo.className}`}>
                     {stockInfo.text}
                   </p>
                 )}
                 {activeLine === line.key && !locked && (
-                  <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded border border-slate-200 bg-white shadow-lg">
+                  <ul className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded border border-slate-200 bg-white shadow-lg">
                     {suggestions.length === 0 ? (
-                      <li className="px-3 py-3 text-sm text-amber-900">
-                        {stockOnly
-                          ? "No medicines in stock right now. Add stock under Stock, or uncheck the filter above to prescribe any medicine."
-                          : "No matches — keep typing or pick from the list."}
+                      <li className="px-3 py-2 text-sm text-amber-900">
+                        {stockOnly ? (
+                          <>
+                            No in-stock match. Uncheck &quot;Show only medicines in
+                            stock&quot; to prescribe outside medicines.
+                          </>
+                        ) : line.medicine_name.trim() ? (
+                          <button
+                            type="button"
+                            className="w-full rounded bg-amber-50 px-2 py-2 text-left font-medium hover:bg-amber-100"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => confirmOutsideMedicine(line.key)}
+                          >
+                            Use &quot;{line.medicine_name.trim()}&quot; as outside
+                            medicine
+                          </button>
+                        ) : (
+                          "Type a medicine name or pick from the list."
+                        )}
                       </li>
                     ) : (
                       suggestions.map((med) => {
@@ -436,6 +541,7 @@ export function PrescriptionForm({
                             <button
                               type="button"
                               className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                              onMouseDown={(e) => e.preventDefault()}
                               onClick={() => pickMedicine(line.key, med)}
                             >
                               <span>{formatMedicineLabel(med)}</span>
@@ -454,7 +560,7 @@ export function PrescriptionForm({
                   </ul>
                 )}
               </div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-4">
+              <div className="relative z-0 mt-2 grid gap-2 sm:grid-cols-4">
                 <input
                   value={line.dose ?? ""}
                   disabled={locked}
@@ -547,7 +653,7 @@ export function PrescriptionForm({
 
       <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
         <ActionButton
-          label={isSent ? "Save medicines" : "Save medicines"}
+          label="Save medicines"
           onClick={savePrescription}
           disabled={busy}
           variant={isSent ? "secondary" : "primary"}
@@ -557,7 +663,7 @@ export function PrescriptionForm({
             label="Send to pharmacy"
             variant="pharmacy"
             onClick={sendToPharmacy}
-            disabled={busy}
+            disabled={busy || (safetyWarnings.length > 0 && !warningsAcknowledged)}
           />
         )}
       </div>

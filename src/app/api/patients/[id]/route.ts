@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { visitInclude } from "@/lib/db-includes";
 import { serializeVisit } from "@/lib/serialize";
 import { visitEmrCompleteForDischarge } from "@/lib/nabh";
-import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
+import { AUDIT_ACTIONS, diffFields, getSessionFromCookies, logAudit } from "@/lib/audit";
 import type { PatientStatus, UpdatePatientInput } from "@/lib/types";
 
 export async function PATCH(
@@ -13,10 +13,25 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = (await request.json()) as UpdatePatientInput;
+    const session = await getSessionFromCookies();
 
     let status: PatientStatus | undefined = body.status;
     if (status === "return_to_doctor") {
       status = "in_followup";
+    }
+
+    const clinicalRoles = ["doctor", "reception", "admin", "manager"];
+    if (status === "completed" && !clinicalRoles.includes(session?.role ?? "")) {
+      return NextResponse.json(
+        { error: "Only doctor/reception can mark a visit completed" },
+        { status: 403 },
+      );
+    }
+    if (body.doctor_id && !clinicalRoles.includes(session?.role ?? "")) {
+      return NextResponse.json(
+        { error: "Only doctor/reception can reassign a visit's doctor" },
+        { status: 403 },
+      );
     }
 
     const existing = await prisma.patientVisit.findUnique({ where: { id } });
@@ -96,13 +111,25 @@ export async function PATCH(
       include: visitInclude,
     });
 
-    const session = await getSessionFromCookies();
-    if (status) {
+    const diff = existing
+      ? diffFields(existing, visit, [
+          "status",
+          "doctor_id",
+          "medico_legal",
+          "room_number",
+          "lab_eta",
+          "radio_eta",
+          "completed_at",
+        ])
+      : {};
+
+    if (Object.keys(diff).length > 0) {
       await logAudit({
         action: AUDIT_ACTIONS.VISIT_UPDATE,
         entity_type: "visit",
         entity_id: id,
-        summary: `Visit status → ${status} for ${visit.patient_name}`,
+        summary: `Visit updated for ${visit.patient_name}${status ? ` — status → ${status}` : ""}`,
+        details: { changes: diff },
         session,
       });
     }

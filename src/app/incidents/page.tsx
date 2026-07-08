@@ -78,7 +78,7 @@ export default function IncidentsPage() {
   return (
     <ConsoleShell
       title="Incident reporting"
-      subtitle="Patient safety events · NABH PSG requirement"
+      subtitle="Patient safety events · NABH PSQ.7a requirement"
       current="/incidents"
     >
       <form

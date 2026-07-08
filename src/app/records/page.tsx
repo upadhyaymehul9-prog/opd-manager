@@ -48,6 +48,14 @@ export default function RecordsPage() {
         {stats.total} visit(s) today · {stats.completed} completed · open any row
         for full detail, print, or PDF
       </p>
+      <div className="mb-4 flex flex-wrap gap-4 text-sm font-medium">
+        <Link href="/records/release" className="text-cyan-800 hover:underline">
+          Release-of-information log →
+        </Link>
+        <Link href="/records/completeness" className="text-amber-800 hover:underline">
+          Record completeness →
+        </Link>
+      </div>
 
       {loading && <p className="text-slate-600">Loading records…</p>}
       {error && <p className="text-red-600">{error}</p>}

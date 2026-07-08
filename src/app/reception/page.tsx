@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { format } from "date-fns";
+import Link from "next/link";
 import { ConsoleShell, SetupBanner } from "@/components/ConsoleShell";
 import { TodayCollectionPanel } from "@/components/TodayCollectionPanel";
 import { AppointmentsPanel } from "@/components/AppointmentsPanel";
@@ -52,9 +52,6 @@ export default function ReceptionPage() {
     { id: string; patient_number: number; name: string; mobile: string | null }[]
   >([]);
   const [duplicateConfirmed, setDuplicateConfirmed] = useState(false);
-  const [mobileVerifyCode, setMobileVerifyCode] = useState<string | null>(null);
-  const [mobileVerified, setMobileVerified] = useState(false);
-  const [verifyInput, setVerifyInput] = useState("");
   const [consultationFee, setConsultationFee] = useState("");
   const [paymentMode, setPaymentMode] = useState("cash");
   const [collectFee, setCollectFee] = useState(true);
@@ -219,9 +216,6 @@ export default function ReceptionPage() {
       if (!res.ok) throw new Error(data.error || "Registration failed");
 
       setLastVisit(data);
-      setMobileVerifyCode(data.mobile_verify_code ?? null);
-      setMobileVerified(false);
-      setVerifyInput("");
       clearRegistrationForm();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
@@ -319,7 +313,7 @@ export default function ReceptionPage() {
 
           {patientType === "new" && duplicateWarning.length > 0 && (
             <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-              <p className="font-semibold">Possible duplicate (NABH AAC.1g)</p>
+              <p className="font-semibold">Possible duplicate</p>
               <ul className="mt-1 list-inside list-disc">
                 {duplicateWarning.map((p) => (
                   <li key={p.id ?? p.patient_number}>
@@ -351,11 +345,21 @@ export default function ReceptionPage() {
                 />
                 I confirm this is a genuinely new patient (not a duplicate)
               </label>
+              <p className="mt-2 text-xs text-amber-800">
+                Already registered under two IDs?{" "}
+                <Link
+                  href="/settings/patients/merge"
+                  className="font-semibold underline hover:text-amber-950"
+                >
+                  Merge duplicate records
+                </Link>{" "}
+                (manager/admin) instead of creating a third.
+              </p>
             </div>
           )}
 
           <label className="mt-4 block text-sm font-medium text-slate-700">
-            Point of origin (AAC.1c)
+            Point of origin
           </label>
           <select
             value={pointOfOrigin}
@@ -648,56 +652,6 @@ export default function ReceptionPage() {
                     label="Send token on WhatsApp"
                     className="text-sm"
                   />
-                  {mobileVerifyCode && (
-                    <div className="rounded-lg border border-indigo-200 bg-white p-3 text-sm">
-                      <p className="font-medium text-indigo-900">
-                        Mobile verification (AAC.1b)
-                      </p>
-                      <p className="mt-1 text-slate-600">
-                        Share code <strong>{mobileVerifyCode}</strong> with patient via
-                        WhatsApp/SMS, then confirm below.
-                      </p>
-                      <div className="mt-2 flex gap-2">
-                        <input
-                          type="text"
-                          maxLength={6}
-                          value={verifyInput}
-                          onChange={(e) => setVerifyInput(e.target.value)}
-                          placeholder="Enter code"
-                          className="w-28 rounded border border-slate-300 px-2 py-1"
-                        />
-                        <button
-                          type="button"
-                          className="rounded bg-indigo-600 px-3 py-1 text-white"
-                          onClick={async () => {
-                            const res = await fetch(
-                              `/api/patients/${lastVisit.id}/verify-mobile`,
-                              {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ code: verifyInput }),
-                              },
-                            );
-                            if (res.ok) {
-                              setMobileVerifyCode(null);
-                              setVerifyInput("");
-                              setMobileVerified(true);
-                            } else {
-                              const d = await res.json();
-                              setError(d.error || "Invalid verification code");
-                            }
-                          }}
-                        >
-                          Verify
-                        </button>
-                      </div>
-                      {mobileVerified && (
-                        <p className="mt-2 text-xs font-medium text-emerald-700">
-                          Mobile verified successfully.
-                        </p>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
             </div>

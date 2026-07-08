@@ -1,4 +1,28 @@
-import { addDays, startOfDay, subDays } from "date-fns";
+// The clinic operates in IST (UTC+5:30, no DST). Day boundaries here are
+// pinned to IST regardless of the server process's local timezone — otherwise
+// a host running in UTC would shift "today" by 5.5 hours, misattributing
+// late-night/early-morning activity to the wrong calendar day in reports and
+// day-end reconciliation.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function startOfDay(date: Date): Date {
+  const shifted = new Date(date.getTime() + IST_OFFSET_MS);
+  shifted.setUTCHours(0, 0, 0, 0);
+  return new Date(shifted.getTime() - IST_OFFSET_MS);
+}
+
+export function addDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * DAY_MS);
+}
+
+function subDays(date: Date, days: number): Date {
+  return addDays(date, -days);
+}
+
+export function dateStrIST(date: Date): string {
+  return new Date(date.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
+}
 
 export function parseDateParam(value: string | null): Date | null {
   if (!value?.trim()) return null;
@@ -7,11 +31,11 @@ export function parseDateParam(value: string | null): Date | null {
 }
 
 export function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return dateStrIST(new Date());
 }
 
 export function yesterdayStr() {
-  return subDays(new Date(), 1).toISOString().slice(0, 10);
+  return dateStrIST(subDays(new Date(), 1));
 }
 
 export function resolveRange(searchParams: URLSearchParams) {
@@ -27,8 +51,8 @@ export function resolveRange(searchParams: URLSearchParams) {
   }
 
   const rangeEndExclusive = addDays(rangeEnd, 1);
-  const from = rangeStart.toISOString().slice(0, 10);
-  const to = rangeEnd.toISOString().slice(0, 10);
+  const from = dateStrIST(rangeStart);
+  const to = dateStrIST(rangeEnd);
   const isToday = from === to && from === todayStr();
 
   return {

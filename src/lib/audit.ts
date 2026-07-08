@@ -41,15 +41,38 @@ export async function logAudit(input: {
         ip_address: await clientIp(),
       },
     });
-  } catch {
-    // Audit must not break clinical workflow
+  } catch (e) {
+    // Audit must not break clinical workflow — but a swallowed failure here
+    // means the audit trail silently has a hole, so at least surface it.
+    console.error("logAudit failed", { action: input.action, entity_type: input.entity_type }, e);
   }
+}
+
+/** Computes only the fields that actually changed, so audit entries record
+ * a real before/after diff instead of just a summary sentence. */
+export function diffFields<T extends Record<string, unknown>>(
+  before: T,
+  after: T,
+  keys: (keyof T & string)[],
+): Record<string, { from: unknown; to: unknown }> {
+  const diff: Record<string, { from: unknown; to: unknown }> = {};
+  for (const key of keys) {
+    const a = before[key];
+    const b = after[key];
+    const changed =
+      a instanceof Date || b instanceof Date ? String(a) !== String(b) : a !== b;
+    if (changed) {
+      diff[key] = { from: a, to: b };
+    }
+  }
+  return diff;
 }
 
 export const AUDIT_ACTIONS = {
   LOGIN: "login",
   LOGIN_FAILED: "login_failed",
   LOGOUT: "logout",
+  PASSWORD_CHANGE: "password_change",
   PATIENT_REGISTER: "patient_register",
   VISIT_UPDATE: "visit_update",
   EMR_UPDATE: "emr_update",
@@ -59,4 +82,9 @@ export const AUDIT_ACTIONS = {
   DISPENSE: "dispense",
   INCIDENT_REPORT: "incident_report",
   INCIDENT_CLOSE: "incident_close",
+  INCIDENT_STATUS_CHANGE: "incident_status_change",
+  MLC_RECORD_CREATE: "mlc_record_create",
+  MLC_RECORD_UPDATE: "mlc_record_update",
+  PATIENT_MERGE: "patient_merge",
+  ROI_RELEASE_CREATE: "roi_release_create",
 } as const;

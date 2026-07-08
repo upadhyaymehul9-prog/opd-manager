@@ -16,7 +16,9 @@ export async function GET(
         doctors: true,
         patient: true,
         prescription: {
-          include: { items: { orderBy: { sort_order: "asc" } } },
+          include: {
+            items: { where: { voided_at: null }, orderBy: { sort_order: "asc" } },
+          },
         },
         pharmacy_bill: { include: { items: true } },
       },
@@ -36,7 +38,9 @@ export async function GET(
             doctors: true,
             patient: true,
             pharmacy_bill: { select: { grand_total: true, bill_no: true } },
-            prescription: { select: { items: { select: { id: true } } } },
+            prescription: {
+              select: { items: { where: { voided_at: null }, select: { id: true } } },
+            },
           },
           orderBy: { registered_at: "desc" },
           take: 20,

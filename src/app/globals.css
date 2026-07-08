@@ -1,7 +1,44 @@
 @import "tailwindcss";
 
+@theme {
+  --color-clinic-bg: #f1f5f9;
+  --color-clinic-surface: #ffffff;
+  --color-clinic-border: #e2e8f0;
+  --color-clinic-text: #0f172a;
+  --color-clinic-muted: #64748b;
+  --color-clinic-accent: #0d9488;
+  --color-clinic-accent-soft: #ccfbf1;
+  --radius-card: 0.875rem;
+  --shadow-card: 0 1px 3px rgb(15 23 42 / 0.06), 0 1px 2px rgb(15 23 42 / 0.04);
+  --shadow-card-hover: 0 4px 12px rgb(15 23 42 / 0.08);
+}
+
 body {
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--color-clinic-bg);
+  color: var(--color-clinic-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.card {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-clinic-border);
+  background: var(--color-clinic-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.card-header {
+  border-bottom: 1px solid var(--color-clinic-border);
+  background: linear-gradient(to right, #f8fafc, #ffffff);
+  padding: 0.875rem 1rem;
+}
+
+.focus-ring {
+  outline: none;
+}
+
+.focus-ring:focus-visible {
+  box-shadow: 0 0 0 3px rgb(13 148 136 / 0.25);
 }
 
 @media print {
@@ -11,17 +48,27 @@ body {
   .pharmacy-bill-print,
   .pharmacy-bill-print *,
   .consultation-bill-print,
-  .consultation-bill-print * {
+  .consultation-bill-print *,
+  .stock-audit-print,
+  .stock-audit-print *,
+  .reports-print,
+  .reports-print * {
     visibility: visible;
   }
   .pharmacy-bill-print,
-  .consultation-bill-print {
+  .consultation-bill-print,
+  .reports-print,
+  .stock-audit-print {
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
     border: none;
     box-shadow: none;
+    background: white;
+  }
+  .reports-print .print-expand {
+    display: table-row !important;
   }
 }
 

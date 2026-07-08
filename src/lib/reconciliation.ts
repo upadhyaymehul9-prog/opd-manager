@@ -1,4 +1,4 @@
-import { addDays, startOfDay } from "date-fns";
+import { addDays, dateStrIST, startOfDay } from "@/lib/date-range";
 import { PAYMENT_MODES } from "@/lib/billing-types";
 import { prisma } from "@/lib/prisma";
 
@@ -63,7 +63,7 @@ function sumByMode(
 export async function buildReconciliation(date: Date): Promise<ReconciliationReport> {
   const dayStart = startOfDay(date);
   const dayEnd = addDays(dayStart, 1);
-  const dateStr = dayStart.toISOString().slice(0, 10);
+  const dateStr = dateStrIST(dayStart);
 
   const [consultationVisits, pharmacyBills] = await Promise.all([
     prisma.patientVisit.findMany({

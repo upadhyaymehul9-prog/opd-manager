@@ -6,6 +6,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const q = searchParams.get("q")?.trim() ?? "";
+    const includeMerged = searchParams.get("include_merged") === "true";
 
     if (q.length < 1) {
       return NextResponse.json([]);
@@ -16,6 +17,7 @@ export async function GET(request: Request) {
 
     const patients = await prisma.patient.findMany({
       where: {
+        ...(includeMerged ? {} : { merged_into_patient_id: null }),
         OR: [
           { name: { contains: q, mode: "insensitive" as const } },
           ...(q.length >= 3
@@ -28,6 +30,9 @@ export async function GET(request: Request) {
       orderBy: [{ patient_number: "desc" }],
       take: 20,
       include: {
+        merged_into: {
+          select: { patient_number: true, name: true },
+        },
         visits: {
           orderBy: { registered_at: "desc" },
           take: 1,
@@ -43,8 +48,12 @@ export async function GET(request: Request) {
         name: p.name,
         mobile: p.mobile,
         abha_id: p.abha_id,
+        date_of_birth: p.date_of_birth?.toISOString().slice(0, 10) ?? null,
         last_age: p.visits[0]?.age ?? null,
         last_visit_name: p.visits[0]?.patient_name ?? p.name,
+        merged_into_patient_number: p.merged_into?.patient_number ?? null,
+        merged_into_name: p.merged_into?.name ?? null,
+        is_merged: Boolean(p.merged_into_patient_id),
       })),
     );
   } catch (e) {

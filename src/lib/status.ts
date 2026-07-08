@@ -94,6 +94,78 @@ export const PRESCRIPTION_STATUSES: PatientStatus[] = [
   "at_pharmacy",
 ];
 
+export function getDoctorActions(status: PatientStatus): StatusAction[] {
+  switch (status) {
+    case "registered":
+      return DOCTOR_ACTIONS.filter((a) => a.status === "calling");
+    case "calling":
+      return DOCTOR_ACTIONS.filter((a) => a.status === "in_consultation");
+    case "in_consultation":
+      return DOCTOR_ACTIONS.filter(
+        (a) =>
+          ["to_lab", "to_radiology", "to_pharmacy", "completed"].includes(
+            a.status,
+          ) && a.label !== "Follow-up Done → Pharmacy",
+      );
+    case "return_to_doctor":
+      return DOCTOR_ACTIONS.filter(
+        (a) =>
+          ["in_consultation", "to_lab", "to_radiology", "to_pharmacy", "completed"].includes(
+            a.status,
+          ) && a.label !== "Follow-up Done → Pharmacy",
+      );
+    case "in_followup":
+      return DOCTOR_ACTIONS.filter((a) =>
+        ["in_consultation", "to_lab", "to_radiology", "to_pharmacy", "completed"].includes(
+          a.status,
+        ),
+      );
+    default:
+      return [];
+  }
+}
+
+export function getLabActions(status: PatientStatus): StatusAction[] {
+  switch (status) {
+    case "to_lab":
+      return LAB_ACTIONS.filter((a) => a.status === "at_lab");
+    case "at_lab":
+      return LAB_ACTIONS.filter((a) => a.status === "lab_processing");
+    case "lab_processing":
+      return LAB_ACTIONS.filter((a) => a.status === "lab_ready");
+    case "lab_ready":
+      return LAB_ACTIONS.filter((a) => a.status === "return_to_doctor");
+    default:
+      return [];
+  }
+}
+
+export function getRadiologyActions(status: PatientStatus): StatusAction[] {
+  switch (status) {
+    case "to_radiology":
+      return RADIOLOGY_ACTIONS.filter((a) => a.status === "at_radiology");
+    case "at_radiology":
+      return RADIOLOGY_ACTIONS.filter((a) => a.status === "radio_processing");
+    case "radio_processing":
+      return RADIOLOGY_ACTIONS.filter((a) => a.status === "radio_ready");
+    case "radio_ready":
+      return RADIOLOGY_ACTIONS.filter((a) => a.status === "return_to_doctor");
+    default:
+      return [];
+  }
+}
+
+export function getPharmacyActions(status: PatientStatus): StatusAction[] {
+  switch (status) {
+    case "to_pharmacy":
+      return PHARMACY_ACTIONS.filter((a) => a.status === "at_pharmacy");
+    case "at_pharmacy":
+      return PHARMACY_ACTIONS.filter((a) => a.status === "completed");
+    default:
+      return [];
+  }
+}
+
 export function canWritePrescription(status: PatientStatus) {
   return PRESCRIPTION_STATUSES.includes(status);
 }
