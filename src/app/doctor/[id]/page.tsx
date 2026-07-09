@@ -21,6 +21,75 @@ function isAtPharmacy(status: PatientVisit["status"]) {
   return status === "to_pharmacy" || status === "at_pharmacy";
 }
 
+type WorkspaceTab = "emr" | "mlc" | "procedures" | "labs" | "prescription";
+
+function WorkspaceTabs({
+  visit,
+  doctorId,
+  activeTab,
+  onTabChange,
+}: {
+  visit: PatientVisit;
+  doctorId: string;
+  activeTab: WorkspaceTab;
+  onTabChange: (tab: WorkspaceTab) => void;
+}) {
+  const atPharmacy = isAtPharmacy(visit.status);
+
+  const tabs: { id: WorkspaceTab; label: string }[] = atPharmacy
+    ? [{ id: "prescription", label: "Prescription" }]
+    : [
+        { id: "emr", label: "Consultation (EMR)" },
+        ...(visit.medico_legal ? [{ id: "mlc" as const, label: "MLC" }] : []),
+        { id: "procedures", label: "Procedures" },
+        { id: "labs", label: "Lab tests" },
+        { id: "prescription", label: "Prescription" },
+      ];
+
+  const currentTab = tabs.some((t) => t.id === activeTab) ? activeTab : tabs[0].id;
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-1 border-b border-slate-200">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onTabChange(tab.id)}
+            aria-current={currentTab === tab.id ? "page" : undefined}
+            className={`focus-ring -mb-px rounded-t-lg border-b-2 px-3 py-2 text-sm font-medium transition ${
+              currentTab === tab.id
+                ? "border-teal-600 text-teal-700"
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <div className="pt-3">
+        {currentTab === "emr" && (
+          <ConsultationEmrPanel
+            visitId={visit.id}
+            doctorId={doctorId}
+            initialAllergies={visit.patient_allergies}
+          />
+        )}
+        {currentTab === "mlc" && visit.medico_legal && <MlcDetailsPanel visitId={visit.id} />}
+        {currentTab === "procedures" && <ProcedurePanel visitId={visit.id} />}
+        {currentTab === "labs" && <LabTestsPanel visitId={visit.id} canOrder />}
+        {currentTab === "prescription" && (
+          <PrescriptionForm
+            visitId={visit.id}
+            doctorId={doctorId}
+            patientAllergies={visit.patient_allergies}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DoctorConsolePage({
   params,
 }: {
@@ -29,6 +98,7 @@ export default function DoctorConsolePage({
   const { id: doctorId } = use(params);
   const { visits, loading, error, refresh } = usePatientVisits({ activeOnly: true });
   const [workspaceOpen, setWorkspaceOpen] = useState<Record<string, boolean>>({});
+  const [activeTab, setActiveTab] = useState<Record<string, WorkspaceTab>>({});
   const [busyDeleteId, setBusyDeleteId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -140,25 +210,14 @@ export default function DoctorConsolePage({
                   </span>
                 </button>
                 {isWorkspaceOpen(visit.id) && (
-                  <div className="mt-3 space-y-3">
-                    {!isAtPharmacy(visit.status) && (
-                      <>
-                        <ConsultationEmrPanel
-                          visitId={visit.id}
-                          doctorId={doctorId}
-                          initialAllergies={visit.patient_allergies}
-                        />
-                        {visit.medico_legal && (
-                          <MlcDetailsPanel visitId={visit.id} />
-                        )}
-                        <ProcedurePanel visitId={visit.id} />
-                        <LabTestsPanel visitId={visit.id} canOrder />
-                      </>
-                    )}
-                    <PrescriptionForm
-                      visitId={visit.id}
+                  <div className="mt-3">
+                    <WorkspaceTabs
+                      visit={visit}
                       doctorId={doctorId}
-                      patientAllergies={visit.patient_allergies}
+                      activeTab={activeTab[visit.id] ?? "emr"}
+                      onTabChange={(tab) =>
+                        setActiveTab((prev) => ({ ...prev, [visit.id]: tab }))
+                      }
                     />
                   </div>
                 )}
