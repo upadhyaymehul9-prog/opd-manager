@@ -2,9 +2,11 @@
 
 import { format } from "date-fns";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ConsoleShell } from "@/components/ConsoleShell";
+import { DateRangeBar } from "@/components/DateRangeBar";
 import { StatusBadge } from "@/components/PatientCard";
+import { todayStr } from "@/lib/date-range";
 import type { PharmacyBillView } from "@/lib/billing-types";
 import type { Prescription } from "@/lib/prescription-types";
 import type { PatientVisit } from "@/lib/types";
@@ -22,31 +24,53 @@ type RecordRow = {
 };
 
 export default function RecordsPage() {
+  const [fromDate, setFromDate] = useState(todayStr);
+  const [toDate, setToDate] = useState(todayStr);
   const [rows, setRows] = useState<RecordRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({ total: 0, completed: 0 });
 
+  const queryRange = useMemo(() => {
+    if (fromDate <= toDate) return { from: fromDate, to: toDate };
+    return { from: toDate, to: fromDate };
+  }, [fromDate, toDate]);
+
   useEffect(() => {
-    fetch("/api/records")
+    setLoading(true);
+    fetch(`/api/records?from=${queryRange.from}&to=${queryRange.to}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
         setRows(data.rows ?? []);
         setStats({ total: data.total ?? 0, completed: data.completed ?? 0 });
+        setError(null);
       })
       .catch(() => setError("Could not load records"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [queryRange.from, queryRange.to]);
+
+  const isToday = queryRange.from === todayStr() && queryRange.to === todayStr();
 
   return (
     <ConsoleShell
       title="Patient records"
-      subtitle="Today's visits — prescriptions, dispense, and pharmacy bills"
+      subtitle="Every visit — live status, prescriptions, dispense, and pharmacy bills"
       current="/records"
     >
+      <DateRangeBar
+        fromDate={fromDate}
+        toDate={toDate}
+        onFromChange={setFromDate}
+        onToChange={setToDate}
+        onPreset={(from, to) => {
+          setFromDate(from);
+          setToDate(to);
+        }}
+      />
+
       <p className="mb-4 text-sm text-slate-600">
-        {stats.total} visit(s) today · {stats.completed} completed · open any row
-        for full detail, print, or PDF
+        {stats.total} visit(s) {isToday ? "today" : "in this period"} ·{" "}
+        {stats.completed} completed · open any row for full detail, print, or PDF
       </p>
       <div className="mb-4 flex flex-wrap gap-4 text-sm font-medium">
         <Link href="/records/release" className="text-cyan-800 hover:underline">

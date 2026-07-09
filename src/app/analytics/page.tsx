@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { ConsoleShell } from "@/components/ConsoleShell";
 import { DateRangeBar } from "@/components/DateRangeBar";
-import { ReportsDashboard } from "@/components/ReportsDashboard";
 import { OperationsDashboard } from "@/components/OperationsDashboard";
 import { StockAlertsPanel } from "@/components/StockAlertsPanel";
 import {
@@ -171,11 +171,23 @@ export default function AnalyticsPage() {
                   />
                 </section>
 
-                <ReportsDashboard
-                  hideDateBar
-                  fromDate={queryRange.from}
-                  toDate={queryRange.to}
-                />
+                <Link
+                  href="/reports"
+                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm hover:bg-slate-50"
+                >
+                  <span>
+                    <span className="block font-semibold text-slate-900">
+                      Department registers &amp; revenue
+                    </span>
+                    <span className="text-sm text-slate-600">
+                      Registration, doctor-wise, lab, radiology, and pharmacy
+                      registers with revenue by department
+                    </span>
+                  </span>
+                  <span className="text-sm font-medium text-indigo-700">
+                    Open reports →
+                  </span>
+                </Link>
               </div>
             )}
           </div>

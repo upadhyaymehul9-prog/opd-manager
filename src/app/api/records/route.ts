@@ -1,5 +1,7 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { startOfDay } from "date-fns";
+import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
+import { resolveRange, todayStr } from "@/lib/date-range";
 import { serializeBill } from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
 import { serializePrescription } from "@/lib/serialize";
@@ -7,17 +9,20 @@ import { serializeVisit } from "@/lib/serialize";
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const dateParam = searchParams.get("date");
-    const dayStart = dateParam
-      ? startOfDay(new Date(dateParam))
-      : startOfDay(new Date());
-    const dayEnd = new Date(dayStart);
-    dayEnd.setDate(dayEnd.getDate() + 1);
+    const token = (await cookies()).get(SESSION_COOKIE)?.value;
+    const session = token ? await verifySessionToken(token) : null;
+
+    let { searchParams } = new URL(request.url);
+    if (session?.role === "pharmacy" || session?.role === "reception") {
+      const today = todayStr();
+      searchParams = new URLSearchParams({ from: today, to: today });
+    }
+
+    const { rangeStart, rangeEndExclusive, from } = resolveRange(searchParams);
 
     const visits = await prisma.patientVisit.findMany({
       where: {
-        registered_at: { gte: dayStart, lt: dayEnd },
+        registered_at: { gte: rangeStart, lt: rangeEndExclusive },
       },
       include: {
         doctors: true,
@@ -54,7 +59,7 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({
-      date: dayStart.toISOString().slice(0, 10),
+      date: from,
       total: rows.length,
       completed: rows.filter((r) => r.visit.status === "completed").length,
       rows,
