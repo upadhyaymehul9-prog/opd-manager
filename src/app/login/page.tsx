@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { DEFAULT_BOOTSTRAP_PASSWORD } from "@/lib/default-accounts";
 
 const REMEMBER_USER_KEY = "opd_remember_username";
 
@@ -9,6 +10,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next");
+  const prefillUser = searchParams.get("user");
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -17,9 +19,18 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (prefillUser) {
+      // Came from a department card on the homepage — prefill both fields
+      // with that department's default bootstrap credentials so the user
+      // only has to click Sign in. Only meaningful until that account's
+      // password has actually been changed.
+      setUsername(prefillUser);
+      setPassword(DEFAULT_BOOTSTRAP_PASSWORD);
+      return;
+    }
     const saved = localStorage.getItem(REMEMBER_USER_KEY);
     if (saved) setUsername(saved);
-  }, []);
+  }, [prefillUser]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

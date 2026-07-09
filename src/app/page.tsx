@@ -10,42 +10,49 @@ const DEPARTMENT_CONSOLES = [
     title: "Reception",
     desc: "Register patients — name, consultant, room, auto timestamp",
     color: "border-emerald-200 hover:border-emerald-400 bg-emerald-50",
+    username: "reception",
   },
   {
     href: "/doctor",
     title: "Doctor",
     desc: "Call, consult, send to lab / radiology / pharmacy",
     color: "border-blue-200 hover:border-blue-400 bg-blue-50",
+    username: "doctor",
   },
   {
     href: "/lab",
     title: "Laboratory",
     desc: "Receive patients, set report ETA, send back to doctor",
     color: "border-purple-200 hover:border-purple-400 bg-purple-50",
+    username: "lab",
   },
   {
     href: "/radiology",
     title: "Radiology",
     desc: "Receive patients, set report ETA, send back to doctor",
     color: "border-indigo-200 hover:border-indigo-400 bg-indigo-50",
+    username: "radiology",
   },
   {
     href: "/pharmacy",
     title: "Pharmacy",
     desc: "Dispense medicines and mark patient exit",
     color: "border-teal-200 hover:border-teal-400 bg-teal-50",
+    username: "pharmacy",
   },
   {
     href: "/stock",
     title: "Pharmacy Stock",
     desc: "Inventory batches, expiry, low-stock alerts",
     color: "border-amber-200 hover:border-amber-400 bg-amber-50",
+    username: "pharmacy",
   },
   {
     href: "/tv",
     title: "TV Display",
     desc: "Waiting room screen — calls, directions, report ETAs",
     color: "border-rose-200 hover:border-rose-400 bg-rose-50",
+    username: "tv",
   },
 ];
 
@@ -55,30 +62,35 @@ const ADMIN_CONSOLES = [
     title: "OPD Manager",
     desc: "Full clinic overview — every patient from entry to exit",
     color: "border-slate-300 hover:border-slate-500 bg-slate-50",
+    username: "manager",
   },
   {
     href: "/analytics",
     title: "Analytics",
     desc: "Performance, revenue, lab TAT, and OPD prediction",
     color: "border-indigo-300 hover:border-indigo-500 bg-indigo-50",
+    username: "manager",
   },
   {
     href: "/records",
     title: "Records",
     desc: "Visit history — prescriptions, bills, print & PDF",
     color: "border-cyan-200 hover:border-cyan-400 bg-cyan-50",
+    username: "manager",
   },
   {
     href: "/reports",
     title: "Reports",
     desc: "Department registers and medicine tracking by date",
     color: "border-sky-300 hover:border-sky-500 bg-sky-50",
+    username: "manager",
   },
   {
     href: "/settings/doctors",
     title: "My profile",
     desc: "Doctor name, specialty, photo, consultation fee",
     color: "border-violet-300 hover:border-violet-500 bg-violet-50",
+    username: "doctor",
   },
 ];
 
@@ -98,7 +110,7 @@ function ConsoleGrid({
           key={c.href}
           href={
             loginFirst
-              ? `/login?next=${encodeURIComponent(c.href)}`
+              ? `/login?next=${encodeURIComponent(c.href)}&user=${encodeURIComponent(c.username)}`
               : c.href
           }
           className={`rounded-2xl border-2 p-5 transition shadow-lg ${c.color}`}
