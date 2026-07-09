@@ -45,6 +45,19 @@ const PAGE_ACCESS: Record<string, UserRole[]> = {
   "/account/change-password": [...USER_ROLES],
 };
 
+/** Paths a user with mustChangePassword=true may still reach — everything
+ * else redirects/blocks until they set their own password. */
+const PASSWORD_CHANGE_ALLOWED_PATHS = [
+  "/account/change-password",
+  "/api/auth/change-password",
+  "/api/auth/logout",
+  "/api/auth/me",
+];
+
+export function isPasswordChangeAllowedPath(pathname: string) {
+  return PASSWORD_CHANGE_ALLOWED_PATHS.includes(pathname);
+}
+
 function getSecret() {
   const secret = process.env.SESSION_SECRET;
   if (secret) return new TextEncoder().encode(secret);
@@ -89,6 +102,7 @@ export async function verifySessionToken(
       role: payload.role as UserRole,
       displayName: payload.displayName ? String(payload.displayName) : null,
       doctorId: payload.doctorId ? String(payload.doctorId) : null,
+      mustChangePassword: Boolean(payload.mustChangePassword),
     };
   } catch {
     return null;

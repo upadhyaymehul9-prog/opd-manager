@@ -20,6 +20,11 @@ async function main() {
 
   const hash = await bcrypt.hash(password, 12);
 
+  // On re-run this must never touch password_hash/must_change_password for
+  // an account that already exists -- someone may have already set their
+  // own password, and silently resetting it back to the shared default
+  // would undo that (and re-force a change on an account that doesn't need
+  // one). Only brand-new accounts get the default password.
   for (const user of DEFAULT_USERS) {
     await prisma.user.upsert({
       where: { username: user.username },
@@ -28,20 +33,20 @@ async function main() {
         password_hash: hash,
         role: user.role,
         display_name: user.display_name,
+        must_change_password: true,
       },
       update: {
-        password_hash: hash,
         role: user.role,
         display_name: user.display_name,
       },
     });
   }
 
-  console.log("Seeded clinic login accounts:");
+  console.log("Seeded clinic login accounts (existing passwords left untouched):");
   for (const user of DEFAULT_USERS) {
-    console.log(`  ${user.username} / ${password}  (${user.display_name})`);
+    console.log(`  ${user.username} / ${password}  (${user.display_name}) -- only applies if newly created`);
   }
-  console.log("\nChange passwords after first login in production.");
+  console.log("\nEach account must set its own password on first login.");
 }
 
 main()

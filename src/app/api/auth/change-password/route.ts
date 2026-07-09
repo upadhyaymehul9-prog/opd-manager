@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { hashPassword, verifyPassword } from "@/lib/auth";
+import {
+  createSessionToken,
+  hashPassword,
+  sessionCookieOptions,
+  verifyPassword,
+} from "@/lib/auth";
 import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 
@@ -46,7 +51,7 @@ export async function POST(request: Request) {
     const password_hash = await hashPassword(newPassword);
     await prisma.user.update({
       where: { id: user.id },
-      data: { password_hash },
+      data: { password_hash, must_change_password: false },
     });
 
     await logAudit({
@@ -57,7 +62,15 @@ export async function POST(request: Request) {
       session,
     });
 
-    return NextResponse.json({ ok: true });
+    // Reissue the session cookie with mustChangePassword cleared so the
+    // forced-change redirect doesn't keep firing on this same session.
+    const token = await createSessionToken({
+      ...session,
+      mustChangePassword: false,
+    });
+    const response = NextResponse.json({ ok: true });
+    response.cookies.set(sessionCookieOptions(token));
+    return response;
   } catch (e) {
     const message = e instanceof Error ? e.message : "Password change failed";
     return NextResponse.json({ error: message }, { status: 500 });

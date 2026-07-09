@@ -17,4 +17,5 @@ export type SessionPayload = {
   role: UserRole;
   displayName: string | null;
   doctorId: string | null;
+  mustChangePassword: boolean;
 };

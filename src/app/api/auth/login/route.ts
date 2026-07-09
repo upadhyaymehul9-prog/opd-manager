@@ -73,22 +73,22 @@ export async function POST(request: Request) {
 
     const role = user.role as UserRole;
     const remember = Boolean(body.remember_me);
-    const token = await createSessionToken(
-      {
-        userId: user.id,
-        username: user.username,
-        role,
-        displayName: user.display_name,
-        doctorId: user.doctor_id,
-      },
-      remember,
-    );
+    const sessionPayload = {
+      userId: user.id,
+      username: user.username,
+      role,
+      displayName: user.display_name,
+      doctorId: user.doctor_id,
+      mustChangePassword: user.must_change_password,
+    };
+    const token = await createSessionToken(sessionPayload, remember);
 
     const response = NextResponse.json({
       ok: true,
       role,
-      home: getHomeForRole(role),
+      home: user.must_change_password ? "/account/change-password" : getHomeForRole(role),
       displayName: user.display_name,
+      mustChangePassword: user.must_change_password,
     });
     const cookie = sessionCookieOptions(token, remember);
     response.cookies.set(cookie);
@@ -98,13 +98,7 @@ export async function POST(request: Request) {
       entity_type: "user",
       entity_id: user.id,
       summary: `${user.username} logged in`,
-      session: {
-        userId: user.id,
-        username: user.username,
-        role,
-        displayName: user.display_name,
-        doctorId: user.doctor_id,
-      },
+      session: sessionPayload,
     });
 
     return response;

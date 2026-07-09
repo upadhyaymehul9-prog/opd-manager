@@ -145,6 +145,9 @@ model User {
   doctor                Doctor?   @relation(fields: [doctor_id], references: [id], onDelete: SetNull)
   failed_login_attempts Int       @default(0)
   locked_until          DateTime? @db.Timestamptz(6)
+  /// Forces a password change on next login. True for every seeded default
+  /// account; cleared once the user sets their own password.
+  must_change_password  Boolean   @default(true)
   created_at            DateTime  @default(now()) @db.Timestamptz(6)
 
   @@map("users")

@@ -16,5 +16,6 @@ export async function GET() {
     displayName: session.displayName,
     doctorId: session.doctorId,
     navPaths: rolesForNav(session.role),
+    mustChangePassword: session.mustChangePassword,
   });
 }

@@ -9,6 +9,7 @@ type SessionInfo = {
   displayName: string | null;
   doctorId: string | null;
   navPaths: string[];
+  mustChangePassword: boolean;
 };
 
 export function useSession() {
