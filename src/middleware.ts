@@ -4,7 +4,6 @@ import {
   canAccessPath,
   getHomeForRole,
   getSessionFromRequest,
-  isPasswordChangeAllowedPath,
 } from "@/lib/auth";
 
 const PUBLIC_PATHS = ["/login", "/api/auth/login", "/feedback", "/api/feedback"];
@@ -41,21 +40,8 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === "/login") {
     return NextResponse.redirect(
-      new URL(
-        session.mustChangePassword ? "/account/change-password" : getHomeForRole(session.role),
-        request.url,
-      ),
+      new URL(getHomeForRole(session.role), request.url),
     );
-  }
-
-  if (session.mustChangePassword && !isPasswordChangeAllowedPath(pathname)) {
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json(
-        { error: "Password change required before continuing" },
-        { status: 403 },
-      );
-    }
-    return NextResponse.redirect(new URL("/account/change-password", request.url));
   }
 
   if (!canAccessPath(session, pathname, request.method)) {

@@ -41,9 +41,7 @@ function LoginForm() {
       } else {
         localStorage.removeItem(REMEMBER_USER_KEY);
       }
-      router.push(
-        data.mustChangePassword ? "/account/change-password" : next || data.home || "/",
-      );
+      router.push(next || data.home || "/");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

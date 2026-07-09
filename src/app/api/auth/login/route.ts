@@ -86,7 +86,7 @@ export async function POST(request: Request) {
     const response = NextResponse.json({
       ok: true,
       role,
-      home: user.must_change_password ? "/account/change-password" : getHomeForRole(role),
+      home: getHomeForRole(role),
       displayName: user.display_name,
       mustChangePassword: user.must_change_password,
     });
