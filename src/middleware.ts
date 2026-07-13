@@ -6,10 +6,16 @@ import {
   getSessionFromRequest,
 } from "@/lib/auth";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/feedback", "/api/feedback"];
+const PUBLIC_PATHS = ["/login", "/api/auth/login", "/feedback"];
 
 function isPublicBookingApi(pathname: string) {
   return pathname.startsWith("/api/public/booking/");
+}
+
+// The public feedback form must POST anonymously, but reading feedback
+// (GET) exposes patient names/mobiles and must stay behind auth.
+function isPublicFeedbackSubmit(pathname: string, method: string) {
+  return pathname === "/api/feedback" && method === "POST";
 }
 
 export async function middleware(request: NextRequest) {
@@ -17,6 +23,7 @@ export async function middleware(request: NextRequest) {
 
   if (
     PUBLIC_PATHS.includes(pathname) ||
+    isPublicFeedbackSubmit(pathname, request.method) ||
     isPublicBookingApi(pathname) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")

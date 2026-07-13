@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { serializeBill } from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
 import { serializePrescription, serializeVisit } from "@/lib/serialize";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ visitId: string }> },
 ) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const { visitId } = await params;
 
     const visit = await prisma.patientVisit.findUnique({
@@ -61,7 +66,6 @@ export async function GET(
       })),
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Record error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("records/[visitId] GET", e, "Record error");
   }
 }

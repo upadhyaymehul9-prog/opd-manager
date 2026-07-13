@@ -1,4 +1,6 @@
 import type { Prisma } from "@prisma/client";
+import { AppError } from "@/lib/api-error";
+import { istDateOnly } from "@/lib/date-range";
 
 export const LOW_STOCK_THRESHOLD = 10;
 export const MIN_SHELF_LIFE_MONTHS = 3;
@@ -6,16 +8,18 @@ export const EXPIRY_WARNING_DAYS = 90;
 
 type Tx = Prisma.TransactionClient;
 
+// Stock deals in `@db.Date` columns (expiry_date), so day boundaries are the
+// IST calendar date at UTC midnight — consistent with reporting and immune to
+// the server process timezone. Previously used the host's local midnight,
+// which shifted expiry/receiving checks by 5.5h on a UTC host.
 export function startOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return istDateOnly(date);
 }
 
 export function addMonths(date: Date, months: number): Date {
-  const d = new Date(date);
-  d.setMonth(d.getMonth() + months);
-  return startOfDay(d);
+  const d = istDateOnly(date);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return d;
 }
 
 export function minAllowedExpiryDate(): Date {
@@ -98,7 +102,7 @@ export async function deductFromStock(
   }
 
   if (remaining > 0) {
-    throw new Error(
+    throw new AppError(
       `Insufficient stock — need ${qty}, short by ${remaining}. Add stock first.`,
     );
   }

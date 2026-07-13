@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { PROCEDURE_TYPES, type ProcedureType } from "@/lib/types";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ visitId: string }> },
 ) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const { visitId } = await params;
     const rows = await prisma.visitProcedure.findMany({
       where: { patient_visit_id: visitId },
@@ -22,8 +27,7 @@ export async function GET(
       })),
     );
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Procedure error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("visits/procedures GET", e, "Procedure error");
   }
 }
 
@@ -32,6 +36,9 @@ export async function POST(
   { params }: { params: Promise<{ visitId: string }> },
 ) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const { visitId } = await params;
     const body = await request.json();
     const procedure_type = String(body.procedure_type ?? "") as ProcedureType;
@@ -73,7 +80,6 @@ export async function POST(
       { status: 201 },
     );
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Procedure error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("visits/procedures POST", e, "Procedure error");
   }
 }

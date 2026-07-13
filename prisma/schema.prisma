@@ -370,6 +370,16 @@ model ConsultationBillCounter {
   @@map("consultation_bill_counter")
 }
 
+/// Per-day pharmacy bill sequence. An atomic upsert-increment on this row
+/// serializes concurrent billing so two bills can't collide on bill_no.
+/// visit_date is the IST calendar day (see lib/date-range istDateOnly).
+model PharmacyBillCounter {
+  bill_date DateTime @id @db.Date
+  last_no   Int      @default(0)
+
+  @@map("pharmacy_bill_counter")
+}
+
 model Prescription {
   id                  String             @id @default(uuid()) @db.Uuid
   patient_visit_id    String             @unique @db.Uuid

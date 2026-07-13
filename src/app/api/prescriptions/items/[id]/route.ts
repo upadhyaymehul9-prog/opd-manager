@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { AppError, errorResponse } from "@/lib/api-error";
 import { computePrescriptionStatus } from "@/lib/prescription-status";
 import { getSessionFromCookies } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
@@ -111,7 +112,7 @@ export async function PATCH(
       if (dispensed && !item.dispensed && item.medicine_id) {
         const available = await getAvailableQuantity(tx, item.medicine_id);
         if (available < qty) {
-          throw new Error(
+          throw new AppError(
             `Insufficient stock for ${item.medicine_name} — available ${available}, need ${qty}`,
           );
         }
@@ -173,8 +174,7 @@ export async function PATCH(
 
     return NextResponse.json(serializePrescriptionItem(updatedItem));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Update failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("prescriptions/items PATCH", e, "Update failed");
   }
 }
 
@@ -240,7 +240,6 @@ export async function DELETE(
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Delete failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("prescriptions/items DELETE", e, "Delete failed");
   }
 }

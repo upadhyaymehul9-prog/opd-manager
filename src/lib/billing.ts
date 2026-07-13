@@ -1,4 +1,3 @@
-import { format } from "date-fns";
 import type { Prisma } from "@prisma/client";
 import type {
   BillPreview,
@@ -7,7 +6,9 @@ import type {
   PharmacyBillView,
 } from "@/lib/billing-types";
 import { DEFAULT_GST_RATE, PAYMENT_MODES } from "@/lib/billing-types";
-import { startOfDay, usableBatchWhere } from "@/lib/stock";
+import { AppError } from "@/lib/api-error";
+import { dateStrIST, istDateOnly } from "@/lib/date-range";
+import { usableBatchWhere } from "@/lib/stock";
 
 type Tx = Prisma.TransactionClient;
 
@@ -17,6 +18,17 @@ export function round2(n: number): number {
 
 export function isPaymentMode(value: string): value is PaymentMode {
   return (PAYMENT_MODES as readonly string[]).includes(value);
+}
+
+/**
+ * Validates a client-supplied unit-price override. Returns the rounded price,
+ * or null if it is not a finite number ≥ 0 (rejecting NaN, Infinity, and
+ * negative prices that would otherwise produce a negative or corrupt bill).
+ */
+export function parseUnitPriceOverride(raw: unknown): number | null {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return round2(n);
 }
 
 export function calculateLine(
@@ -67,11 +79,11 @@ export async function buildBillPreview(
   });
 
   if (!prescription) {
-    throw new Error("Prescription not found");
+    throw new AppError("Prescription not found", 404);
   }
 
   if (prescription.items.length === 0) {
-    throw new Error("No dispensed medicines to bill");
+    throw new AppError("No dispensed medicines to bill");
   }
 
   const lines: BillPreviewLine[] = [];
@@ -105,14 +117,22 @@ export async function buildBillPreview(
   };
 }
 
+export function formatPharmacyBillNo(day: Date, seq: number): string {
+  const datePart = dateStrIST(day).replace(/-/g, "");
+  return `PH-${datePart}-${String(seq).padStart(3, "0")}`;
+}
+
 export async function generateBillNo(tx: Tx): Promise<string> {
-  const today = format(new Date(), "yyyyMMdd");
-  const prefix = `PH-${today}-`;
-  const todayStart = startOfDay(new Date());
-  const count = await tx.pharmacyBill.count({
-    where: { created_at: { gte: todayStart } },
+  // Per-IST-day atomic counter. The previous count(today)+1 approach raced:
+  // two bills generated in the same instant read the same count and collided
+  // on the bill_no unique constraint. The counter row serializes them.
+  const today = istDateOnly();
+  const row = await tx.pharmacyBillCounter.upsert({
+    where: { bill_date: today },
+    create: { bill_date: today, last_no: 1 },
+    update: { last_no: { increment: 1 } },
   });
-  return `${prefix}${String(count + 1).padStart(3, "0")}`;
+  return formatPharmacyBillNo(today, row.last_no);
 }
 
 export function serializeBill(bill: {
@@ -181,7 +201,7 @@ export async function createPharmacyBill(
   const prescription = await tx.prescription.findUnique({
     where: { id: prescriptionId },
   });
-  if (!prescription) throw new Error("Prescription not found");
+  if (!prescription) throw new AppError("Prescription not found", 404);
 
   const preview =
     previewOverride ??

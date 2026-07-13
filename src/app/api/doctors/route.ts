@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { serializeDoctor } from "@/lib/serialize";
 
@@ -7,8 +8,7 @@ export async function GET() {
     const doctors = await prisma.doctor.findMany({ orderBy: { name: "asc" } });
     return NextResponse.json(doctors.map(serializeDoctor));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Database error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("doctors GET", e, "Database error");
   }
 }
 
@@ -34,7 +34,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(serializeDoctor(doctor), { status: 201 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Database error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("doctors POST", e, "Database error");
   }
 }

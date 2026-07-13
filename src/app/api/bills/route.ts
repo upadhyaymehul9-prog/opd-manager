@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import {
   buildBillPreview,
   createPharmacyBill,
   isPaymentMode,
+  parseUnitPriceOverride,
   serializeBill,
 } from "@/lib/billing";
 import {
@@ -47,8 +49,7 @@ export async function GET(request: Request) {
       { status: 400 },
     );
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Bill error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("bills GET", e, "Bill error");
   }
 }
 
@@ -113,10 +114,14 @@ export async function POST(request: Request) {
     if (Array.isArray(body.lines)) {
       for (const line of body.lines) {
         if (line.prescription_item_id != null && line.unit_price != null) {
-          priceOverrides.set(
-            String(line.prescription_item_id),
-            Number(line.unit_price),
-          );
+          const price = parseUnitPriceOverride(line.unit_price);
+          if (price === null) {
+            return NextResponse.json(
+              { error: "Unit price must be a number of 0 or more" },
+              { status: 400 },
+            );
+          }
+          priceOverrides.set(String(line.prescription_item_id), price);
         }
       }
     }
@@ -132,7 +137,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(serializeBill(bill), { status: 201 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Bill error";
+    const message = e instanceof Error ? e.message : "";
     if (message.includes("pharmacy_bills") || message.includes("does not exist")) {
       return NextResponse.json(
         {
@@ -142,6 +147,6 @@ export async function POST(request: Request) {
         { status: 503 },
       );
     }
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("bills POST", e, "Bill error");
   }
 }

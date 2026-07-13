@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { dateStrIST, resolveRange, startOfDay } from "@/lib/date-range";
+import { dateStrIST, istDateOnly, resolveRange, startOfDay } from "@/lib/date-range";
+
+describe("istDateOnly", () => {
+  it("returns UTC midnight of the current IST calendar date", () => {
+    // 2026-07-12 20:00 UTC is 2026-07-13 01:30 IST — still IST day 13.
+    const d = istDateOnly(new Date("2026-07-12T20:00:00.000Z"));
+    expect(d.toISOString()).toBe("2026-07-13T00:00:00.000Z");
+  });
+
+  it("is idempotent for a value already at UTC midnight (a @db.Date value)", () => {
+    const stored = new Date("2026-07-13T00:00:00.000Z");
+    expect(istDateOnly(stored).toISOString()).toBe("2026-07-13T00:00:00.000Z");
+  });
+});
 
 describe("date-range", () => {
   it("pins day boundaries to IST", () => {

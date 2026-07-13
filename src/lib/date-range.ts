@@ -24,6 +24,16 @@ export function dateStrIST(date: Date): string {
   return new Date(date.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
 }
 
+// UTC midnight of the IST calendar date containing `date`. Use this for
+// `@db.Date` columns (visit_date, expiry_date, audit_date): Prisma stores and
+// compares those at UTC midnight, so the boundary must be a UTC-midnight
+// instant of the correct IST day — NOT startOfDay(), which returns a
+// timestamptz instant (18:30Z of the prior day) meant for @db.Timestamptz
+// columns. Idempotent for values already at UTC midnight.
+export function istDateOnly(date: Date = new Date()): Date {
+  return new Date(`${dateStrIST(date)}T00:00:00.000Z`);
+}
+
 export function parseDateParam(value: string | null): Date | null {
   if (!value?.trim()) return null;
   const d = startOfDay(new Date(value));

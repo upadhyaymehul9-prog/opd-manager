@@ -1,29 +1,17 @@
 import { prisma } from "@/lib/prisma";
-
-function todayDateOnly(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
+import { istDateOnly } from "@/lib/date-range";
 
 export async function nextTokenNumber(): Promise<number> {
-  const visitDate = todayDateOnly();
+  // Token numbers reset per IST calendar day (visit_date is a @db.Date), so
+  // the day boundary must be pinned to IST regardless of server timezone.
+  const visitDate = istDateOnly();
 
-  const row = await prisma.$transaction(async (tx) => {
-    const existing = await tx.dailyToken.findUnique({
-      where: { visit_date: visitDate },
-    });
-
-    if (existing) {
-      return tx.dailyToken.update({
-        where: { visit_date: visitDate },
-        data: { last_token: { increment: 1 } },
-      });
-    }
-
-    return tx.dailyToken.create({
-      data: { visit_date: visitDate, last_token: 1 },
-    });
+  // Atomic upsert: two registrations at opening time can't both create the
+  // day's first token row (which previously raced to a P2002 collision).
+  const row = await prisma.dailyToken.upsert({
+    where: { visit_date: visitDate },
+    create: { visit_date: visitDate, last_token: 1 },
+    update: { last_token: { increment: 1 } },
   });
 
   return row.last_token;

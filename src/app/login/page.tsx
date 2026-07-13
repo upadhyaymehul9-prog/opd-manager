@@ -6,6 +6,10 @@ import { DEFAULT_BOOTSTRAP_PASSWORD } from "@/lib/default-accounts";
 
 const REMEMBER_USER_KEY = "opd_remember_username";
 
+// Only in an explicit demo/kiosk deployment do we auto-fill the shared
+// bootstrap password. Set NEXT_PUBLIC_DEMO_MODE=1 to opt in.
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -20,12 +24,13 @@ function LoginForm() {
 
   useEffect(() => {
     if (prefillUser) {
-      // Came from a department card on the homepage — prefill both fields
-      // with that department's default bootstrap credentials so the user
-      // only has to click Sign in. Only meaningful until that account's
-      // password has actually been changed.
+      // Came from a department card on the homepage — prefill the username so
+      // the user only has to type a password. The default password is only
+      // auto-filled in explicit demo mode; in a real deployment the bootstrap
+      // password must never leave the server, so staff type it once and are
+      // pushed to change it (see mustChangePassword banner).
       setUsername(prefillUser);
-      setPassword(DEFAULT_BOOTSTRAP_PASSWORD);
+      if (DEMO_MODE) setPassword(DEFAULT_BOOTSTRAP_PASSWORD);
       return;
     }
     const saved = localStorage.getItem(REMEMBER_USER_KEY);

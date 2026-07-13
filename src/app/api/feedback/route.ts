@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 
 function rating(v: unknown): number | null {
@@ -42,8 +43,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ...feedback, average_score: avg }, { status: 201 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Could not save feedback";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("feedback POST", e, "Could not save feedback");
   }
 }
 
@@ -71,7 +71,6 @@ export async function GET() {
 
     return NextResponse.json({ average_score: Math.round(avg * 10) / 10, rows });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to load feedback";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("feedback GET", e, "Failed to load feedback");
   }
 }

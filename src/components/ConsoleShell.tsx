@@ -255,6 +255,23 @@ export function ConsoleShell({
           </div>
         </header>
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
+          {session?.mustChangePassword && (
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
+              <div>
+                <p className="font-semibold">You&apos;re still on the shared default password</p>
+                <p className="mt-1 text-sm">
+                  Set your own password so this account can&apos;t be used by
+                  anyone who knows the default.
+                </p>
+              </div>
+              <Link
+                href="/account/change-password"
+                className="focus-ring shrink-0 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+              >
+                Set password
+              </Link>
+            </div>
+          )}
           {children}
         </main>
       </div>

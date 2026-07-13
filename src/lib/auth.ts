@@ -427,12 +427,41 @@ export function canAccessApi(
     return session.role === "admin" || session.role === "manager";
   }
 
-  if (pathname === "/api/doctors" && method === "POST") {
-    return session.role === "admin" || session.role === "manager";
+  // Doctor list is read by every authenticated console — reception picks a
+  // consultant, the TV screen labels rooms, pharmacy shows the prescriber.
+  if (pathname === "/api/doctors" && method === "GET") {
+    return true;
   }
 
-  if (pathname.match(/^\/api\/doctors\/[^/]+$/) && method === "PATCH") {
-    return true;
+  // Lab-test catalog: the clinical staff who order or result tests.
+  if (pathname === "/api/lab-tests/catalog") {
+    return (
+      session.role === "doctor" ||
+      session.role === "lab" ||
+      session.role === "reception" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
+  }
+
+  // Per-visit clinical sub-resources (procedures, lab tests). Their handlers
+  // self-check role too; this is the outer gate that keeps the shared TV
+  // display account out of patient clinical data.
+  if (
+    pathname.match(/^\/api\/visits\/[^/]+\/procedures$/) ||
+    pathname.match(/^\/api\/visits\/[^/]+\/lab-tests$/) ||
+    pathname.match(/^\/api\/visits\/[^/]+\/lab-tests\/[^/]+$/)
+  ) {
+    return session.role !== "display";
+  }
+
+  // Patient records: every clinical role needs patient context except the
+  // shared, low-trust TV/display account.
+  if (
+    pathname === "/api/patients" ||
+    pathname.match(/^\/api\/patients\/[^/]+$/)
+  ) {
+    return session.role !== "display";
   }
 
   if (
@@ -484,10 +513,8 @@ export function canAccessApi(
     );
   }
 
-  if (pathname.startsWith("/api/")) {
-    return true;
-  }
-
+  // Default deny: any API route not explicitly allowed above is forbidden.
+  // New routes are born locked and must be added to this policy on purpose.
   return false;
 }
 
