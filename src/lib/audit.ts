@@ -75,6 +75,7 @@ export const AUDIT_ACTIONS = {
   PASSWORD_CHANGE: "password_change",
   PATIENT_REGISTER: "patient_register",
   VISIT_UPDATE: "visit_update",
+  VISIT_DELETE: "visit_delete",
   EMR_UPDATE: "emr_update",
   CONSENT_RECORD: "consent_record",
   PRESCRIPTION_SAVE: "prescription_save",

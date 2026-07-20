@@ -433,8 +433,16 @@ export function canAccessApi(
     return true;
   }
 
-  // Lab-test catalog: the clinical staff who order or result tests.
+  // Lab-test catalog: read for ordering staff; mutations are clinical/lab only.
   if (pathname === "/api/lab-tests/catalog") {
+    if (method === "POST") {
+      return (
+        session.role === "doctor" ||
+        session.role === "lab" ||
+        session.role === "admin" ||
+        session.role === "manager"
+      );
+    }
     return (
       session.role === "doctor" ||
       session.role === "lab" ||
@@ -444,23 +452,35 @@ export function canAccessApi(
     );
   }
 
-  // Per-visit clinical sub-resources (procedures, lab tests). Their handlers
-  // self-check role too; this is the outer gate that keeps the shared TV
-  // display account out of patient clinical data.
+  // Fee-bearing procedures: doctor / admin / manager only (not pharmacy/lab).
+  if (pathname.match(/^\/api\/visits\/[^/]+\/procedures$/)) {
+    if (method === "POST") {
+      return (
+        session.role === "doctor" ||
+        session.role === "admin" ||
+        session.role === "manager"
+      );
+    }
+    return session.role !== "display";
+  }
+
+  // Per-visit lab tests — handlers re-check; keep display out.
   if (
-    pathname.match(/^\/api\/visits\/[^/]+\/procedures$/) ||
     pathname.match(/^\/api\/visits\/[^/]+\/lab-tests$/) ||
     pathname.match(/^\/api\/visits\/[^/]+\/lab-tests\/[^/]+$/)
   ) {
     return session.role !== "display";
   }
 
-  // Patient records: every clinical role needs patient context except the
-  // shared, low-trust TV/display account.
+  // Visit list/detail: non-display. Mutations are further gated in the handler
+  // (status machine + clinical-only meta fields).
   if (
     pathname === "/api/patients" ||
     pathname.match(/^\/api\/patients\/[^/]+$/)
   ) {
+    if (method === "PATCH" || method === "DELETE") {
+      return session.role !== "display";
+    }
     return session.role !== "display";
   }
 

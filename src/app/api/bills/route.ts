@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import {
   buildBillPreview,
   createPharmacyBill,
@@ -15,6 +16,9 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const { searchParams } = new URL(request.url);
     const visitId = searchParams.get("visit_id")?.trim();
     const prescriptionId = searchParams.get("prescription_id")?.trim();
@@ -55,6 +59,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const body = await request.json();
     const visit_id = String(body.visit_id ?? "").trim();
     const payment_mode = String(body.payment_mode ?? "cash");

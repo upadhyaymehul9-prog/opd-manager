@@ -85,6 +85,11 @@ export function PrescriptionDetail({
   const dispensedCount =
     prescription?.items.filter((i) => i.dispensed).length ?? 0;
   const readyToBill = prescription != null && pending === 0 && dispensedCount > 0;
+  const readyToExitWithoutBill =
+    prescription != null &&
+    prescription.items.length > 0 &&
+    pending === 0 &&
+    dispensedCount === 0;
 
   useEffect(() => {
     if (!prescription || !readyToBill || completedBill) return;
@@ -261,9 +266,35 @@ export function PrescriptionDetail({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Complete failed");
-      setCompletedBill(data.bill);
+      if (data.bill) {
+        setCompletedBill(data.bill);
+      } else {
+        onComplete?.();
+        router.refresh();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Complete failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function exitWithoutBill() {
+    if (!prescription || !readyToExitWithoutBill) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/prescriptions/${prescription.id}/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payment_mode: paymentMode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Exit failed");
+      onComplete?.();
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Exit failed");
     } finally {
       setBusy(false);
     }
@@ -559,16 +590,25 @@ export function PrescriptionDetail({
         <p className="text-sm text-slate-600">
           {pending > 0
             ? `${pending} medicine(s) still pending — dispense or skip each line`
-            : dispensedCount === 0
-              ? "Dispense at least one medicine, or skip all lines"
+            : readyToExitWithoutBill
+              ? "All lines skipped — you can exit without a pharmacy bill"
               : "Ready to generate bill and exit"}
         </p>
-        <ActionButton
-          label="Generate bill & exit"
-          variant="primary"
-          disabled={busy || !readyToBill}
-          onClick={completeWithBill}
-        />
+        {readyToExitWithoutBill ? (
+          <ActionButton
+            label="Exit without bill"
+            variant="primary"
+            disabled={busy}
+            onClick={exitWithoutBill}
+          />
+        ) : (
+          <ActionButton
+            label="Generate bill & exit"
+            variant="primary"
+            disabled={busy || !readyToBill}
+            onClick={completeWithBill}
+          />
+        )}
       </div>
     </div>
   );

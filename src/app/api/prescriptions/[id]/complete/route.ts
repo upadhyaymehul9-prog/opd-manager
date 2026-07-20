@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
-import { createPharmacyBill, isPaymentMode, serializeBill, buildBillPreview } from "@/lib/billing";
-import { visitEmrCompleteForDischarge } from "@/lib/nabh";
+import { AppError, errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
+import {
+  createPharmacyBill,
+  isPaymentMode,
+  parseUnitPriceOverride,
+  serializeBill,
+} from "@/lib/billing";
 import {
   hasDispensedForBilling,
   pendingRxItems,
 } from "@/lib/prescription-status";
+import { assertVisitReadyForDischarge, canExitWithoutPharmacyBill } from "@/lib/discharge-gates";
 import { prisma } from "@/lib/prisma";
 import { serializePrescription } from "@/lib/serialize";
 
@@ -17,88 +24,100 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
     const payment_mode = String(body.payment_mode ?? "cash");
 
     if (!isPaymentMode(payment_mode)) {
-      return NextResponse.json(
-        { error: "payment_mode must be cash, upi, or card" },
-        { status: 400 },
-      );
-    }
-
-    const prescription = await prisma.prescription.findUnique({
-      where: { id },
-      include: prescriptionInclude,
-    });
-
-    if (!prescription) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-
-    const visit = await prisma.patientVisit.findUnique({
-      where: { id: prescription.patient_visit_id },
-    });
-    if (!visit) {
-      return NextResponse.json({ error: "Visit not found" }, { status: 404 });
-    }
-    if (!visitEmrCompleteForDischarge(visit)) {
-      return NextResponse.json(
-        {
-          error:
-            "NABH: complete EMR (chief complaint and diagnosis) before marking visit completed",
-        },
-        { status: 400 },
-      );
-    }
-
-    const pending = pendingRxItems(prescription.items);
-    if (pending.length > 0) {
-      return NextResponse.json(
-        {
-          error: `${pending.length} medicine(s) still pending — dispense in-stock items or skip outside/unavailable medicines`,
-        },
-        { status: 400 },
-      );
-    }
-
-    if (!hasDispensedForBilling(prescription.items)) {
-      return NextResponse.json(
-        { error: "Dispense at least one medicine before generating bill" },
-        { status: 400 },
-      );
+      throw new AppError("payment_mode must be cash, upi, or card", 400);
     }
 
     const priceOverrides = new Map<string, number>();
     if (Array.isArray(body.lines)) {
       for (const line of body.lines) {
         if (line.prescription_item_id && line.unit_price != null) {
-          priceOverrides.set(
-            String(line.prescription_item_id),
-            Number(line.unit_price),
-          );
+          const parsed = parseUnitPriceOverride(line.unit_price);
+          if (parsed == null) {
+            throw new AppError("Invalid unit_price on bill line", 400);
+          }
+          priceOverrides.set(String(line.prescription_item_id), parsed);
         }
       }
     }
 
     const now = new Date();
 
-    const preview = await buildBillPreview(
-      prisma,
-      id,
-      priceOverrides.size > 0 ? priceOverrides : undefined,
-    );
-
     const result = await prisma.$transaction(
       async (tx) => {
-        const bill = await createPharmacyBill(
-          tx,
-          id,
-          payment_mode,
-          priceOverrides.size > 0 ? priceOverrides : undefined,
-          preview,
-        );
+        const prescription = await tx.prescription.findUnique({
+          where: { id },
+          include: prescriptionInclude,
+        });
+        if (!prescription) {
+          throw new AppError("Not found", 404);
+        }
+
+        const visit = await tx.patientVisit.findUnique({
+          where: { id: prescription.patient_visit_id },
+          include: {
+            pharmacy_bill: { select: { id: true } },
+            mlc_record: { select: { id: true } },
+            lab_tests: {
+              where: { status: { in: ["ordered", "collected"] } },
+              select: { id: true },
+            },
+          },
+        });
+        if (!visit) {
+          throw new AppError("Visit not found", 404);
+        }
+
+        const pending = pendingRxItems(prescription.items);
+        if (pending.length > 0) {
+          throw new AppError(
+            `${pending.length} medicine(s) still pending — dispense in-stock items or skip outside/unavailable medicines`,
+            400,
+          );
+        }
+
+        const exitWithoutBill = canExitWithoutPharmacyBill(prescription.items);
+        if (!hasDispensedForBilling(prescription.items) && !exitWithoutBill) {
+          throw new AppError(
+            "Dispense at least one medicine before generating bill, or skip all lines to exit without billing",
+            400,
+          );
+        }
+
+        // Discharge gates (EMR / MLC / pending labs). Bill may be created in this same TX.
+        assertVisitReadyForDischarge({
+          visit,
+          prescriptionItems: prescription.items,
+          hasPharmacyBill:
+            Boolean(visit.pharmacy_bill) || hasDispensedForBilling(prescription.items),
+          hasMlcRecord: Boolean(visit.mlc_record),
+          pendingLabTests: visit.lab_tests.length,
+        });
+
+        let bill = visit.pharmacy_bill
+          ? await tx.pharmacyBill.findUniqueOrThrow({
+              where: { id: visit.pharmacy_bill.id },
+              include: { items: true },
+            })
+          : null;
+
+        if (!bill && hasDispensedForBilling(prescription.items)) {
+          // Preview is rebuilt inside createPharmacyBill within this TX so
+          // concurrent un-dispense cannot produce a stale bill.
+          bill = await createPharmacyBill(
+            tx,
+            id,
+            payment_mode,
+            priceOverrides.size > 0 ? priceOverrides : undefined,
+          );
+        }
 
         await tx.patientVisit.update({
           where: { id: prescription.patient_visit_id },
@@ -107,7 +126,11 @@ export async function POST(
 
         const updatedRx = await tx.prescription.update({
           where: { id },
-          data: { status: "dispensed" },
+          data: {
+            status: hasDispensedForBilling(prescription.items)
+              ? "dispensed"
+              : "sent_to_pharmacy",
+          },
           include: prescriptionInclude,
         });
 
@@ -117,20 +140,22 @@ export async function POST(
     );
 
     return NextResponse.json({
-      bill: serializeBill(result.bill),
+      bill: result.bill ? serializeBill(result.bill) : null,
       prescription: serializePrescription(result.prescription),
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Complete failed";
-    if (message.includes("pharmacy_bills") || message.includes("does not exist")) {
-      return NextResponse.json(
-        {
-          error:
-            "Billing not set up on database — run npm run db:push, then redeploy.",
-        },
-        { status: 503 },
-      );
+    if (e instanceof Error) {
+      const message = e.message;
+      if (message.includes("pharmacy_bills") || message.includes("does not exist")) {
+        return NextResponse.json(
+          {
+            error:
+              "Billing not set up on database — run npm run db:push, then redeploy.",
+          },
+          { status: 503 },
+        );
+      }
     }
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("prescriptions/[id]/complete", e, "Complete failed");
   }
 }

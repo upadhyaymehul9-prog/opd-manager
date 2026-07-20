@@ -138,7 +138,7 @@ export function LabTestsPanel({
   }
 
   async function removeTest(testId: string) {
-    if (!window.confirm("Remove this lab test?")) return;
+    if (!window.confirm("Cancel this lab test order?")) return;
     setBusy(true);
     setError(null);
     try {

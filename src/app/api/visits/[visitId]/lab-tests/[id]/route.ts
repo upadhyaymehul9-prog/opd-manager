@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { AppError, errorResponse } from "@/lib/api-error";
 import { getSessionFromCookies } from "@/lib/audit";
 import type { VisitLabTestResultInput } from "@/lib/lab-test-types";
 import { serializeVisitLabTest } from "@/lib/lab-tests";
@@ -35,10 +36,10 @@ export async function PATCH(
     const isResult = hasValue || body.status === "resulted";
 
     if (isResult && !RESULT_ROLES.has(session.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      throw new AppError("Unauthorized", 401);
     }
     if (isCancel && !ORDER_ROLES.has(session.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      throw new AppError("Unauthorized", 401);
     }
 
     const valueNumeric =
@@ -54,7 +55,7 @@ export async function PATCH(
         : existing.value_text;
 
     const hasEnteredValue =
-      valueNumeric != null && !Number.isNaN(valueNumeric) ||
+      (valueNumeric != null && !Number.isNaN(valueNumeric)) ||
       Boolean(valueText?.trim());
 
     let status = body.status ?? existing.status;
@@ -82,11 +83,11 @@ export async function PATCH(
 
     return NextResponse.json(serializeVisitLabTest(row));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Lab test update error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("lab-tests/[id] PATCH", e, "Lab test update error");
   }
 }
 
+/** Soft-cancel only — never hard-delete resulted clinical data. */
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ visitId: string; id: string }> },
@@ -94,7 +95,7 @@ export async function DELETE(
   try {
     const session = await getSessionFromCookies();
     if (!session || !ORDER_ROLES.has(session.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      throw new AppError("Unauthorized", 401);
     }
 
     const { visitId, id } = await params;
@@ -105,10 +106,25 @@ export async function DELETE(
       return NextResponse.json({ error: "Test not found" }, { status: 404 });
     }
 
-    await prisma.visitLabTest.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
+    if (existing.status === "resulted") {
+      throw new AppError(
+        "Cannot remove a resulted lab test — cancel is not allowed after results are entered",
+        409,
+      );
+    }
+
+    const row = await prisma.visitLabTest.update({
+      where: { id },
+      data: {
+        status: "cancelled",
+        notes: existing.notes
+          ? `${existing.notes}\n[Cancelled by ${session.displayName || session.username}]`
+          : `Cancelled by ${session.displayName || session.username}`,
+      },
+    });
+
+    return NextResponse.json(serializeVisitLabTest(row));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Lab test delete error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("lab-tests/[id] DELETE", e, "Lab test delete error");
   }
 }

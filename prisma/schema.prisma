@@ -434,8 +434,9 @@ model PharmacyBill {
   gst_total        Float
   grand_total      Float
   created_at       DateTime           @default(now()) @db.Timestamptz(6)
-  patient_visit    PatientVisit       @relation(fields: [patient_visit_id], references: [id], onDelete: Cascade)
-  prescription     Prescription       @relation(fields: [prescription_id], references: [id], onDelete: Cascade)
+  /// Restrict: financial records must not vanish if a visit is deleted.
+  patient_visit    PatientVisit       @relation(fields: [patient_visit_id], references: [id], onDelete: Restrict)
+  prescription     Prescription       @relation(fields: [prescription_id], references: [id], onDelete: Restrict)
   items            PharmacyBillItem[]
 
   @@index([created_at(sort: Desc)])
@@ -557,7 +558,7 @@ model PatientConsent {
   witness_name     String?
   consent_text     String?
   created_at       DateTime     @default(now()) @db.Timestamptz(6)
-  visit            PatientVisit @relation(fields: [patient_visit_id], references: [id], onDelete: Cascade)
+  visit            PatientVisit @relation(fields: [patient_visit_id], references: [id], onDelete: Restrict)
   patient          Patient?     @relation(fields: [patient_id], references: [id], onDelete: SetNull)
 
   @@index([patient_id])

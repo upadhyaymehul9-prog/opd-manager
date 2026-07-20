@@ -65,6 +65,18 @@ describe("canAccessApi — previously-fallthrough routes stay reachable", () => 
     ).toBe(true);
   });
 
+  it("blocks pharmacy from creating fee-bearing procedures", () => {
+    expect(
+      canAccessApi(sessionFor("pharmacy"), "/api/visits/abc/procedures", "POST"),
+    ).toBe(false);
+  });
+
+  it("blocks reception from creating lab catalog entries", () => {
+    expect(
+      canAccessApi(sessionFor("reception"), "/api/lab-tests/catalog", "POST"),
+    ).toBe(false);
+  });
+
   it("lets reception read a patient record", () => {
     expect(canAccessApi(sessionFor("reception"), "/api/patients", "GET")).toBe(
       true,
