@@ -3,10 +3,16 @@ import { prisma } from "@/lib/prisma";
 import { DEFAULT_LAB_TESTS, serializeLabCatalog } from "@/lib/lab-tests";
 
 async function ensureDefaultCatalog() {
-  const count = await prisma.labTestCatalog.count();
-  if (count > 0) return;
+  const existing = await prisma.labTestCatalog.findMany({
+    select: { name: true },
+  });
+  const have = new Set(existing.map((r) => r.name.trim().toLowerCase()));
+  const missing = DEFAULT_LAB_TESTS.filter(
+    (t) => !have.has(t.name.trim().toLowerCase()),
+  );
+  if (missing.length === 0) return;
   await prisma.labTestCatalog.createMany({
-    data: DEFAULT_LAB_TESTS.map((t) => ({
+    data: missing.map((t) => ({
       name: t.name,
       unit: t.unit,
       ref_range: t.ref_range,
