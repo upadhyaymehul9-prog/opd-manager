@@ -29,6 +29,7 @@ const RADIO_STATUSES = new Set([
 ]);
 const RADIO_PENDING = new Set([
   "to_radiology",
+  "radio_calling",
   "at_radiology",
   "radio_processing",
 ]);
