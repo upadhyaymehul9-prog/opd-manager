@@ -138,7 +138,11 @@ export default function ReceptionPage() {
     setPatientName(p.name);
     setMobile(p.mobile ?? "");
     setAddress(p.address ?? "");
-    setGender(p.gender ?? "");
+    setGender(
+      p.gender === "male" || p.gender === "female" || p.gender === "other"
+        ? p.gender
+        : (p.gender ?? "").trim().toLowerCase() || "",
+    );
     setEmergencyContact(p.emergency_contact ?? "");
     setDateOfBirth(p.date_of_birth ?? "");
     setOccupation(p.occupation ?? "");
