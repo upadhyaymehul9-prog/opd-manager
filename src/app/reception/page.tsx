@@ -20,6 +20,13 @@ type PatientSearchHit = {
   patient_number: number;
   name: string;
   mobile: string | null;
+  address: string | null;
+  gender: string | null;
+  emergency_contact: string | null;
+  date_of_birth: string | null;
+  occupation: string | null;
+  national_id_type: string | null;
+  national_id: string | null;
   abha_id: string | null;
   last_age: number | null;
 };
@@ -130,8 +137,16 @@ export default function ReceptionPage() {
     setSelectedPatientNumber(p.patient_number);
     setPatientName(p.name);
     setMobile(p.mobile ?? "");
+    setAddress(p.address ?? "");
+    setGender(p.gender ?? "");
+    setEmergencyContact(p.emergency_contact ?? "");
+    setDateOfBirth(p.date_of_birth ?? "");
+    setOccupation(p.occupation ?? "");
+    setNationalIdType(p.national_id_type ?? "");
+    setNationalId(p.national_id ?? "");
     setAbhaId(p.abha_id ?? "");
-    if (p.last_age) setAge(String(p.last_age));
+    if (p.last_age != null) setAge(String(p.last_age));
+    else setAge("");
     setSearchQuery("");
     setSearchResults([]);
   }
@@ -345,8 +360,23 @@ export default function ReceptionPage() {
                     <button
                       type="button"
                       className="text-left underline hover:text-amber-950"
-                      onClick={() => {
+                      onClick={async () => {
                         setPatientType("old");
+                        // Load full demographics so the form auto-fills.
+                        const res = await fetch(
+                          `/api/patients/search?q=${encodeURIComponent(String(p.patient_number))}`,
+                        );
+                        if (res.ok) {
+                          const hits = (await res.json()) as PatientSearchHit[];
+                          const match =
+                            hits.find((h) => h.id === p.id) ?? hits[0];
+                          if (match) {
+                            pickPatient(match);
+                            setDuplicateWarning([]);
+                            setDuplicateConfirmed(false);
+                            return;
+                          }
+                        }
                         setSelectedPatientId(p.id);
                         setSelectedPatientNumber(p.patient_number);
                         setPatientName(p.name);
