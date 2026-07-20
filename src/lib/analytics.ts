@@ -20,7 +20,7 @@ const LAB_STATUSES = new Set([
   "lab_processing",
   "lab_ready",
 ]);
-const LAB_PENDING = new Set(["to_lab", "at_lab", "lab_processing"]);
+const LAB_PENDING = new Set(["to_lab", "lab_calling", "at_lab", "lab_processing"]);
 const RADIO_STATUSES = new Set([
   "to_radiology",
   "at_radiology",
