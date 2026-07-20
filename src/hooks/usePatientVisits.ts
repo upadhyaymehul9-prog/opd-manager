@@ -3,14 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import type { PatientVisit } from "@/lib/types";
 
-const POLL_INTERVAL_MS = 3000;
+/** Live queues don't need sub-second freshness — keep Neon load low. */
+const POLL_INTERVAL_MS = 15_000;
 
 export function usePatientVisits(options?: {
   activeOnly?: boolean;
   todayOnly?: boolean;
   from?: string;
   to?: string;
-  /** Poll interval in ms. Default 3000. Set false to disable polling. */
+  /** Poll interval in ms. Default 10000. Set false to disable polling. */
   pollMs?: number | false;
 }) {
   const activeOnly = options?.activeOnly ?? false;
@@ -48,8 +49,34 @@ export function usePatientVisits(options?: {
   useEffect(() => {
     fetchVisits();
     if (pollMs === false) return;
-    const interval = setInterval(fetchVisits, pollMs);
-    return () => clearInterval(interval);
+
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    const start = () => {
+      if (interval) return;
+      interval = setInterval(fetchVisits, pollMs);
+    };
+    const stop = () => {
+      if (!interval) return;
+      clearInterval(interval);
+      interval = null;
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        stop();
+      } else {
+        fetchVisits();
+        start();
+      }
+    };
+
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [fetchVisits, pollMs]);
 
   return { visits, loading, error, refresh: fetchVisits };

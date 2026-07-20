@@ -17,6 +17,10 @@ import {
 import type { PatientStatus, UpdatePatientInput } from "@/lib/types";
 import type { UserRole } from "@/lib/auth-types";
 
+async function loadVisitLite(visitId: string) {
+  return prisma.patientVisit.findUnique({ where: { id: visitId } });
+}
+
 async function loadDischargeContext(visitId: string) {
   return prisma.patientVisit.findUnique({
     where: { id: visitId },
@@ -54,7 +58,11 @@ export async function PATCH(
       status = "in_followup";
     }
 
-    const existing = await loadDischargeContext(id);
+    // Heavy joins only when discharging — normal status clicks stay fast.
+    const existing =
+      status === "completed"
+        ? await loadDischargeContext(id)
+        : await loadVisitLite(id);
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -83,12 +91,15 @@ export async function PATCH(
     }
 
     if (status === "completed") {
+      const full = existing as NonNullable<
+        Awaited<ReturnType<typeof loadDischargeContext>>
+      >;
       assertVisitReadyForDischarge({
-        visit: existing,
-        prescriptionItems: existing.prescription?.items ?? null,
-        hasPharmacyBill: Boolean(existing.pharmacy_bill),
-        hasMlcRecord: Boolean(existing.mlc_record),
-        pendingLabTests: existing.lab_tests.length,
+        visit: full,
+        prescriptionItems: full.prescription?.items ?? null,
+        hasPharmacyBill: Boolean(full.pharmacy_bill),
+        hasMlcRecord: Boolean(full.mlc_record),
+        pendingLabTests: full.lab_tests.length,
       });
     }
 

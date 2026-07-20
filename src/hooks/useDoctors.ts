@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Doctor } from "@/lib/types";
 
-const POLL_INTERVAL_MS = 3000;
+/** Doctor status rarely changes — 3s polling was hammering the API/DB. */
+const POLL_INTERVAL_MS = 30_000;
 
-export function useDoctors() {
+export function useDoctors(options?: { pollMs?: number | false }) {
+  const pollMs = options?.pollMs ?? POLL_INTERVAL_MS;
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,9 +31,36 @@ export function useDoctors() {
 
   useEffect(() => {
     fetchDoctors();
-    const interval = setInterval(fetchDoctors, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [fetchDoctors]);
+    if (pollMs === false) return;
+
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    const start = () => {
+      if (interval) return;
+      interval = setInterval(fetchDoctors, pollMs);
+    };
+    const stop = () => {
+      if (!interval) return;
+      clearInterval(interval);
+      interval = null;
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        stop();
+      } else {
+        fetchDoctors();
+        start();
+      }
+    };
+
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [fetchDoctors, pollMs]);
 
   return { doctors, loading, error, refresh: fetchDoctors };
 }

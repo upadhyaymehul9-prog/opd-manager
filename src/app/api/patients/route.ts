@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { addDays, startOfDay } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { visitInclude } from "@/lib/db-includes";
 import { nextConsultationBillNo } from "@/lib/consultation-billing";
-import { parseDateParam } from "@/lib/date-range";
+import { addDays, parseDateParam, startOfDay } from "@/lib/date-range";
 import { findOrCreatePatient } from "@/lib/patients";
 import { isValidAbhaInput, parseAbhaInput } from "@/lib/abha";
 import { findDuplicatePatients } from "@/lib/duplicate-patients";
@@ -12,6 +11,9 @@ import { nextTokenNumber } from "@/lib/tokens";
 import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
 import { CONSENT_TEXT_V1 } from "@/lib/nabh";
 import type { CreatePatientInput } from "@/lib/types";
+
+/** How far back "active" queues look — avoids loading years of abandoned visits. */
+const ACTIVE_LOOKBACK_DAYS = 2;
 
 export async function GET(request: Request) {
   try {
@@ -27,19 +29,33 @@ export async function GET(request: Request) {
     } = {};
 
     if (activeOnly) where.status = { not: "completed" };
-    if (todayOnly) where.registered_at = { gte: startOfDay(new Date()) };
-    else if (fromParam || toParam) {
+
+    if (todayOnly) {
+      where.registered_at = { gte: startOfDay(new Date()) };
+    } else if (fromParam || toParam) {
       const rangeStart = parseDateParam(fromParam) ?? startOfDay(new Date());
       const rangeEnd = parseDateParam(toParam) ?? rangeStart;
       const start = rangeStart <= rangeEnd ? rangeStart : rangeEnd;
       const end = rangeStart <= rangeEnd ? rangeEnd : rangeStart;
       where.registered_at = { gte: start, lt: addDays(end, 1) };
+    } else if (activeOnly) {
+      // Live consoles poll this often — never return unbounded history.
+      where.registered_at = {
+        gte: addDays(startOfDay(new Date()), -ACTIVE_LOOKBACK_DAYS),
+      };
+    } else {
+      // Unfiltered list would dump the entire table — refuse and require a range.
+      return NextResponse.json(
+        { error: "from/to, today=true, or active=true is required" },
+        { status: 400 },
+      );
     }
 
     const visits = await prisma.patientVisit.findMany({
-      where: Object.keys(where).length > 0 ? where : undefined,
+      where,
       include: visitInclude,
       orderBy: { registered_at: "desc" },
+      take: 500,
     });
 
     return NextResponse.json(visits.map(serializeVisit));

@@ -184,7 +184,7 @@ export function PrescriptionForm({
 
   useEffect(() => {
     if (!isSent) return;
-    const t = setInterval(loadPrescription, 15_000);
+    const t = setInterval(loadPrescription, 30_000);
     return () => clearInterval(t);
   }, [isSent, loadPrescription]);
 
