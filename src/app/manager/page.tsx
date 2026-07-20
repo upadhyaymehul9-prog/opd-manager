@@ -23,13 +23,14 @@ const FLOW_STAGES: { key: string; label: string; statuses: PatientStatus[] }[] =
     {
       key: "lab",
       label: "Lab",
-      statuses: ["to_lab", "at_lab", "lab_processing", "lab_ready"],
+      statuses: ["to_lab", "lab_calling", "at_lab", "lab_processing", "lab_ready"],
     },
     {
       key: "radiology",
       label: "Radiology",
       statuses: [
         "to_radiology",
+        "radio_calling",
         "at_radiology",
         "radio_processing",
         "radio_ready",

@@ -121,12 +121,18 @@ export async function PATCH(
     if (status === "to_radiology") data.radio_referred = true;
     if (status === "completed") data.completed_at = now;
 
-    if (status === "at_lab" || status === "lab_processing" || status === "lab_ready") {
+    if (
+      status === "lab_calling" ||
+      status === "at_lab" ||
+      status === "lab_processing" ||
+      status === "lab_ready"
+    ) {
       if (!existing.lab_started_at) data.lab_started_at = now;
     }
     if (status === "lab_ready") data.lab_ready_at = now;
 
     if (
+      status === "radio_calling" ||
       status === "at_radiology" ||
       status === "radio_processing" ||
       status === "radio_ready"

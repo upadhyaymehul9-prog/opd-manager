@@ -6,10 +6,12 @@ export const TV_TOKEN_STATUS_LABELS: Record<PatientStatus, string> = {
   calling: "Doctor Calling",
   in_consultation: "In Consultation",
   to_lab: "Go to Lab",
+  lab_calling: "Lab Calling",
   at_lab: "At Lab",
   lab_processing: "Lab Pending",
   lab_ready: "Lab Ready",
   to_radiology: "Go to Radiology",
+  radio_calling: "Radiology Calling",
   at_radiology: "At Radiology",
   radio_processing: "Radiology Pending",
   radio_ready: "Radiology Ready",
@@ -22,6 +24,7 @@ export const TV_TOKEN_STATUS_LABELS: Record<PatientStatus, string> = {
 
 export const LAB_REPORT_STATUSES: PatientStatus[] = [
   "to_lab",
+  "lab_calling",
   "at_lab",
   "lab_processing",
   "lab_ready",
@@ -29,11 +32,12 @@ export const LAB_REPORT_STATUSES: PatientStatus[] = [
 
 export function getLabReportStatusLabel(status: PatientStatus): string {
   if (status === "lab_ready") return "READY";
+  if (status === "lab_calling") return "CALLING";
   return "PENDING";
 }
 
 export function isLabPending(status: PatientStatus) {
-  return ["to_lab", "at_lab", "lab_processing"].includes(status);
+  return ["to_lab", "lab_calling", "at_lab", "lab_processing"].includes(status);
 }
 
 export function isLabReady(status: PatientStatus) {
@@ -48,6 +52,7 @@ export function isTokenWaiting(status: PatientStatus) {
 
 export const RADIO_REPORT_STATUSES: PatientStatus[] = [
   "to_radiology",
+  "radio_calling",
   "at_radiology",
   "radio_processing",
   "radio_ready",
@@ -55,11 +60,17 @@ export const RADIO_REPORT_STATUSES: PatientStatus[] = [
 
 export function getRadioReportStatusLabel(status: PatientStatus): string {
   if (status === "radio_ready") return "READY";
+  if (status === "radio_calling") return "CALLING";
   return "PENDING";
 }
 
 export function isRadioPending(status: PatientStatus) {
-  return ["to_radiology", "at_radiology", "radio_processing"].includes(status);
+  return [
+    "to_radiology",
+    "radio_calling",
+    "at_radiology",
+    "radio_processing",
+  ].includes(status);
 }
 
 export function isRadioReady(status: PatientStatus) {

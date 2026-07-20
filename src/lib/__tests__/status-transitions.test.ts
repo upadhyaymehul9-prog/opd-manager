@@ -21,6 +21,11 @@ describe("isValidStatusTransition", () => {
     expect(isValidStatusTransition("to_lab", "lab_ready")).toBe(false);
     expect(isValidStatusTransition("completed", "registered")).toBe(false);
   });
+
+  it("allows lab call then arrive", () => {
+    expect(isValidStatusTransition("to_lab", "lab_calling")).toBe(true);
+    expect(isValidStatusTransition("lab_calling", "at_lab")).toBe(true);
+  });
 });
 
 describe("roleMaySetStatus", () => {

@@ -125,12 +125,20 @@ export default function TVDisplayPage() {
                 return {
                   key: v.id,
                   highlight:
-                    v.status === "calling" || statusLabel === "YOU ARE NEXT",
-                  blinkName: v.status === "calling",
+                    v.status === "calling" ||
+                    v.status === "lab_calling" ||
+                    v.status === "radio_calling" ||
+                    statusLabel === "YOU ARE NEXT",
+                  blinkName:
+                    v.status === "calling" ||
+                    v.status === "lab_calling" ||
+                    v.status === "radio_calling",
                   statusClass:
                     statusLabel === "YOU ARE NEXT"
                       ? "bg-green-600 text-white"
-                      : v.status === "calling"
+                      : v.status === "calling" ||
+                          v.status === "lab_calling" ||
+                          v.status === "radio_calling"
                         ? "bg-amber-500 text-white"
                         : undefined,
                   cells: [

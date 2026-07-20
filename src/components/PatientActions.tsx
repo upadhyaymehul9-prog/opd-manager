@@ -83,7 +83,7 @@ export function PatientActions({
       {showEtaFor && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
           <label className="text-sm font-medium text-slate-700">
-            Report ready in (minutes):
+            Report ready in (minutes) — shown on TV:
           </label>
           <input
             type="number"

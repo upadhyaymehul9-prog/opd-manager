@@ -10,11 +10,13 @@ const TRANSITIONS: Record<PatientStatus, readonly PatientStatus[]> = {
   registered: ["calling"],
   calling: ["in_consultation"],
   in_consultation: ["to_lab", "to_radiology", "to_pharmacy", "completed"],
-  to_lab: ["at_lab"],
+  to_lab: ["lab_calling", "at_lab"],
+  lab_calling: ["at_lab"],
   at_lab: ["lab_processing"],
   lab_processing: ["lab_ready"],
   lab_ready: ["return_to_doctor", "in_followup"],
-  to_radiology: ["at_radiology"],
+  to_radiology: ["radio_calling", "at_radiology"],
+  radio_calling: ["at_radiology"],
   at_radiology: ["radio_processing"],
   radio_processing: ["radio_ready"],
   radio_ready: ["return_to_doctor", "in_followup"],
@@ -46,12 +48,14 @@ const SUPER_ROLES: UserRole[] = ["admin", "manager"];
 
 const LAB_STATUSES: PatientStatus[] = [
   "to_lab",
+  "lab_calling",
   "at_lab",
   "lab_processing",
   "lab_ready",
 ];
 const RADIO_STATUSES: PatientStatus[] = [
   "to_radiology",
+  "radio_calling",
   "at_radiology",
   "radio_processing",
   "radio_ready",
