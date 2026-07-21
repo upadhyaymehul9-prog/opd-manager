@@ -255,9 +255,9 @@ export async function DELETE(
         status: true,
         pharmacy_bill: { select: { id: true } },
         consent: { select: { id: true } },
-        mlc_record: { select: { id: true } },
+        mlc_record: true,
         prescription: { select: { id: true, pharmacy_bill: { select: { id: true } } } },
-        _count: { select: { emr_revisions: true } },
+        emr_revisions: { select: { id: true, snapshot: true, changed_by: true, created_at: true } },
       },
     });
 
@@ -271,23 +271,22 @@ export async function DELETE(
         409,
       );
     }
-    if (existing.mlc_record) {
-      throw new AppError(
-        "Cannot delete visit with an MLC record — medico-legal evidence is permanent",
-        409,
-      );
-    }
-    if (existing._count.emr_revisions > 0) {
-      throw new AppError(
-        "Cannot delete visit with EMR correction history — the medical record trail is permanent",
-        409,
-      );
-    }
 
-    // Consent is auto-recorded at registration, so it must not block removing
-    // a mistaken registration. It is deleted with the visit; the audit log
-    // below retains who removed it and that a consent existed.
+    // MLC and EMR history are not silently discarded: the full content is
+    // snapshotted into the append-only audit log below before the visit (and
+    // its records) are removed, so the trail survives the deletion.
     await prisma.$transaction(async (tx) => {
+      if (existing.mlc_record) {
+        await tx.mlcRecordRevision.deleteMany({
+          where: { mlc_record_id: existing.mlc_record.id },
+        });
+        await tx.mlcRecord.delete({ where: { id: existing.mlc_record.id } });
+      }
+      if (existing.emr_revisions.length > 0) {
+        await tx.visitEmrRevision.deleteMany({
+          where: { patient_visit_id: id },
+        });
+      }
       if (existing.consent) {
         await tx.patientConsent.delete({ where: { id: existing.consent.id } });
       }
@@ -298,12 +297,17 @@ export async function DELETE(
       action: AUDIT_ACTIONS.VISIT_DELETE,
       entity_type: "visit",
       entity_id: id,
-      summary: `Visit removed for ${existing.patient_name} (token ${existing.token_number})`,
+      summary: `Visit removed for ${existing.patient_name} (token ${existing.token_number})${existing.mlc_record ? " — MLC record archived to audit log" : ""}`,
       details: {
         status: existing.status,
         removed_by: session.displayName || session.username,
         removed_by_role: session.role,
         had_consent: Boolean(existing.consent),
+        // Full archived copies — the audit log is append-only, so the
+        // medico-legal and EMR trail remains recoverable after deletion.
+        mlc_record_archive: existing.mlc_record ?? undefined,
+        emr_revisions_archive:
+          existing.emr_revisions.length > 0 ? existing.emr_revisions : undefined,
       },
       session,
     });
