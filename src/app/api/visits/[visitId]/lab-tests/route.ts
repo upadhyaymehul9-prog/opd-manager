@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { AppError, errorResponse } from "@/lib/api-error";
 import { getSessionFromCookies } from "@/lib/audit";
 import type { VisitLabTestInput } from "@/lib/lab-test-types";
+import { matchLabPanelByName } from "@/lib/lab-panels";
 import { serializeVisitLabTest } from "@/lib/lab-tests";
 import { prisma } from "@/lib/prisma";
 
@@ -65,15 +66,29 @@ export async function POST(
       throw new AppError("Visit not found", 404);
     }
 
-    const items = Array.isArray(body.items)
+    const requested = Array.isArray(body.items)
       ? body.items
       : body.test_name
         ? [body]
         : [];
 
-    if (items.length === 0) {
+    if (requested.length === 0) {
       throw new AppError("At least one test is required", 400);
     }
+
+    // Panel names (CBC, LFT, Lipid Profile…) expand into one row per
+    // component so the lab enters a complete structured report instead of a
+    // single free-text value.
+    const items: VisitLabTestInput[] = requested.flatMap((item) => {
+      const panel = matchLabPanelByName(String(item.test_name ?? ""));
+      if (!panel) return [item];
+      return panel.components.map((c) => ({
+        test_name: c.name,
+        unit: c.unit,
+        ref_range: c.ref_range,
+        value_type: c.value_type,
+      }));
+    });
 
     const existingCount = await prisma.visitLabTest.count({
       where: { patient_visit_id: visitId },

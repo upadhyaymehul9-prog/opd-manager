@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LAB_PANELS, getLabPanel } from "@/lib/lab-panels";
+import { LAB_PANELS, getLabPanel, matchLabPanelByName } from "@/lib/lab-panels";
 
 describe("lab panels", () => {
   it("exposes a CBC panel with the full haemogram components", () => {
@@ -34,5 +34,25 @@ describe("lab panels", () => {
 
   it("returns undefined for an unknown panel code", () => {
     expect(getLabPanel("does-not-exist")).toBeUndefined();
+  });
+});
+
+describe("matchLabPanelByName", () => {
+  it("matches catalog panel names like CBC and LFT to their templates", () => {
+    expect(matchLabPanelByName("CBC (Complete Blood Count)")?.code).toBe("cbc");
+    expect(matchLabPanelByName("cbc")?.code).toBe("cbc");
+    expect(matchLabPanelByName("Complete Blood Count")?.code).toBe("cbc");
+    expect(matchLabPanelByName("LFT (Liver Function Test)")?.code).toBe("lft");
+    expect(matchLabPanelByName("Lipid Profile")?.code).toBe("lipid");
+    expect(matchLabPanelByName("TFT (Thyroid Function Test)")?.code).toBe("tft");
+    expect(matchLabPanelByName("Urine Routine & Microscopy")?.code).toBe(
+      "urine_routine",
+    );
+  });
+
+  it("does not match single-analyte tests", () => {
+    expect(matchLabPanelByName("Hemoglobin (Hb)")).toBeUndefined();
+    expect(matchLabPanelByName("Serum Creatinine")).toBeUndefined();
+    expect(matchLabPanelByName("")).toBeUndefined();
   });
 });

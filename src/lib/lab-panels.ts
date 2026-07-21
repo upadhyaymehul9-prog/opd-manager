@@ -14,6 +14,8 @@ export type LabPanel = {
   name: string;
   /** Grouping shown in the picker (e.g. Hematology, Biochemistry). */
   category: string;
+  /** Alternate names that should resolve to this panel (catalog entries, shorthand). */
+  aliases: string[];
   components: LabPanelComponent[];
 };
 
@@ -30,6 +32,7 @@ export const LAB_PANELS: LabPanel[] = [
     code: "cbc",
     name: "CBC (Complete Blood Count)",
     category: "Hematology",
+    aliases: ["cbc", "complete blood count", "complete hemogram", "hemogram"],
     components: [
       { name: "Hemoglobin (Hb)", unit: "g/dL", ref_range: "M 13–17 / F 12–15", value_type: "numeric" },
       { name: "Total RBC Count", unit: "million/µL", ref_range: "M 4.5–5.5 / F 3.8–4.8", value_type: "numeric" },
@@ -56,6 +59,7 @@ export const LAB_PANELS: LabPanel[] = [
     code: "lft",
     name: "LFT (Liver Function Test)",
     category: "Biochemistry",
+    aliases: ["lft", "liver function test", "liver panel", "liver profile"],
     components: [
       { name: "Total Bilirubin", unit: "mg/dL", ref_range: "0.1–1.2", value_type: "numeric" },
       { name: "Direct Bilirubin", unit: "mg/dL", ref_range: "0–0.3", value_type: "numeric" },
@@ -74,6 +78,13 @@ export const LAB_PANELS: LabPanel[] = [
     code: "kft",
     name: "KFT / RFT (Kidney Function Test)",
     category: "Biochemistry",
+    aliases: [
+      "kft",
+      "rft",
+      "kidney function test",
+      "renal function test",
+      "renal profile",
+    ],
     components: [
       { name: "Blood Urea", unit: "mg/dL", ref_range: "15–40", value_type: "numeric" },
       { name: "Blood Urea Nitrogen (BUN)", unit: "mg/dL", ref_range: "7–20", value_type: "numeric" },
@@ -90,6 +101,7 @@ export const LAB_PANELS: LabPanel[] = [
     code: "lipid",
     name: "Lipid Profile",
     category: "Biochemistry",
+    aliases: ["lipid profile", "lipid panel", "fasting lipid profile"],
     components: [
       { name: "Total Cholesterol", unit: "mg/dL", ref_range: "<200", value_type: "numeric" },
       { name: "Triglycerides", unit: "mg/dL", ref_range: "<150", value_type: "numeric" },
@@ -104,6 +116,7 @@ export const LAB_PANELS: LabPanel[] = [
     code: "tft",
     name: "TFT (Thyroid Function Test)",
     category: "Endocrinology",
+    aliases: ["tft", "thyroid function test", "thyroid profile", "thyroid panel"],
     components: [
       { name: "T3 (Triiodothyronine)", unit: "ng/dL", ref_range: "80–200", value_type: "numeric" },
       { name: "T4 (Thyroxine)", unit: "µg/dL", ref_range: "5–12", value_type: "numeric" },
@@ -114,6 +127,11 @@ export const LAB_PANELS: LabPanel[] = [
     code: "electrolytes",
     name: "Serum Electrolytes",
     category: "Biochemistry",
+    aliases: [
+      "serum electrolytes",
+      "serum electrolytes (na/k/cl)",
+      "electrolytes",
+    ],
     components: [
       { name: "Sodium (Na)", unit: "mmol/L", ref_range: "135–145", value_type: "numeric" },
       { name: "Potassium (K)", unit: "mmol/L", ref_range: "3.5–5.1", value_type: "numeric" },
@@ -124,6 +142,7 @@ export const LAB_PANELS: LabPanel[] = [
     code: "diabetes",
     name: "Blood Sugar Panel",
     category: "Diabetes",
+    aliases: ["blood sugar panel", "sugar profile", "diabetes profile"],
     components: [
       { name: "Fasting Blood Sugar (FBS)", unit: "mg/dL", ref_range: "70–100", value_type: "numeric" },
       { name: "Post-Prandial Blood Sugar (PP2BS)", unit: "mg/dL", ref_range: "<140", value_type: "numeric" },
@@ -135,6 +154,12 @@ export const LAB_PANELS: LabPanel[] = [
     code: "coagulation",
     name: "Coagulation Profile (PT/INR)",
     category: "Hematology",
+    aliases: [
+      "coagulation profile",
+      "pt/inr",
+      "prothrombin time (pt/inr)",
+      "pt inr",
+    ],
     components: [
       { name: "Prothrombin Time (PT)", unit: "sec", ref_range: "11–13.5", value_type: "numeric" },
       { name: "INR", unit: null, ref_range: "0.8–1.2", value_type: "numeric" },
@@ -145,6 +170,7 @@ export const LAB_PANELS: LabPanel[] = [
     code: "iron",
     name: "Iron Studies",
     category: "Biochemistry",
+    aliases: ["iron studies", "iron profile"],
     components: [
       { name: "Serum Iron", unit: "µg/dL", ref_range: "60–170", value_type: "numeric" },
       { name: "TIBC", unit: "µg/dL", ref_range: "250–450", value_type: "numeric" },
@@ -156,6 +182,12 @@ export const LAB_PANELS: LabPanel[] = [
     code: "urine_routine",
     name: "Urine Routine & Microscopy",
     category: "Clinical Pathology",
+    aliases: [
+      "urine routine & microscopy",
+      "urine routine",
+      "urine r/m",
+      "urine rm",
+    ],
     components: [
       { name: "Colour", unit: null, ref_range: "Pale yellow", value_type: "text" },
       { name: "Appearance", unit: null, ref_range: "Clear", value_type: "text" },
@@ -180,6 +212,7 @@ export const LAB_PANELS: LabPanel[] = [
     code: "widal",
     name: "Widal Test",
     category: "Serology",
+    aliases: ["widal test", "widal"],
     components: [
       { name: "S. Typhi O", unit: "titre", ref_range: "<1:80", value_type: "text" },
       { name: "S. Typhi H", unit: "titre", ref_range: "<1:80", value_type: "text" },
@@ -191,6 +224,7 @@ export const LAB_PANELS: LabPanel[] = [
     code: "dengue",
     name: "Dengue Profile",
     category: "Serology",
+    aliases: ["dengue profile", "dengue igm / igg", "dengue panel"],
     components: [
       { name: "Dengue NS1 Antigen", unit: null, ref_range: "Negative", value_type: "text" },
       { name: "Dengue IgM", unit: null, ref_range: "Negative", value_type: "text" },
@@ -201,4 +235,19 @@ export const LAB_PANELS: LabPanel[] = [
 
 export function getLabPanel(code: string): LabPanel | undefined {
   return LAB_PANELS.find((p) => p.code === code);
+}
+
+/**
+ * Resolve a test name (as stored in the catalog or typed by a doctor) to a
+ * panel template, so ordering "CBC (Complete Blood Count)" can expand into the
+ * full multi-component report instead of one free-text row.
+ */
+export function matchLabPanelByName(name: string): LabPanel | undefined {
+  const normalized = name.trim().toLowerCase();
+  if (!normalized) return undefined;
+  return LAB_PANELS.find(
+    (p) =>
+      p.name.toLowerCase() === normalized ||
+      p.aliases.some((a) => a === normalized),
+  );
 }
