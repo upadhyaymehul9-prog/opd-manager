@@ -34,7 +34,7 @@ export default function LabPage() {
   return (
     <ConsoleShell
       title="Laboratory Console"
-      subtitle="Call patient → mark arrived → set report ready time → send back to doctor"
+      subtitle="Call patient → mark arrived → enter results → send back to doctor"
       current="/lab"
     >
       {loading && <p className="text-slate-600">Loading…</p>}
@@ -50,13 +50,10 @@ export default function LabPage() {
             <strong>Patient Arrived</strong> — patient is at the lab counter
           </li>
           <li>
-            <strong>Set ready time &amp; start</strong> — enter minutes until report is ready
+            <strong>Set ready time &amp; start</strong> — enter minutes until report is ready (optional if results are already entered)
           </li>
           <li>
-            <strong>Report Ready</strong> — tests finished
-          </li>
-          <li>
-            <strong>Send Back to Doctor</strong> — returns patient to doctor cabin
+            <strong>Report Ready</strong> or <strong>Send Back to Doctor</strong> — use either once tests are done; send back returns patient to doctor cabin
           </li>
         </ol>
       </div>

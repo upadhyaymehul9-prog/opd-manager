@@ -155,7 +155,9 @@ export function getLabActions(status: PatientStatus): StatusAction[] {
     case "at_lab":
       return LAB_ACTIONS.filter((a) => a.status === "lab_processing");
     case "lab_processing":
-      return LAB_ACTIONS.filter((a) => a.status === "lab_ready");
+      return LAB_ACTIONS.filter((a) =>
+        ["lab_ready", "return_to_doctor"].includes(a.status),
+      );
     case "lab_ready":
       return LAB_ACTIONS.filter((a) => a.status === "return_to_doctor");
     default:
@@ -174,7 +176,9 @@ export function getRadiologyActions(status: PatientStatus): StatusAction[] {
     case "at_radiology":
       return RADIOLOGY_ACTIONS.filter((a) => a.status === "radio_processing");
     case "radio_processing":
-      return RADIOLOGY_ACTIONS.filter((a) => a.status === "radio_ready");
+      return RADIOLOGY_ACTIONS.filter((a) =>
+        ["radio_ready", "return_to_doctor"].includes(a.status),
+      );
     case "radio_ready":
       return RADIOLOGY_ACTIONS.filter((a) => a.status === "return_to_doctor");
     default:

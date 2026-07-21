@@ -26,6 +26,11 @@ describe("isValidStatusTransition", () => {
     expect(isValidStatusTransition("to_lab", "lab_calling")).toBe(true);
     expect(isValidStatusTransition("lab_calling", "at_lab")).toBe(true);
   });
+
+  it("allows send-back from lab processing when results are already entered", () => {
+    expect(isValidStatusTransition("lab_processing", "return_to_doctor")).toBe(true);
+    expect(isValidStatusTransition("lab_processing", "lab_ready")).toBe(true);
+  });
 });
 
 describe("roleMaySetStatus", () => {

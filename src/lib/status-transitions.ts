@@ -13,12 +13,14 @@ const TRANSITIONS: Record<PatientStatus, readonly PatientStatus[]> = {
   to_lab: ["lab_calling", "at_lab"],
   lab_calling: ["at_lab"],
   at_lab: ["lab_processing"],
-  lab_processing: ["lab_ready"],
+  // Results may already be entered mid-processing, so allow sending the
+  // patient back without a separate "Report Ready" click.
+  lab_processing: ["lab_ready", "return_to_doctor", "in_followup"],
   lab_ready: ["return_to_doctor", "in_followup"],
   to_radiology: ["radio_calling", "at_radiology"],
   radio_calling: ["at_radiology"],
   at_radiology: ["radio_processing"],
-  radio_processing: ["radio_ready"],
+  radio_processing: ["radio_ready", "return_to_doctor", "in_followup"],
   radio_ready: ["return_to_doctor", "in_followup"],
   return_to_doctor: [
     "in_consultation",
@@ -103,15 +105,19 @@ export function roleMaySetStatus(
     return CLINICAL_ROLES.includes(role);
   }
 
-  if (LAB_STATUSES.includes(to) || (from.startsWith("lab") && to === "return_to_doctor") || (from === "lab_ready" && to === "in_followup")) {
+  if (
+    LAB_STATUSES.includes(to) ||
+    (from.startsWith("lab") &&
+      (to === "return_to_doctor" || to === "in_followup"))
+  ) {
     if (to === "to_lab") return CLINICAL_ROLES.includes(role);
     return LAB_ROLES.includes(role) || CLINICAL_ROLES.includes(role);
   }
 
   if (
     RADIO_STATUSES.includes(to) ||
-    (from.startsWith("radio") && to === "return_to_doctor") ||
-    (from === "radio_ready" && to === "in_followup")
+    (from.startsWith("radio") &&
+      (to === "return_to_doctor" || to === "in_followup"))
   ) {
     if (to === "to_radiology") return CLINICAL_ROLES.includes(role);
     return RADIO_ROLES.includes(role) || CLINICAL_ROLES.includes(role);
