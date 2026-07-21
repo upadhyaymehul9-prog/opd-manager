@@ -17,12 +17,6 @@ const VIEW_ROLES = new Set([
   "radiology",
 ]);
 
-/** Visit statuses where ordering tests should also move the patient into the lab queue. */
-const CONSULT_STATUSES = new Set([
-  "in_consultation",
-  "return_to_doctor",
-  "in_followup",
-]);
 
 export async function GET(
   _request: Request,
@@ -131,13 +125,9 @@ export async function POST(
         throw new AppError("No valid tests to add", 400);
       }
 
-      // Keep structured orders in sync with the visit lab queue when ordered mid-consult.
-      if (CONSULT_STATUSES.has(visit.status)) {
-        await tx.patientVisit.update({
-          where: { id: visitId },
-          data: { status: "to_lab", lab_referred: true },
-        });
-      } else if (!visit.lab_referred) {
+      // Ordering tests only flags the referral — the doctor moves the patient
+      // with the explicit "Send to Lab" button when the consult step is done.
+      if (!visit.lab_referred) {
         await tx.patientVisit.update({
           where: { id: visitId },
           data: { lab_referred: true },
