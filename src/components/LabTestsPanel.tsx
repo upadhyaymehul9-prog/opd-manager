@@ -6,6 +6,7 @@ import type {
   VisitLabTestItem,
 } from "@/lib/lab-test-types";
 import { formatLabValue } from "@/lib/lab-tests";
+import { LAB_PANELS, getLabPanel } from "@/lib/lab-panels";
 
 type LabTestsPanelProps = {
   visitId: string;
@@ -26,6 +27,7 @@ export function LabTestsPanel({
   const [catalog, setCatalog] = useState<LabTestCatalogItem[]>([]);
   const [query, setQuery] = useState("");
   const [selectedCatalogId, setSelectedCatalogId] = useState("");
+  const [selectedPanel, setSelectedPanel] = useState("");
   const [customName, setCustomName] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -101,6 +103,39 @@ export function LabTestsPanel({
       await loadTests();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not add test");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addPanel() {
+    const panel = getLabPanel(selectedPanel);
+    if (!panel) {
+      setError("Pick a report panel first");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/visits/${visitId}/lab-tests`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: panel.components.map((c) => ({
+            test_name: c.name,
+            unit: c.unit,
+            ref_range: c.ref_range,
+            value_type: c.value_type,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not add panel");
+      setSelectedPanel("");
+      await loadTests();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not add panel");
     } finally {
       setBusy(false);
     }
@@ -203,8 +238,48 @@ export function LabTestsPanel({
       </div>
 
       {canOrder && (
+        <div className="mt-3 space-y-2 rounded-lg border border-violet-200 bg-violet-50/60 p-3">
+          <p className="text-xs font-medium text-violet-900">
+            Add full report panel — expands into every component with reference ranges
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={selectedPanel}
+              onChange={(e) => setSelectedPanel(e.target.value)}
+              className="min-w-[220px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">Pick a report panel (CBC, LFT, KFT…)</option>
+              {Array.from(new Set(LAB_PANELS.map((p) => p.category))).map(
+                (category) => (
+                  <optgroup key={category} label={category}>
+                    {LAB_PANELS.filter((p) => p.category === category).map(
+                      (p) => (
+                        <option key={p.code} value={p.code}>
+                          {p.name} ({p.components.length})
+                        </option>
+                      ),
+                    )}
+                  </optgroup>
+                ),
+              )}
+            </select>
+            <button
+              type="button"
+              onClick={addPanel}
+              disabled={busy || !selectedPanel}
+              className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+            >
+              Add panel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {canOrder && (
         <div className="mt-3 space-y-2 rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
-          <p className="text-xs font-medium text-emerald-900">Add test</p>
+          <p className="text-xs font-medium text-emerald-900">
+            Add single test
+          </p>
           <div className="flex flex-wrap gap-2">
             <input
               type="search"
