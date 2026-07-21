@@ -172,6 +172,49 @@ export function LabTestsPanel({
     }
   }
 
+  function pendingDraftLines() {
+    return tests
+      .filter((t) => t.status !== "resulted" && t.status !== "cancelled")
+      .map((t) => {
+        const draft = drafts[t.id];
+        if (!draft) return null;
+        const value_numeric =
+          t.value_type !== "text" && draft.value_numeric !== ""
+            ? Number(draft.value_numeric)
+            : null;
+        const value_text =
+          t.value_type !== "numeric" ? draft.value_text.trim() || null : null;
+        if (value_numeric == null && !value_text) return null;
+        return { id: t.id, value_numeric, value_text, notes: draft.notes || null };
+      })
+      .filter((line): line is NonNullable<typeof line> => line !== null);
+  }
+
+  async function saveAllResults() {
+    const results = pendingDraftLines();
+    if (results.length === 0) {
+      setError("Enter values first — then save the whole report in one click");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/visits/${visitId}/lab-tests`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ results }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not save results");
+      await loadTests();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save results");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function markCollected(testId: string) {
     setBusy(true);
     setError(null);
@@ -335,6 +378,23 @@ export function LabTestsPanel({
         </p>
       )}
 
+      {canEnterResults &&
+        tests.some((t) => t.status === "ordered" || t.status === "collected") && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2">
+            <p className="text-xs font-medium text-emerald-900">
+              Enter values below, then store the whole report in one click
+            </p>
+            <button
+              type="button"
+              onClick={saveAllResults}
+              disabled={busy}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              Save all results
+            </button>
+          </div>
+        )}
+
       {tests.length === 0 ? (
         <p className="mt-3 text-sm text-slate-500">
           No lab tests added yet.
@@ -468,6 +528,21 @@ export function LabTestsPanel({
               })}
             </tbody>
           </table>
+          {canEnterResults &&
+            tests.some(
+              (t) => t.status === "ordered" || t.status === "collected",
+            ) && (
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={saveAllResults}
+                  disabled={busy}
+                  className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  Save all results
+                </button>
+              </div>
+            )}
         </div>
       )}
     </section>
