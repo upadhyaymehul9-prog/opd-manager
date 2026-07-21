@@ -137,6 +137,25 @@ export function LabTestsPanel({
     }
   }
 
+  async function markCollected(testId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/visits/${visitId}/lab-tests/${testId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "collected" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not mark collected");
+      await loadTests();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not mark collected");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function removeTest(testId: string) {
     if (!window.confirm("Cancel this lab test order?")) return;
     setBusy(true);
@@ -335,6 +354,16 @@ export function LabTestsPanel({
                     {(canEnterResults || canOrder) && (
                       <td className="py-2">
                         <div className="flex flex-col gap-1">
+                          {canEnterResults && test.status === "ordered" && (
+                            <button
+                              type="button"
+                              onClick={() => markCollected(test.id)}
+                              disabled={busy}
+                              className="rounded border border-blue-300 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                            >
+                              Sample collected
+                            </button>
+                          )}
                           {canEnterResults && !isResulted && (
                             <button
                               type="button"
@@ -345,7 +374,8 @@ export function LabTestsPanel({
                               Save result
                             </button>
                           )}
-                          {canOrder && test.status === "ordered" && (
+                          {canOrder &&
+                            (test.status === "ordered" || test.status === "collected") && (
                             <button
                               type="button"
                               onClick={() => removeTest(test.id)}

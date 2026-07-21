@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { AUDIT_ACTIONS, diffFields, getSessionFromCookies, logAudit } from "@/lib/audit";
 
@@ -53,7 +54,6 @@ export async function PATCH(
 
     return NextResponse.json(incident);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Update failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("incidents/[id] PATCH", e, "Update failed");
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
 import { mergePatients } from "@/lib/patient-merge";
@@ -59,7 +60,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, target, summary });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Merge failed";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return errorResponse("patients/merge POST", e, "Merge failed");
   }
 }

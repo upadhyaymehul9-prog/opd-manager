@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import {
   LOW_STOCK_THRESHOLD,
@@ -54,13 +56,15 @@ export async function GET(request: Request) {
 
     return NextResponse.json(filtered);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Stock error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("stock GET", e, "Stock error");
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const body = await request.json();
     const medicine_id = String(body.medicine_id ?? "").trim();
     const quantity = Number(body.quantity);
@@ -123,7 +127,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(serializeBatch(batch), { status: 201 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Stock error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("stock POST", e, "Stock error");
   }
 }

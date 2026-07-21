@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { parseDateParam, todayStr } from "@/lib/date-range";
 import { buildReconciliation } from "@/lib/reconciliation";
 
@@ -11,7 +12,6 @@ export async function GET(request: Request) {
     const report = await buildReconciliation(date);
     return NextResponse.json(report);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Reconciliation error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("reconciliation GET", e, "Reconciliation error");
   }
 }

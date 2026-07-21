@@ -1,17 +1,24 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
+import { canWritePrescription } from "@/lib/status";
 import { prisma } from "@/lib/prisma";
 import { serializePrescription } from "@/lib/serialize";
-import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
+import { AUDIT_ACTIONS, logAudit } from "@/lib/audit";
+import type { PatientStatus } from "@/lib/types";
 
-const prescriptionInclude = { items: true };
+const prescriptionInclude = { items: { where: { voided_at: null } } };
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const session = guard.session;
+
     const { id } = await params;
-    const session = await getSessionFromCookies();
     const rawBody = await request.text();
     const body = rawBody
       ? (JSON.parse(rawBody) as { acknowledged_warnings?: unknown[] })
@@ -19,7 +26,10 @@ export async function POST(
 
     const prescription = await prisma.prescription.findUnique({
       where: { id },
-      include: prescriptionInclude,
+      include: {
+        ...prescriptionInclude,
+        patient_visit: { select: { status: true } },
+      },
     });
 
     if (!prescription) {
@@ -40,13 +50,30 @@ export async function POST(
       );
     }
 
+    const visitStatus = prescription.patient_visit.status as PatientStatus;
+    const alreadyAtPharmacy =
+      visitStatus === "to_pharmacy" || visitStatus === "at_pharmacy";
+    // Sending is only valid from consult-side stages — never from lab/radiology
+    // queues or a completed visit (that would silently yank the patient's
+    // status out of the current workflow step).
+    if (!alreadyAtPharmacy && !canWritePrescription(visitStatus)) {
+      return NextResponse.json(
+        {
+          error: `Cannot send to pharmacy while patient is "${visitStatus}" — finish the current step first`,
+        },
+        { status: 400 },
+      );
+    }
+
     const now = new Date();
 
     const updated = await prisma.$transaction(async (tx) => {
-      await tx.patientVisit.update({
-        where: { id: prescription.patient_visit_id },
-        data: { status: "to_pharmacy" },
-      });
+      if (!alreadyAtPharmacy) {
+        await tx.patientVisit.update({
+          where: { id: prescription.patient_visit_id },
+          data: { status: "to_pharmacy" },
+        });
+      }
 
       return tx.prescription.update({
         where: { id },
@@ -72,7 +99,6 @@ export async function POST(
 
     return NextResponse.json(serializePrescription(updated));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Send failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("prescriptions/[id]/send", e, "Send failed");
   }
 }

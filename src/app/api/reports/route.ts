@@ -1,17 +1,20 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 import { resolveRange, todayStr } from "@/lib/date-range";
 import { prisma } from "@/lib/prisma";
 
 const LAB_STATUSES = new Set([
   "to_lab",
+  "lab_calling",
   "at_lab",
   "lab_processing",
   "lab_ready",
 ]);
 const RADIO_STATUSES = new Set([
   "to_radiology",
+  "radio_calling",
   "at_radiology",
   "radio_processing",
   "radio_ready",
@@ -295,7 +298,6 @@ export async function GET(request: Request) {
       })),
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Report error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("reports GET", e, "Report error");
   }
 }

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { DEFAULT_CONSULTATION_TEMPLATES } from "@/lib/emr-types";
 import { prisma } from "@/lib/prisma";
 import { serializeTemplate } from "@/lib/emr";
@@ -27,13 +29,15 @@ export async function GET(request: Request) {
 
     return NextResponse.json(templates.map(serializeTemplate));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to load templates";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("consultation-templates GET", e, "Failed to load templates");
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const body = await request.json();
     const {
       doctor_id,
@@ -61,7 +65,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(serializeTemplate(template), { status: 201 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Create failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("consultation-templates POST", e, "Create failed");
   }
 }

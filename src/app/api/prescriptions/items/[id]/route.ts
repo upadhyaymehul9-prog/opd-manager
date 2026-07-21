@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { AppError, errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { computePrescriptionStatus } from "@/lib/prescription-status";
 import { getSessionFromCookies } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
@@ -37,18 +38,55 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const { id } = await params;
     const body = await request.json();
 
     const item = await prisma.prescriptionItem.findUnique({
       where: { id },
       include: {
-        prescription: { include: { items: { where: { voided_at: null } } } },
+        prescription: {
+          include: {
+            items: { where: { voided_at: null } },
+            patient_visit: {
+              select: { status: true, pharmacy_bill: { select: { id: true } } },
+            },
+          },
+        },
       },
     });
 
     if (!item) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const visit = item.prescription.patient_visit;
+    const dispensedChanging =
+      body.dispensed !== undefined && Boolean(body.dispensed) !== item.dispensed;
+
+    // A completed visit is discharged — dispensing changes would silently
+    // reopen it or desync stock from the final bill.
+    if (visit?.status === "completed" && dispensedChanging) {
+      return NextResponse.json(
+        { error: "Visit already completed — dispensing can no longer be changed" },
+        { status: 409 },
+      );
+    }
+
+    // Once a pharmacy bill exists, un-dispensing would restore stock while
+    // the bill still charges for it. Require the bill to be voided first.
+    if (
+      visit?.pharmacy_bill &&
+      body.dispensed !== undefined &&
+      !body.dispensed &&
+      item.dispensed
+    ) {
+      return NextResponse.json(
+        { error: "A pharmacy bill exists for this visit — cannot un-dispense billed items" },
+        { status: 409 },
+      );
     }
 
     const dispensed = body.dispensed !== undefined ? Boolean(body.dispensed) : item.dispensed;
@@ -162,7 +200,9 @@ export async function PATCH(
         },
       });
 
-      if (dispensed) {
+      // Only advance to_pharmacy → at_pharmacy; never yank a visit out of
+      // another stage (or reopen a completed one) as a dispensing side effect.
+      if (dispensed && visit?.status === "to_pharmacy") {
         await tx.patientVisit.update({
           where: { id: item.prescription.patient_visit_id },
           data: { status: "at_pharmacy" },
@@ -179,10 +219,13 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const { id } = await params;
 
     const item = await prisma.prescriptionItem.findUnique({

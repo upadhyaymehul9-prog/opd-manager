@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { LOW_STOCK_THRESHOLD, usableBatchWhere } from "@/lib/stock";
 
@@ -49,7 +50,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json(availability);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Stock error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("stock/availability GET", e, "Stock error");
   }
 }

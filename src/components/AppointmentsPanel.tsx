@@ -142,11 +142,20 @@ export function AppointmentsPanel({
   }
 
   async function handleArrive(id: string) {
+    if (
+      !window.confirm(
+        "Confirm the patient has given informed consent for consultation and treatment (NABH)?",
+      )
+    ) {
+      return;
+    }
     setArrivingId(id);
     setError(null);
     try {
       const res = await fetch(`/api/appointments/${id}/arrive`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ consent_accepted: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Registration failed");

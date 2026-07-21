@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 
 function rating(v: unknown): number | null {
@@ -10,6 +11,9 @@ function rating(v: unknown): number | null {
 
 export async function POST(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const body = await request.json();
     const patient_name = String(body.patient_name ?? "").trim();
     const q1 = rating(body.q1_overall);

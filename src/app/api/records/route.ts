@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 import { resolveRange, todayStr } from "@/lib/date-range";
 import { serializeBill } from "@/lib/billing";
@@ -65,7 +66,6 @@ export async function GET(request: Request) {
       rows,
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Records error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("records GET", e, "Records error");
   }
 }

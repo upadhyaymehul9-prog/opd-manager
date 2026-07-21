@@ -99,6 +99,18 @@ export function visitMessageForStatus(
         tokenNumber: visit.token_number,
         roomNumber: visit.room_number,
       });
+    case "lab_calling":
+      return (
+        `Dear ${visit.patient_name},\n\n` +
+        `Token #${visit.token_number} — please proceed to the laboratory for your tests.\n\n` +
+        `— ${CLINIC}`
+      );
+    case "radio_calling":
+      return (
+        `Dear ${visit.patient_name},\n\n` +
+        `Token #${visit.token_number} — please proceed to radiology for your scan.\n\n` +
+        `— ${CLINIC}`
+      );
     case "lab_ready":
       return labReadyMessage({
         patientName: visit.patient_name,

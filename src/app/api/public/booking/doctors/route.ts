@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { verifyBookMyClinicKey } from "@/lib/bookmyclinic";
 
@@ -21,7 +22,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ doctors });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to load doctors";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("public/booking/doctors GET", e, "Failed to load doctors");
   }
 }

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import {
   assertSlotAvailable,
@@ -13,6 +15,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const { id } = await params;
     const body = await request.json();
     const { status, notes } = body as { status?: string; notes?: string };
@@ -51,7 +56,6 @@ export async function PATCH(
 
     return NextResponse.json(serializeAppointment(appointment));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Update failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("appointments/[id] PATCH", e, "Update failed");
   }
 }

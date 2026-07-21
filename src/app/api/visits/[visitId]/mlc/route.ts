@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
 import { nextCasualtyNumber, serializeMlcRecord } from "@/lib/mlc";
@@ -19,8 +20,7 @@ export async function GET(
     });
     return NextResponse.json(record ? serializeMlcRecord(record) : null);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to load MLC record";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("visits/[visitId]/mlc GET", e, "Failed to load MLC record");
   }
 }
 
@@ -86,8 +86,7 @@ export async function POST(
 
     return NextResponse.json(serializeMlcRecord(record), { status: 201 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to create MLC record";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("visits/[visitId]/mlc POST", e, "Failed to create MLC record");
   }
 }
 
@@ -169,7 +168,6 @@ export async function PATCH(
 
     return NextResponse.json(serializeMlcRecord(updated));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to update MLC record";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("visits/[visitId]/mlc PATCH", e, "Failed to update MLC record");
   }
 }

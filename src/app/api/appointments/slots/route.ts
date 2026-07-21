@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { generateAvailableSlots } from "@/lib/appointments";
 
 export async function GET(request: Request) {
@@ -17,7 +18,6 @@ export async function GET(request: Request) {
     const slots = await generateAvailableSlots(doctorId, date);
     return NextResponse.json({ doctor_id: doctorId, date, slots });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to load slots";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("appointments/slots GET", e, "Failed to load slots");
   }
 }

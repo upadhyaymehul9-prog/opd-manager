@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { AppError, errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { visitInclude } from "@/lib/db-includes";
 import { nextConsultationBillNo } from "@/lib/consultation-billing";
@@ -8,12 +10,17 @@ import { isValidAbhaInput, parseAbhaInput } from "@/lib/abha";
 import { findDuplicatePatients } from "@/lib/duplicate-patients";
 import { serializeVisit } from "@/lib/serialize";
 import { nextTokenNumber } from "@/lib/tokens";
-import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
+import { AUDIT_ACTIONS, logAudit } from "@/lib/audit";
 import { CONSENT_TEXT_V1 } from "@/lib/nabh";
 import type { CreatePatientInput } from "@/lib/types";
 
-/** How far back "active" queues look — avoids loading years of abandoned visits. */
-const ACTIVE_LOOKBACK_DAYS = 2;
+/**
+ * How far back "active" queues look — avoids loading years of abandoned
+ * visits while keeping multi-day open visits (weekend lab holds, pending
+ * pharmacy pickups) visible on the live consoles. Active rows are already
+ * filtered to status != completed and capped at 500, so this stays cheap.
+ */
+const ACTIVE_LOOKBACK_DAYS = 30;
 
 export async function GET(request: Request) {
   try {
@@ -60,13 +67,16 @@ export async function GET(request: Request) {
 
     return NextResponse.json(visits.map(serializeVisit));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Database error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("patients GET", e, "Database error");
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const body = (await request.json()) as CreatePatientInput;
     const {
       patient_name,
@@ -105,8 +115,6 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-
-    const session = await getSessionFromCookies();
 
     if (!isValidAbhaInput(abha_id)) {
       return NextResponse.json(
@@ -186,7 +194,7 @@ export async function POST(request: Request) {
       let patient;
       if (patient_id) {
         patient = await tx.patient.findUnique({ where: { id: patient_id } });
-        if (!patient) throw new Error("Patient not found");
+        if (!patient) throw new AppError("Patient not found", 404);
         if (normalizedAbha && patient.abha_id !== normalizedAbha) {
           patient = await tx.patient.update({
             where: { id: patient_id },
@@ -281,19 +289,17 @@ export async function POST(request: Request) {
         include: visitInclude,
       });
 
-      if (session) {
-        await tx.patientConsent.create({
-          data: {
-            patient_visit_id: created.id,
-            patient_id: patient.id,
-            accepted: true,
-            consent_text: CONSENT_TEXT_V1,
-            recorded_by: session.displayName || session.username,
-            recorded_by_role: session.role,
-            witness_name: witness_name?.trim() || null,
-          },
-        });
-      }
+      await tx.patientConsent.create({
+        data: {
+          patient_visit_id: created.id,
+          patient_id: patient.id,
+          accepted: true,
+          consent_text: CONSENT_TEXT_V1,
+          recorded_by: session.displayName || session.username,
+          recorded_by_role: session.role,
+          witness_name: witness_name?.trim() || null,
+        },
+      });
 
       return created;
     });
@@ -320,7 +326,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(serializeVisit(visit), { status: 201 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Database error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("patients POST", e, "Database error");
   }
 }

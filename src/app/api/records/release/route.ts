@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { resolveRange } from "@/lib/date-range";
 import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
@@ -24,8 +25,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(rows);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to load ROI log";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("records/release GET", e, "Failed to load ROI log");
   }
 }
 
@@ -112,7 +112,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(row, { status: 201 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to create ROI log";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("records/release POST", e, "Failed to create ROI log");
   }
 }

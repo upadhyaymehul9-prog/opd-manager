@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { buildBillPreview } from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
 
@@ -20,7 +21,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json(preview);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Preview error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("bills/preview GET", e, "Preview error");
   }
 }

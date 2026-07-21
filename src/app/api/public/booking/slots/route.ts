@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { generateAvailableSlots } from "@/lib/appointments";
 import { verifyBookMyClinicKey } from "@/lib/bookmyclinic";
 
@@ -26,7 +27,6 @@ export async function GET(request: Request) {
       slots: slots.filter((s) => s.available),
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to load slots";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("public/booking/slots GET", e, "Failed to load slots");
   }
 }

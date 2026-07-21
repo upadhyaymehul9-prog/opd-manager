@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
 
@@ -15,8 +16,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(incidents);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to load incidents";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("incidents GET", e, "Failed to load incidents");
   }
 }
 
@@ -64,7 +64,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(incident, { status: 201 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to report incident";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("incidents POST", e, "Failed to report incident");
   }
 }

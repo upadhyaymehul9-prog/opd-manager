@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { startOfDay } from "@/lib/date-range";
 import { prisma } from "@/lib/prisma";
 import { getNabhComplianceSnapshot } from "@/lib/nabh-compliance";
@@ -26,7 +27,6 @@ export async function GET() {
 
     return NextResponse.json({ ...compliance, recentAudits });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to load compliance";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("nabh/compliance GET", e, "Failed to load compliance");
   }
 }

@@ -16,6 +16,7 @@ import type {
 
 const LAB_STATUSES = new Set([
   "to_lab",
+  "lab_calling",
   "at_lab",
   "lab_processing",
   "lab_ready",
@@ -23,6 +24,7 @@ const LAB_STATUSES = new Set([
 const LAB_PENDING = new Set(["to_lab", "lab_calling", "at_lab", "lab_processing"]);
 const RADIO_STATUSES = new Set([
   "to_radiology",
+  "radio_calling",
   "at_radiology",
   "radio_processing",
   "radio_ready",

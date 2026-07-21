@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { resolveRange } from "@/lib/date-range";
 import { prisma } from "@/lib/prisma";
 import { buildRecordCompletenessReport } from "@/lib/record-completeness";
@@ -46,7 +47,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json(buildRecordCompletenessReport(visits, from, to));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to load report";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("records/completeness GET", e, "Failed to load report");
   }
 }

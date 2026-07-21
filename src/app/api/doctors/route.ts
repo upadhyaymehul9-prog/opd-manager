@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { serializeDoctor } from "@/lib/serialize";
 
@@ -14,6 +15,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const body = await request.json();
     const { name, room_number, specialty } = body;
 

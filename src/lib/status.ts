@@ -133,10 +133,11 @@ export function getDoctorActions(status: PatientStatus): StatusAction[] {
           ) && a.label !== "Follow-up Done → Pharmacy",
       );
     case "in_followup":
-      return DOCTOR_ACTIONS.filter((a) =>
-        ["in_consultation", "to_lab", "to_radiology", "to_pharmacy", "completed"].includes(
-          a.status,
-        ),
+      return DOCTOR_ACTIONS.filter(
+        (a) =>
+          ["in_consultation", "to_lab", "to_radiology", "to_pharmacy", "completed"].includes(
+            a.status,
+          ) && a.label !== "Send to Pharmacy",
       );
     default:
       return [];

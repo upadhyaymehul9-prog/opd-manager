@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { serializeVisitEmr, visitEmrSelect } from "@/lib/emr";
-import { AUDIT_ACTIONS, diffFields, getSessionFromCookies, logAudit } from "@/lib/audit";
+import { AUDIT_ACTIONS, diffFields, logAudit } from "@/lib/audit";
 import type { UpdateVisitEmrInput } from "@/lib/emr-types";
 
 function trimOrNull(v: string | null | undefined) {
@@ -25,8 +27,7 @@ export async function GET(
 
     return NextResponse.json(serializeVisitEmr(visit));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to load EMR";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("visits/[visitId]/emr GET", e, "Failed to load EMR");
   }
 }
 
@@ -35,9 +36,12 @@ export async function PATCH(
   { params }: { params: Promise<{ visitId: string }> },
 ) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { visitId } = await params;
     const body = (await request.json()) as UpdateVisitEmrInput;
-    const session = await getSessionFromCookies();
 
     const existing = await prisma.patientVisit.findUnique({
       where: { id: visitId },
@@ -202,7 +206,6 @@ export async function PATCH(
 
     return NextResponse.json(serializeVisitEmr(result));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Save failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("visits/[visitId]/emr PATCH", e, "Save failed");
   }
 }

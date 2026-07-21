@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { getStockAudit } from "@/lib/stock-audit";
 
 export async function GET(
@@ -13,7 +14,6 @@ export async function GET(
     }
     return NextResponse.json(audit);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Stock audit error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("stock/audit/[id] GET", e, "Stock audit error");
   }
 }

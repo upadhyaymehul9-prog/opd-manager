@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 import { addDays, dateStrIST, startOfDay } from "@/lib/date-range";
 import { prisma } from "@/lib/prisma";
@@ -49,7 +50,6 @@ export async function GET() {
 
     return NextResponse.json(payload);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Collection error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("collection/today GET", e, "Collection error");
   }
 }

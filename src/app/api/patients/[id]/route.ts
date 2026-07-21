@@ -257,6 +257,7 @@ export async function DELETE(
         consent: { select: { id: true } },
         mlc_record: { select: { id: true } },
         prescription: { select: { id: true, pharmacy_bill: { select: { id: true } } } },
+        _count: { select: { emr_revisions: true } },
       },
     });
 
@@ -276,14 +277,22 @@ export async function DELETE(
         409,
       );
     }
-    if (existing.consent) {
+    if (existing._count.emr_revisions > 0) {
       throw new AppError(
-        "Cannot delete visit with recorded consent — remove is blocked for compliance",
+        "Cannot delete visit with EMR correction history — the medical record trail is permanent",
         409,
       );
     }
 
-    await prisma.patientVisit.delete({ where: { id } });
+    // Consent is auto-recorded at registration, so it must not block removing
+    // a mistaken registration. It is deleted with the visit; the audit log
+    // below retains who removed it and that a consent existed.
+    await prisma.$transaction(async (tx) => {
+      if (existing.consent) {
+        await tx.patientConsent.delete({ where: { id: existing.consent.id } });
+      }
+      await tx.patientVisit.delete({ where: { id } });
+    });
 
     await logAudit({
       action: AUDIT_ACTIONS.VISIT_DELETE,
@@ -294,6 +303,7 @@ export async function DELETE(
         status: existing.status,
         removed_by: session.displayName || session.username,
         removed_by_role: session.role,
+        had_consent: Boolean(existing.consent),
       },
       session,
     });

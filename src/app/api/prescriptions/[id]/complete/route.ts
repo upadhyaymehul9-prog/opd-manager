@@ -75,6 +75,18 @@ export async function POST(
           throw new AppError("Visit not found", 404);
         }
 
+        if (visit.status === "completed") {
+          throw new AppError("Visit is already completed", 409);
+        }
+        // Pharmacy exit only applies to visits actually at the pharmacy —
+        // a patient still in consult/lab must finish those steps first.
+        if (visit.status !== "to_pharmacy" && visit.status !== "at_pharmacy") {
+          throw new AppError(
+            `Patient is "${visit.status}" — send to pharmacy before completing the visit`,
+            400,
+          );
+        }
+
         const pending = pendingRxItems(prescription.items);
         if (pending.length > 0) {
           throw new AppError(
@@ -156,6 +168,6 @@ export async function POST(
         );
       }
     }
-    return errorResponse("prescriptions/[id]/complete", e, "Complete failed");
+    return errorResponse("prescriptions/[id]/complete POST", e, "Complete failed");
   }
 }

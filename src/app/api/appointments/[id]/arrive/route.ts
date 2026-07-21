@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
 import { visitInclude } from "@/lib/db-includes";
 import { nextConsultationBillNo } from "@/lib/consultation-billing";
@@ -10,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { serializeAppointment } from "@/lib/appointments";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -18,6 +19,18 @@ export async function POST(
     const session = await getSessionFromCookies();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = (await request.json().catch(() => ({}))) as {
+      consent_accepted?: boolean;
+    };
+    // Same NABH rule as walk-in registration: consent must be explicitly
+    // confirmed by the patient at check-in, not silently auto-recorded.
+    if (!body.consent_accepted) {
+      return NextResponse.json(
+        { error: "Informed consent must be confirmed at check-in (NABH)" },
+        { status: 400 },
+      );
     }
 
     const appointment = await prisma.appointment.findUnique({
@@ -130,7 +143,6 @@ export async function POST(
       already_registered: false,
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Registration failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("appointments/[id]/arrive POST", e, "Registration failed");
   }
 }

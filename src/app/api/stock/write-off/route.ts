@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { AppError, errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { serializeMedicine } from "@/lib/serialize";
 import { serializeBatch } from "@/lib/stock";
@@ -23,13 +25,15 @@ export async function GET() {
       })),
     );
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Write-off error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("stock/write-off GET", e, "Write-off error");
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const body = await request.json();
     const batch_id = String(body.batch_id ?? "").trim();
     const reason = String(body.reason ?? "expired").trim();
@@ -48,12 +52,12 @@ export async function POST(request: Request) {
       });
 
       if (!batch) {
-        throw new Error("Batch not found");
+        throw new AppError("Batch not found", 404);
       }
 
       const deduct = qtyOverride ?? batch.quantity;
       if (deduct <= 0 || deduct > batch.quantity) {
-        throw new Error("Invalid quantity for write-off");
+        throw new AppError("Invalid quantity for write-off", 400);
       }
 
       const remaining = batch.quantity - deduct;
@@ -96,7 +100,6 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Write-off error";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return errorResponse("stock/write-off POST", e, "Write-off error");
   }
 }

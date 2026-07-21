@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import {
   getPharmacyStockSnapshot,
   listStockAudits,
   saveStockAudit,
 } from "@/lib/stock-audit";
-import { getSessionFromCookies } from "@/lib/audit";
 
 export async function GET(request: Request) {
   try {
@@ -17,14 +18,16 @@ export async function GET(request: Request) {
     const audits = await listStockAudits();
     return NextResponse.json(audits);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Stock audit error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("stock/audit GET", e, "Stock audit error");
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const session = await getSessionFromCookies();
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const body = await request.json();
     const audit = await saveStockAudit({
       audit_date: String(body.audit_date ?? new Date().toISOString().slice(0, 10)),
@@ -35,7 +38,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(audit, { status: 201 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Stock audit error";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return errorResponse("stock/audit POST", e, "Stock audit error");
   }
 }

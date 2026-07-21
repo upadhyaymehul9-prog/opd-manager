@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { parseAbhaInput } from "@/lib/abha";
 
@@ -86,7 +87,6 @@ export async function GET(request: Request) {
       }),
     );
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Search error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("patients/search GET", e, "Search error");
   }
 }

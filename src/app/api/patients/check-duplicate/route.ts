@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { findDuplicatePatients } from "@/lib/duplicate-patients";
 
 export async function GET(request: Request) {
@@ -29,7 +30,6 @@ export async function GET(request: Request) {
       })),
     );
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Check failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("patients/check-duplicate GET", e, "Check failed");
   }
 }

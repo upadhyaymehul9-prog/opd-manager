@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import {
   assertSlotAvailable,
   getClinicSchedule,
@@ -83,7 +84,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(serializeAppointment(appointment), { status: 201 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Booking failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("public/booking/appointments POST", e, "Booking failed");
   }
 }

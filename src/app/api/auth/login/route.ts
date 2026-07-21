@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import type { UserRole } from "@/lib/auth-types";
 import {
   createSessionToken,
@@ -103,7 +104,6 @@ export async function POST(request: Request) {
 
     return response;
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Login failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("auth/login POST", e, "Login failed");
   }
 }

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { serializeDoctor } from "@/lib/serialize";
@@ -29,8 +31,7 @@ export async function GET(
 
     return NextResponse.json(serializeDoctor(doctor));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Database error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("doctors/[id] GET", e, "Database error");
   }
 }
 
@@ -39,6 +40,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const { id } = await params;
     const token = (await cookies()).get(SESSION_COOKIE)?.value;
     const session = token ? await verifySessionToken(token) : null;
@@ -101,7 +105,6 @@ export async function PATCH(
 
     return NextResponse.json(serializeDoctor(doctor));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Update failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("doctors/[id] PATCH", e, "Update failed");
   }
 }

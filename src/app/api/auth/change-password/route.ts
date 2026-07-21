@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import {
   createSessionToken,
   hashPassword,
@@ -72,7 +73,6 @@ export async function POST(request: Request) {
     response.cookies.set(sessionCookieOptions(token));
     return response;
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Password change failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("auth/change-password POST", e, "Password change failed");
   }
 }

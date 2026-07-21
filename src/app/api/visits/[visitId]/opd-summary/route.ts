@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { visitInclude } from "@/lib/db-includes";
 import { serializeVisit } from "@/lib/serialize";
@@ -54,7 +55,6 @@ export async function GET(
       lab_tests: labTests.map(serializeVisitLabTest),
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to load summary";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("visits/[visitId]/opd-summary GET", e, "Failed to load summary");
   }
 }

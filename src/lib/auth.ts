@@ -289,7 +289,8 @@ export function canAccessApi(
     if (session.role === "admin" || session.role === "manager") return true;
     if (session.role !== "doctor") return false;
     const doctorId = pathname.split("/")[3];
-    return !session.doctorId || session.doctorId === doctorId;
+    // A doctor account may only edit its own linked doctor profile.
+    return Boolean(session.doctorId) && session.doctorId === doctorId;
   }
 
   if (pathname === "/api/patients" && method === "POST") {
@@ -378,7 +379,9 @@ export function canAccessApi(
   }
 
   if (pathname.startsWith("/api/prescriptions/items/") && method === "DELETE") {
+    // Doctors remove medicines from their own prescriptions (soft-void).
     return (
+      session.role === "doctor" ||
       session.role === "pharmacy" ||
       session.role === "admin" ||
       session.role === "manager"
@@ -401,7 +404,12 @@ export function canAccessApi(
   }
 
   if (pathname === "/api/stock/write-off" && method === "POST") {
-    return session.role === "admin" || session.role === "manager";
+    // Write-off is a routine pharmacy task (expired/damaged stock).
+    return (
+      session.role === "pharmacy" ||
+      session.role === "admin" ||
+      session.role === "manager"
+    );
   }
 
   if (

@@ -34,12 +34,16 @@ export async function PATCH(
       body.notes !== undefined;
     const isCancel = body.status === "cancelled";
     const isResult = hasValue || body.status === "resulted";
+    const isCollect = body.status === "collected";
 
-    if (isResult && !RESULT_ROLES.has(session.role)) {
+    if ((isResult || isCollect) && !RESULT_ROLES.has(session.role)) {
       throw new AppError("Unauthorized", 401);
     }
     if (isCancel && !ORDER_ROLES.has(session.role)) {
       throw new AppError("Unauthorized", 401);
+    }
+    if (isCollect && existing.status !== "ordered") {
+      throw new AppError("Only an ordered test can be marked collected", 400);
     }
 
     const valueNumeric =

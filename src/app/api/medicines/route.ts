@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { serializeMedicine } from "@/lib/serialize";
 import { LOW_STOCK_THRESHOLD, startOfDay } from "@/lib/stock";
@@ -97,13 +99,15 @@ export async function GET(request: Request) {
         }),
     );
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Database error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("medicines GET", e, "Database error");
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const body = await request.json();
     const name = String(body.name ?? "").trim();
     if (!name) {
@@ -135,7 +139,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(serializeMedicine(medicine), { status: 201 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Database error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("medicines POST", e, "Database error");
   }
 }

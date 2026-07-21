@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { startOfDay, subDays } from "date-fns";
+import { errorResponse } from "@/lib/api-error";
 import { buildAnalytics } from "@/lib/analytics";
 import type { AnalyticsPharmacySales } from "@/lib/analytics-types";
 import { resolveRange } from "@/lib/date-range";
@@ -73,7 +74,6 @@ export async function GET(request: Request) {
     );
     return NextResponse.json(payload);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Analytics error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("analytics GET", e, "Analytics error");
   }
 }

@@ -6,6 +6,14 @@ import { DEFAULT_BOOTSTRAP_PASSWORD } from "@/lib/default-accounts";
 
 const REMEMBER_USER_KEY = "opd_remember_username";
 
+// Temporary bootstrap convenience — staff should change passwords after first
+// login. Set NEXT_PUBLIC_DISABLE_PASSWORD_PREFILL=1 (and redeploy) once
+// accounts have real passwords to turn the prefill off without a code change.
+const PREFILL_PASSWORD =
+  process.env.NEXT_PUBLIC_DISABLE_PASSWORD_PREFILL === "1"
+    ? ""
+    : DEFAULT_BOOTSTRAP_PASSWORD;
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -13,8 +21,7 @@ function LoginForm() {
   const prefillUser = searchParams.get("user");
 
   const [username, setUsername] = useState("");
-  // Temporary bootstrap convenience — staff should change this after first login.
-  const [password, setPassword] = useState(DEFAULT_BOOTSTRAP_PASSWORD);
+  const [password, setPassword] = useState(PREFILL_PASSWORD);
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -24,7 +31,7 @@ function LoginForm() {
       // Came from a department card on the homepage — prefill username + default
       // password so one click signs in. Change password after first login.
       setUsername(prefillUser);
-      setPassword(DEFAULT_BOOTSTRAP_PASSWORD);
+      setPassword(PREFILL_PASSWORD);
       return;
     }
     const saved = localStorage.getItem(REMEMBER_USER_KEY);

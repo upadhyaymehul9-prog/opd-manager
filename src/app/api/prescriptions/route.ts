@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import { AppError, errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { computePrescriptionStatus } from "@/lib/prescription-status";
 import { prisma } from "@/lib/prisma";
 import { serializePrescription } from "@/lib/serialize";
-import { getSessionFromCookies } from "@/lib/audit";
 import type { PrescriptionItemInput } from "@/lib/prescription-types";
 
 const prescriptionInclude = {
@@ -61,13 +62,16 @@ export async function GET(request: Request) {
 
     return NextResponse.json(serializePrescription(prescription));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Database error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("prescriptions GET", e, "Database error");
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const body = await request.json();
     const { patient_visit_id, doctor_id, notes, items } = body as {
       patient_visit_id: string;
@@ -102,8 +106,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const session = await getSessionFromCookies();
-
     const prescription = await prisma.$transaction(async (tx) => {
       const rx = await tx.prescription.upsert({
         where: { patient_visit_id },
@@ -127,7 +129,7 @@ export async function POST(request: Request) {
 
         for (const cur of currentItems) {
           if (cur.dispensed && !incomingIds.has(cur.id)) {
-            throw new Error(
+            throw new AppError(
               `Cannot remove ${cur.medicine_name} — already dispensed at pharmacy`,
             );
           }
@@ -206,7 +208,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(serializePrescription(prescription));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Database error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("prescriptions POST", e, "Database error");
   }
 }

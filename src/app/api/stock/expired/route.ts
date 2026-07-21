@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { serializeMedicine } from "@/lib/serialize";
 import { serializeBatch, startOfDay } from "@/lib/stock";
@@ -23,7 +24,6 @@ export async function GET() {
       })),
     );
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Expired stock error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("stock/expired GET", e, "Expired stock error");
   }
 }

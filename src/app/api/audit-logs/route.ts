@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
@@ -26,7 +27,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json(logs);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to load audit logs";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("audit-logs GET", e, "Failed to load audit logs");
   }
 }

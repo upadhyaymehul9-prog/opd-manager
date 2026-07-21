@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
@@ -30,7 +31,6 @@ export async function GET(
       })),
     );
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to load history";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("visits/[visitId]/mlc/history GET", e, "Failed to load history");
   }
 }

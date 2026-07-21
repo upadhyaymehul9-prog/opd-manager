@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { addDays, startOfDay } from "date-fns";
+import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import {
   assertSlotAvailable,
   getClinicSchedule,
@@ -30,13 +32,15 @@ export async function GET(request: Request) {
 
     return NextResponse.json(appointments.map(serializeAppointment));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Failed to load appointments";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("appointments GET", e, "Failed to load appointments");
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const body = await request.json();
     const {
       doctor_id,
@@ -107,7 +111,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(serializeAppointment(appointment), { status: 201 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Booking failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("appointments POST", e, "Booking failed");
   }
 }

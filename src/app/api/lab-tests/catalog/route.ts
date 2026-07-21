@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_LAB_TESTS, serializeLabCatalog } from "@/lib/lab-tests";
 
@@ -41,13 +43,15 @@ export async function GET(request: Request) {
 
     return NextResponse.json(rows.map(serializeLabCatalog));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Catalog error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("lab-tests/catalog GET", e, "Catalog error");
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const body = await request.json();
     const name = String(body.name ?? "").trim();
     if (!name) {
@@ -70,7 +74,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(serializeLabCatalog(row), { status: 201 });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Catalog error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse("lab-tests/catalog POST", e, "Catalog error");
   }
 }
