@@ -43,6 +43,17 @@ export function istTimeLabel(date: Date): string {
   return `${hours12}:${String(minutes).padStart(2, "0")} ${period}`;
 }
 
+const MONTH_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+// "22 Jul 2026" style date label in IST, regardless of host timezone.
+export function istDateLabel(date: Date): string {
+  const shifted = new Date(date.getTime() + IST_OFFSET_MS);
+  return `${shifted.getUTCDate()} ${MONTH_LABELS[shifted.getUTCMonth()]} ${shifted.getUTCFullYear()}`;
+}
+
 function subDays(date: Date, days: number): Date {
   return addDays(date, -days);
 }
