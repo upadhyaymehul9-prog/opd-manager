@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
-import { errorResponse } from "@/lib/api-error";
+import { AppError, errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
-import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
+import {
+  AUDIT_ACTIONS,
+  getSessionFromCookies,
+  logAudit,
+  logAuditTx,
+} from "@/lib/audit";
 import { nextCasualtyNumber, serializeMlcRecord } from "@/lib/mlc";
 import type { UpdateMlcRecordInput } from "@/lib/mlc";
 
@@ -173,5 +178,64 @@ export async function PATCH(
     return NextResponse.json(serializeMlcRecord(updated));
   } catch (e) {
     return errorResponse("visits/[visitId]/mlc PATCH", e, "Failed to update MLC record");
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ visitId: string }> },
+) {
+  try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
+    const allowedRoles = ["doctor", "admin", "manager"];
+    if (!allowedRoles.includes(session.role)) {
+      throw new AppError("Only doctor/admin/manager can delete an MLC case", 403);
+    }
+
+    const { visitId } = await params;
+    const existing = await prisma.mlcRecord.findUnique({
+      where: { patient_visit_id: visitId },
+      include: { revisions: true },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "MLC record not found" }, { status: 404 });
+    }
+
+    // Opened by mistake or a mislabeled MLC — deletable, but nothing is
+    // silently lost: the full record and its edit history are archived to
+    // the audit log in the same transaction that removes them, and the
+    // visit's medico_legal flag is cleared so discharge isn't stuck
+    // requiring a record that no longer exists.
+    await prisma.$transaction(async (tx) => {
+      await tx.mlcRecordRevision.deleteMany({
+        where: { mlc_record_id: existing.id },
+      });
+      await tx.mlcRecord.delete({ where: { id: existing.id } });
+      await tx.patientVisit.update({
+        where: { id: visitId },
+        data: { medico_legal: false },
+      });
+
+      await logAuditTx(tx, {
+        action: AUDIT_ACTIONS.MLC_RECORD_DELETE,
+        entity_type: "mlc_record",
+        entity_id: existing.id,
+        summary: `MLC case #${existing.casualty_number} deleted for visit ${visitId.slice(0, 8)}… — archived to audit log`,
+        details: {
+          mlc_record_archive: serializeMlcRecord(existing),
+          revisions_archive: existing.revisions.length > 0 ? existing.revisions : undefined,
+          removed_by: session.displayName || session.username,
+          removed_by_role: session.role,
+        },
+        session,
+      });
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return errorResponse("visits/[visitId]/mlc DELETE", e, "Failed to delete MLC record");
   }
 }

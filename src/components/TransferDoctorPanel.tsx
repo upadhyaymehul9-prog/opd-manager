@@ -49,7 +49,7 @@ export function TransferDoctorPanel({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        className="text-xs font-medium text-slate-600 hover:text-slate-900 hover:underline"
       >
         Transfer to another doctor
       </button>

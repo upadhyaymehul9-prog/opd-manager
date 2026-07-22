@@ -28,11 +28,13 @@ function WorkspaceTabs({
   doctorId,
   activeTab,
   onTabChange,
+  onRefresh,
 }: {
   visit: PatientVisit;
   doctorId: string;
   activeTab: WorkspaceTab;
   onTabChange: (tab: WorkspaceTab) => void;
+  onRefresh: () => void;
 }) {
   const atPharmacy = isAtPharmacy(visit.status);
 
@@ -75,7 +77,9 @@ function WorkspaceTabs({
             initialAllergies={visit.patient_allergies}
           />
         )}
-        {currentTab === "mlc" && visit.medico_legal && <MlcDetailsPanel visitId={visit.id} />}
+        {currentTab === "mlc" && visit.medico_legal && (
+          <MlcDetailsPanel visitId={visit.id} onDeleted={onRefresh} />
+        )}
         {currentTab === "procedures" && <ProcedurePanel visitId={visit.id} />}
         {currentTab === "labs" && <LabTestsPanel visitId={visit.id} canOrder />}
         {currentTab === "prescription" && (
@@ -109,12 +113,22 @@ export default function DoctorConsolePage({
   const doctorName =
     visits.find((v) => v.doctor_id === doctorId)?.doctors?.name ?? "Doctor";
 
-  function isWorkspaceOpen(visitId: string) {
-    return workspaceOpen[visitId] ?? false;
+  // Keyed by visit + phase (consult vs. at-pharmacy), not just visit id, so
+  // sending a patient to pharmacy always starts the workspace collapsed
+  // again — a doctor who had it open during consultation doesn't end up
+  // with the full prescription form left expanded after "Send to Pharmacy".
+  // It's still one click away via "Expand" if they need to edit it there.
+  function workspacePhaseKey(visit: PatientVisit) {
+    return `${visit.id}:${isAtPharmacy(visit.status) ? "pharmacy" : "consult"}`;
   }
 
-  function toggleWorkspace(visitId: string) {
-    setWorkspaceOpen((prev) => ({ ...prev, [visitId]: !isWorkspaceOpen(visitId) }));
+  function isWorkspaceOpen(visit: PatientVisit) {
+    return workspaceOpen[workspacePhaseKey(visit)] ?? false;
+  }
+
+  function toggleWorkspace(visit: PatientVisit) {
+    const key = workspacePhaseKey(visit);
+    setWorkspaceOpen((prev) => ({ ...prev, [key]: !(prev[key] ?? false) }));
   }
 
   async function handleDeleteVisit(visit: PatientVisit) {
@@ -164,7 +178,7 @@ export default function DoctorConsolePage({
           </p>
         )}
         {myPatients.map((visit, idx) => (
-          <div key={visit.id} className="space-y-3">
+          <div key={visit.id} className="space-y-2">
             {isAtPharmacy(visit.status) ? (
               <DoctorPatientQueueBar visit={visit} queueIndex={idx + 1} />
             ) : (
@@ -172,45 +186,51 @@ export default function DoctorConsolePage({
                 visit={visit}
                 showDoctor={false}
                 actions={
-                  <div className="space-y-3">
+                  <div className="space-y-2.5">
                     <PatientActions
                       visit={visit}
                       role="doctor"
                       onUpdated={refresh}
                     />
-                    <TransferDoctorPanel
-                      visitId={visit.id}
-                      currentDoctorId={doctorId}
-                      onTransferred={refresh}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteVisit(visit)}
-                      disabled={busyDeleteId === visit.id}
-                      className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
-                    >
-                      {busyDeleteId === visit.id ? "Removing..." : "Remove patient"}
-                    </button>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-200 pt-2">
+                      <TransferDoctorPanel
+                        visitId={visit.id}
+                        currentDoctorId={doctorId}
+                        onTransferred={refresh}
+                      />
+                      <span className="text-slate-300">·</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteVisit(visit)}
+                        disabled={busyDeleteId === visit.id}
+                        className="text-xs font-medium text-red-600 hover:text-red-800 hover:underline disabled:opacity-50"
+                      >
+                        {busyDeleteId === visit.id ? "Removing..." : "Remove patient"}
+                      </button>
+                    </div>
                   </div>
                 }
               />
             )}
             {canWritePrescription(visit.status) && (
-              <section className="rounded-xl border border-blue-200 bg-blue-50/40 p-3">
+              <section className="overflow-hidden rounded-xl border border-slate-200">
                 <button
                   type="button"
-                  onClick={() => toggleWorkspace(visit.id)}
-                  className="flex w-full items-center justify-between rounded-lg bg-white px-3 py-2 text-left"
+                  onClick={() => toggleWorkspace(visit)}
+                  className="flex w-full items-center justify-between bg-slate-50 px-4 py-2 text-left hover:bg-slate-100"
                 >
-                  <span className="text-sm font-semibold text-blue-900">
-                    Doctor workspace (EMR, Procedure, Lab tests, Prescription)
+                  <span className="text-sm font-medium text-slate-700">
+                    Doctor workspace
+                    <span className="ml-1 font-normal text-slate-400">
+                      · EMR, Procedure, Lab tests, Prescription
+                    </span>
                   </span>
-                  <span className="text-xs text-blue-700">
-                    {isWorkspaceOpen(visit.id) ? "Collapse ▴" : "Expand ▾"}
+                  <span className="text-xs font-medium text-slate-500">
+                    {isWorkspaceOpen(visit) ? "Collapse ▴" : "Expand ▾"}
                   </span>
                 </button>
-                {isWorkspaceOpen(visit.id) && (
-                  <div className="mt-3">
+                {isWorkspaceOpen(visit) && (
+                  <div className="border-t border-slate-200 bg-white p-3">
                     <WorkspaceTabs
                       visit={visit}
                       doctorId={doctorId}
@@ -218,6 +238,7 @@ export default function DoctorConsolePage({
                       onTabChange={(tab) =>
                         setActiveTab((prev) => ({ ...prev, [visit.id]: tab }))
                       }
+                      onRefresh={refresh}
                     />
                   </div>
                 )}

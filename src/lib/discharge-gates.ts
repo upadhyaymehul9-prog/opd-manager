@@ -29,6 +29,11 @@ export type DischargeCheckInput = {
   hasMlcRecord: boolean;
   /** Count of lab tests still ordered/collected (not resulted/cancelled) */
   pendingLabTests: number;
+  /** Doctor/admin/manager explicitly chose to discharge without EMR notes
+   * on file. Only bypasses the EMR check below — MLC, pending labs, and
+   * pharmacy-billing gates are never overridable. Caller is responsible for
+   * restricting this to the allowed roles and logging the override. */
+  overrideEmrGate?: boolean;
 };
 
 /**
@@ -36,7 +41,7 @@ export type DischargeCheckInput = {
  * any other path that marks a visit completed.
  */
 export function assertVisitReadyForDischarge(input: DischargeCheckInput) {
-  if (!visitEmrCompleteForDischarge(input.visit)) {
+  if (!input.overrideEmrGate && !visitEmrCompleteForDischarge(input.visit)) {
     throw new AppError(
       "NABH: complete EMR (chief complaint and diagnosis) before marking visit completed",
       400,

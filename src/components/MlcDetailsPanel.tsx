@@ -25,7 +25,15 @@ type MlcRecordView = {
   police_intimation_overdue: boolean;
 };
 
-export function MlcDetailsPanel({ visitId }: { visitId: string }) {
+export function MlcDetailsPanel({
+  visitId,
+  onDeleted,
+}: {
+  visitId: string;
+  /** Called after the MLC record is deleted, so the parent can refresh the
+   * visit list (medico_legal is cleared server-side, hiding this tab). */
+  onDeleted?: () => void;
+}) {
   const [record, setRecord] = useState<MlcRecordView | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -117,6 +125,30 @@ export function MlcDetailsPanel({ visitId }: { visitId: string }) {
     }
   }
 
+  async function deleteCase() {
+    if (!record) return;
+    if (
+      !window.confirm(
+        `Delete MLC case #${record.casualty_number}? This is for cases opened by mistake — the full record is archived to the audit log, and the visit's medico-legal flag is cleared.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/visits/${visitId}/mlc`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not delete MLC case");
+      setRecord(null);
+      onDeleted?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete MLC case");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveAcknowledgment() {
     if (!record) return;
     setBusy(true);
@@ -169,9 +201,19 @@ export function MlcDetailsPanel({ visitId }: { visitId: string }) {
         <h4 className="font-semibold text-amber-900">
           MLC case #{record.casualty_number} (NABH Annexure D / COP.2c)
         </h4>
-        <span className="text-xs text-amber-700">
-          Arrived {new Date(record.arrival_at).toLocaleString()}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-amber-700">
+            Arrived {new Date(record.arrival_at).toLocaleString()}
+          </span>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={deleteCase}
+            className="text-xs font-medium text-red-700 hover:underline disabled:opacity-50"
+          >
+            Delete MLC case
+          </button>
+        </div>
       </div>
 
       {record.police_intimation_overdue && (

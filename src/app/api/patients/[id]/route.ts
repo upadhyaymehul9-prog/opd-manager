@@ -91,6 +91,10 @@ export async function PATCH(
       });
     }
 
+    const overrideEmrGate =
+      Boolean(body.override_emr_gate) &&
+      (role === "doctor" || role === "admin" || role === "manager");
+
     if (status === "completed") {
       const full = existing as NonNullable<
         Awaited<ReturnType<typeof loadDischargeContext>>
@@ -101,6 +105,7 @@ export async function PATCH(
         hasPharmacyBill: Boolean(full.pharmacy_bill),
         hasMlcRecord: Boolean(full.mlc_record),
         pendingLabTests: full.lab_tests.length,
+        overrideEmrGate,
       });
     }
 
@@ -193,8 +198,11 @@ export async function PATCH(
         action: AUDIT_ACTIONS.VISIT_UPDATE,
         entity_type: "visit",
         entity_id: id,
-        summary: `Visit updated for ${visit.patient_name}${status ? ` — status → ${status}` : ""}`,
-        details: { changes: diff },
+        summary: `Visit updated for ${visit.patient_name}${status ? ` — status → ${status}` : ""}${overrideEmrGate ? " — discharged without EMR notes (override)" : ""}`,
+        details: {
+          changes: diff,
+          ...(overrideEmrGate && { emr_gate_overridden: true }),
+        },
         session,
       });
     }

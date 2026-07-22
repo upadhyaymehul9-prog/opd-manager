@@ -35,6 +35,7 @@ export function PrescriptionDetail({
     null,
   );
   const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const [emrGateBlocked, setEmrGateBlocked] = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -239,7 +240,7 @@ export function PrescriptionDetail({
     }
   }
 
-  async function completeWithBill() {
+  async function completeWithBill(overrideEmrGate = false) {
     if (!prescription || !billTotals) return;
 
     const zeroRates = billTotals.lines.filter((l) => l.unit_price <= 0);
@@ -262,10 +263,12 @@ export function PrescriptionDetail({
             prescription_item_id: l.id,
             unit_price: l.unit_price,
           })),
+          ...(overrideEmrGate && { override_emr_gate: true }),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Complete failed");
+      setEmrGateBlocked(false);
       if (data.bill) {
         setCompletedBill(data.bill);
       } else {
@@ -273,13 +276,15 @@ export function PrescriptionDetail({
         router.refresh();
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Complete failed");
+      const message = e instanceof Error ? e.message : "Complete failed";
+      setError(message);
+      setEmrGateBlocked(message.startsWith("NABH: complete EMR"));
     } finally {
       setBusy(false);
     }
   }
 
-  async function exitWithoutBill() {
+  async function exitWithoutBill(overrideEmrGate = false) {
     if (!prescription || !readyToExitWithoutBill) return;
     setBusy(true);
     setError(null);
@@ -287,14 +292,20 @@ export function PrescriptionDetail({
       const res = await fetch(`/api/prescriptions/${prescription.id}/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payment_mode: paymentMode }),
+        body: JSON.stringify({
+          payment_mode: paymentMode,
+          ...(overrideEmrGate && { override_emr_gate: true }),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Exit failed");
+      setEmrGateBlocked(false);
       onComplete?.();
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Exit failed");
+      const message = e instanceof Error ? e.message : "Exit failed";
+      setError(message);
+      setEmrGateBlocked(message.startsWith("NABH: complete EMR"));
     } finally {
       setBusy(false);
     }
@@ -599,14 +610,24 @@ export function PrescriptionDetail({
             label="Exit without bill"
             variant="primary"
             disabled={busy}
-            onClick={exitWithoutBill}
+            onClick={() => exitWithoutBill()}
           />
         ) : (
           <ActionButton
             label="Generate bill & exit"
             variant="primary"
             disabled={busy || !readyToBill}
-            onClick={completeWithBill}
+            onClick={() => completeWithBill()}
+          />
+        )}
+        {emrGateBlocked && (
+          <ActionButton
+            label="Proceed anyway"
+            variant="danger"
+            disabled={busy}
+            onClick={() =>
+              readyToExitWithoutBill ? exitWithoutBill(true) : completeWithBill(true)
+            }
           />
         )}
       </div>

@@ -125,6 +125,9 @@ export type UpdatePatientInput = {
   room_number?: string;
   medico_legal?: boolean;
   mlc_details?: string | null;
+  /** Doctor/admin/manager may bypass the "chief complaint + diagnosis" NABH
+   * gate at discharge — logged to the audit trail when used. */
+  override_emr_gate?: boolean;
 };
 
 export const PROCEDURE_TYPES = [

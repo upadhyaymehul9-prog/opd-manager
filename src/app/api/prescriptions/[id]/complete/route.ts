@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { AppError, errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
+import { AUDIT_ACTIONS, logAuditTx } from "@/lib/audit";
 import {
   createPharmacyBill,
   isPaymentMode,
@@ -26,10 +27,16 @@ export async function POST(
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
     const payment_mode = String(body.payment_mode ?? "cash");
+    const overrideEmrGate =
+      Boolean(body.override_emr_gate) &&
+      (session.role === "doctor" ||
+        session.role === "admin" ||
+        session.role === "manager");
 
     if (!isPaymentMode(payment_mode)) {
       throw new AppError("payment_mode must be cash, upi, or card", 400);
@@ -111,7 +118,19 @@ export async function POST(
             Boolean(visit.pharmacy_bill) || hasDispensedForBilling(prescription.items),
           hasMlcRecord: Boolean(visit.mlc_record),
           pendingLabTests: visit.lab_tests.length,
+          overrideEmrGate,
         });
+
+        if (overrideEmrGate) {
+          await logAuditTx(tx, {
+            action: AUDIT_ACTIONS.VISIT_UPDATE,
+            entity_type: "visit",
+            entity_id: prescription.patient_visit_id,
+            summary: `Visit ${prescription.patient_visit_id.slice(0, 8)}… discharged without EMR notes (override)`,
+            details: { emr_gate_overridden: true },
+            session,
+          });
+        }
 
         let bill = visit.pharmacy_bill
           ? await tx.pharmacyBill.findUniqueOrThrow({

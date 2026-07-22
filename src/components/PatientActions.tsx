@@ -41,6 +41,10 @@ export function PatientActions({
   const [error, setError] = useState<string | null>(null);
   const [etaMinutes, setEtaMinutes] = useState(30);
   const [showEtaFor, setShowEtaFor] = useState<"lab" | "radio" | null>(null);
+  const [pendingOverride, setPendingOverride] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
 
   const actions = actionsForRole(role, visit.status);
 
@@ -58,12 +62,24 @@ export function PatientActions({
     try {
       await updatePatient(visit.id, updates);
       setShowEtaFor(null);
+      setPendingOverride(null);
       onUpdated?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update");
+      const message = e instanceof Error ? e.message : "Failed to update";
+      setError(message);
+      // The NABH EMR gate is the only discharge check a doctor/admin/manager
+      // may explicitly bypass — offer "Proceed anyway" only for that error.
+      setPendingOverride(
+        message.startsWith("NABH: complete EMR") ? updates : null,
+      );
     } finally {
       setBusy(false);
     }
+  }
+
+  function proceedAnyway() {
+    if (!pendingOverride) return;
+    runUpdate({ ...pendingOverride, override_emr_gate: true });
   }
 
   async function confirmEta() {
@@ -107,7 +123,17 @@ export function PatientActions({
         </div>
       )}
       {error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        <div className="space-y-2 rounded-lg bg-red-50 px-3 py-2">
+          <p className="text-sm text-red-700">{error}</p>
+          {pendingOverride && (
+            <ActionButton
+              label="Proceed anyway"
+              variant="danger"
+              disabled={busy}
+              onClick={proceedAnyway}
+            />
+          )}
+        </div>
       )}
       {actions.length > 0 && (
         <div className="flex flex-wrap gap-2">
