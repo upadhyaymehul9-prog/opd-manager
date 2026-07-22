@@ -11,10 +11,13 @@ function trimOrNull(v: string | null | undefined) {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ visitId: string }> },
 ) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const { visitId } = await params;
     const visit = await prisma.patientVisit.findUnique({
       where: { id: visitId },

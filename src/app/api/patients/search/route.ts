@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
+import { istDateOnly } from "@/lib/date-range";
 import { prisma } from "@/lib/prisma";
 import { parseAbhaInput } from "@/lib/abha";
 
-/** Age in whole years from DOB (IST-agnostic calendar math via UTC date parts). */
+/**
+ * Age in whole years from DOB. `today` must be the IST calendar date, not
+ * new Date()'s raw UTC date parts — otherwise between IST 00:00-05:30 (when
+ * the UTC calendar date is still "yesterday") a patient whose birthday is
+ * literally today reads one year younger until UTC catches up. istDateOnly
+ * pins to the same UTC-midnight-of-IST-day convention date_of_birth is
+ * stored in, so comparing their UTC parts directly is correct.
+ */
 function ageFromDob(dob: Date | null | undefined): number | null {
   if (!dob) return null;
-  const today = new Date();
+  const today = istDateOnly(new Date());
   let age = today.getUTCFullYear() - dob.getUTCFullYear();
   const m = today.getUTCMonth() - dob.getUTCMonth();
   if (m < 0 || (m === 0 && today.getUTCDate() < dob.getUTCDate())) age -= 1;

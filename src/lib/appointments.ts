@@ -1,8 +1,19 @@
-import { addDays, addMinutes, format, startOfDay } from "date-fns";
+import { addMinutes } from "date-fns";
 import { Prisma } from "@prisma/client";
+import { addDays, dateStrIST, istTimeLabel, startOfDay, todayStr } from "@/lib/date-range";
 import { prisma } from "@/lib/prisma";
 
 type Tx = Prisma.TransactionClient;
+const HOUR_MS = 60 * 60 * 1000;
+
+// dayStart (from startOfDay) is the absolute instant of IST midnight, so
+// adding whole hours to it lands on that many IST hours past midnight —
+// correct regardless of the host process's timezone. Date#setHours() (the
+// old approach here) sets local-timezone hours, which is wrong on a
+// non-IST host.
+function istHourMark(dayStart: Date, hour: number): Date {
+  return new Date(dayStart.getTime() + hour * HOUR_MS);
+}
 
 export type ClinicSchedule = {
   slot_duration_minutes: number;
@@ -125,20 +136,19 @@ export async function generateAvailableSlots(
   const slots: { time: string; label: string; available: boolean }[] = [];
   const { slot_duration_minutes, opd_start_hour, opd_end_hour } = resolvedSchedule;
 
-  let cursor = new Date(dayStart);
-  cursor.setHours(opd_start_hour, 0, 0, 0);
-  const end = new Date(dayStart);
-  end.setHours(opd_end_hour, 0, 0, 0);
+  let cursor = istHourMark(dayStart, opd_start_hour);
+  const end = istHourMark(dayStart, opd_end_hour);
 
   const now = new Date();
+  const isToday = dateStrIST(dayStart) === todayStr();
   while (cursor < end) {
     const taken = booked.some((b) =>
       overlaps(cursor, slot_duration_minutes, b.scheduled_at, b.duration_minutes),
     );
-    const inPast = cursor <= now && dayStart.toDateString() === now.toDateString();
+    const inPast = cursor <= now && isToday;
     slots.push({
       time: cursor.toISOString(),
-      label: format(cursor, "h:mm a"),
+      label: istTimeLabel(cursor),
       available: !taken && !inPast,
     });
     cursor = addMinutes(cursor, slot_duration_minutes);

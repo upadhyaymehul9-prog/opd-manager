@@ -1,4 +1,5 @@
 import { cookies, headers } from "next/headers";
+import type { Prisma } from "@prisma/client";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 import type { SessionPayload } from "@/lib/auth-types";
 import { prisma } from "@/lib/prisma";
@@ -46,6 +47,43 @@ export async function logAudit(input: {
     // means the audit trail silently has a hole, so at least surface it.
     console.error("logAudit failed", { action: input.action, entity_type: input.entity_type }, e);
   }
+}
+
+/**
+ * Same as logAudit, but runs inside an existing $transaction and does NOT
+ * swallow errors. Use this when the audit entry IS the archive of data being
+ * destroyed in the same transaction (e.g. deleting a visit) — a failed
+ * insert here must roll back the delete, not silently lose the record.
+ */
+export async function logAuditTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    action: string;
+    entity_type: string;
+    entity_id?: string | null;
+    summary: string;
+    details?: Record<string, unknown>;
+    session?: SessionPayload | null;
+    actor?: { userId?: string; username: string; role: string };
+  },
+) {
+  const session = input.session ?? (await getSessionFromCookies());
+  const actor = session ?? input.actor;
+  if (!actor) return;
+
+  await tx.auditLog.create({
+    data: {
+      user_id: session?.userId ?? input.actor?.userId ?? null,
+      username: actor.username,
+      role: actor.role,
+      action: input.action,
+      entity_type: input.entity_type,
+      entity_id: input.entity_id ?? null,
+      summary: input.summary,
+      details: input.details ? JSON.stringify(input.details) : null,
+      ip_address: await clientIp(),
+    },
+  });
 }
 
 /** Computes only the fields that actually changed, so audit entries record

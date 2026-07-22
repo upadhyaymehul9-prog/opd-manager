@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
 import { nextCasualtyNumber, serializeMlcRecord } from "@/lib/mlc";
@@ -10,10 +11,13 @@ function trimOrNull(v: string | null | undefined) {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ visitId: string }> },
 ) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const { visitId } = await params;
     const record = await prisma.mlcRecord.findUnique({
       where: { patient_visit_id: visitId },

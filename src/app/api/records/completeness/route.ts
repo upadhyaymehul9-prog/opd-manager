@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { resolveRange } from "@/lib/date-range";
 import { prisma } from "@/lib/prisma";
 import { buildRecordCompletenessReport } from "@/lib/record-completeness";
 
 export async function GET(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const { searchParams } = new URL(request.url);
     const { rangeStart, rangeEndExclusive, from, to } = resolveRange(searchParams);
 

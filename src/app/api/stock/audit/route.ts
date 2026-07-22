@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
+import { todayStr } from "@/lib/date-range";
 import {
   getPharmacyStockSnapshot,
   listStockAudits,
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const audit = await saveStockAudit({
-      audit_date: String(body.audit_date ?? new Date().toISOString().slice(0, 10)),
+      audit_date: String(body.audit_date ?? todayStr()),
       department: String(body.department ?? "pharmacy"),
       notes: body.notes ?? null,
       created_by: session?.displayName || session?.username || null,

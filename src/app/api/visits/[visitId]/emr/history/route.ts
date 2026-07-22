@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ visitId: string }> },
 ) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const { visitId } = await params;
     const revisions = await prisma.visitEmrRevision.findMany({
       where: { patient_visit_id: visitId },

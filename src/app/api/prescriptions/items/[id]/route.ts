@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { AppError, errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
 import { computePrescriptionStatus } from "@/lib/prescription-status";
-import { getSessionFromCookies } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import {
   deductFromStock,
@@ -225,6 +224,7 @@ export async function DELETE(
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const { id } = await params;
 
@@ -237,6 +237,19 @@ export async function DELETE(
 
     if (!item) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    // ACL grants doctors DELETE on this path so they can remove medicines
+    // from their OWN prescriptions — without this check, any doctor account
+    // could void a medicine another doctor prescribed for another patient.
+    if (
+      session.role === "doctor" &&
+      session.doctorId !== item.prescription.doctor_id
+    ) {
+      throw new AppError(
+        "You can only remove medicines from your own prescriptions",
+        403,
+      );
     }
 
     if (item.dispensed) {
@@ -253,8 +266,6 @@ export async function DELETE(
       );
     }
 
-    const session = await getSessionFromCookies();
-
     await prisma.$transaction(async (tx) => {
       // Never hard-delete a prescribed medicine — void it so the fact it
       // was once prescribed (and by whom it was removed) is retained
@@ -263,7 +274,7 @@ export async function DELETE(
         where: { id },
         data: {
           voided_at: new Date(),
-          voided_by: session?.displayName || session?.username || "unknown",
+          voided_by: session.displayName || session.username,
           void_reason: "removed_by_doctor",
         },
       });

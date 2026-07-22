@@ -9,11 +9,11 @@ function rating(v: unknown): number | null {
   return n;
 }
 
+// Deliberately anonymous: this is the patient-facing feedback kiosk/form.
+// Middleware (isPublicFeedbackSubmit) lets POST through without a session —
+// do not add a requireApi() call here, it would 401 every real submitter.
 export async function POST(request: Request) {
   try {
-    const guard = await requireApi(request);
-    if (guard.response) return guard.response;
-
     const body = await request.json();
     const patient_name = String(body.patient_name ?? "").trim();
     const q1 = rating(body.q1_overall);
@@ -51,8 +51,11 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
     const rows = await prisma.patientFeedback.findMany({
       orderBy: { created_at: "desc" },
       take: 50,

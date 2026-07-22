@@ -1,6 +1,27 @@
-import { format } from "date-fns";
+import { istTimeLabel } from "@/lib/date-range";
 
 const CLINIC = "MK Tech Clinic";
+
+// This message reaches the patient's phone directly, so it must show the
+// clinic's actual IST wall-clock time regardless of what timezone the
+// server process happens to run in — date-fns format() renders in the
+// server's local timezone, which would show the wrong time on a UTC host.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+function formatIST(date: Date): { dateStr: string; timeStr: string } {
+  const shifted = new Date(date.getTime() + IST_OFFSET_MS);
+  const day = shifted.getUTCDate();
+  const month = MONTHS[shifted.getUTCMonth()];
+  const year = shifted.getUTCFullYear();
+  return {
+    dateStr: `${day} ${month} ${year}`,
+    timeStr: istTimeLabel(date),
+  };
+}
 
 export function appointmentReminderMessage(input: {
   patientName: string;
@@ -8,12 +29,13 @@ export function appointmentReminderMessage(input: {
   scheduledAt: string | Date;
 }) {
   const when = new Date(input.scheduledAt);
+  const { dateStr, timeStr } = formatIST(when);
   return (
     `Dear ${input.patientName},\n\n` +
     `Your appointment at ${CLINIC} is confirmed.\n` +
     `Doctor: Dr. ${input.doctorName}\n` +
-    `Date: ${format(when, "d MMM yyyy")}\n` +
-    `Time: ${format(when, "h:mm a")}\n\n` +
+    `Date: ${dateStr}\n` +
+    `Time: ${timeStr}\n\n` +
     `Please arrive 10 minutes early. Reply if you need to reschedule.\n\n` +
     `— ${CLINIC}`
   );

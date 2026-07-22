@@ -1,7 +1,7 @@
 "use client";
 
-import { format, subDays } from "date-fns";
-import { todayStr, yesterdayStr } from "@/lib/date-range";
+import { format } from "date-fns";
+import { addDays, dateStrIST, todayStr, yesterdayStr } from "@/lib/date-range";
 
 type DateRangeBarProps = {
   fromDate: string;
@@ -56,17 +56,11 @@ export function DateRangeBar({
         />
         <PresetButton
           label="Last 7 days"
-          onClick={() =>
-            onPreset(subDays(new Date(), 6).toISOString().slice(0, 10), todayStr())
-          }
+          onClick={() => onPreset(dateStrIST(addDays(new Date(), -6)), todayStr())}
         />
         <PresetButton
           label="This month"
-          onClick={() => {
-            const now = new Date();
-            const start = new Date(now.getFullYear(), now.getMonth(), 1);
-            onPreset(start.toISOString().slice(0, 10), todayStr());
-          }}
+          onClick={() => onPreset(`${todayStr().slice(0, 7)}-01`, todayStr())}
         />
       </div>
       <p className="pb-1 text-sm text-slate-600">

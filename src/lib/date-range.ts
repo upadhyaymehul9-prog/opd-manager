@@ -16,6 +16,33 @@ export function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * DAY_MS);
 }
 
+// Fractional IST hour-of-day (e.g. 13.5 = 1:30 PM IST), for hourly buckets
+// and "how far into the OPD day are we" predictions. Using date.getHours()
+// instead of this shifts every reading by 5.5h on a non-IST host.
+export function istHourOfDay(date: Date): number {
+  const shifted = new Date(date.getTime() + IST_OFFSET_MS);
+  return shifted.getUTCHours() + shifted.getUTCMinutes() / 60;
+}
+
+// IST day-of-week (0 = Sunday), for same-weekday comparisons. date.getDay()
+// reads the server process's local timezone, not the clinic's.
+export function istWeekday(date: Date): number {
+  return new Date(date.getTime() + IST_OFFSET_MS).getUTCDay();
+}
+
+// "9:00 AM" style clock label in IST, regardless of host timezone. Do not
+// pass instants like this through date-fns format() — it renders using the
+// server process's local timezone, which is wrong for a patient/reception
+// facing clock label on a non-IST host.
+export function istTimeLabel(date: Date): string {
+  const shifted = new Date(date.getTime() + IST_OFFSET_MS);
+  const hours24 = shifted.getUTCHours();
+  const minutes = shifted.getUTCMinutes();
+  const period = hours24 >= 12 ? "PM" : "AM";
+  const hours12 = hours24 % 12 || 12;
+  return `${hours12}:${String(minutes).padStart(2, "0")} ${period}`;
+}
+
 function subDays(date: Date, days: number): Date {
   return addDays(date, -days);
 }

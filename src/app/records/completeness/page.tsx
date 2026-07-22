@@ -13,7 +13,7 @@ import {
   type DelinquencyIssue,
   type RecordCompletenessSummary,
 } from "@/lib/record-completeness";
-import { todayStr } from "@/lib/date-range";
+import { addDays, dateStrIST, todayStr } from "@/lib/date-range";
 
 function SummaryCard({
   label,
@@ -42,11 +42,7 @@ function SummaryCard({
 }
 
 export default function RecordCompletenessPage() {
-  const [fromDate, setFromDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 6);
-    return d.toISOString().slice(0, 10);
-  });
+  const [fromDate, setFromDate] = useState(() => dateStrIST(addDays(new Date(), -6)));
   const [toDate, setToDate] = useState(todayStr);
   const [filter, setFilter] = useState<DelinquencyIssue | "all">("all");
   const [report, setReport] = useState<RecordCompletenessSummary | null>(null);

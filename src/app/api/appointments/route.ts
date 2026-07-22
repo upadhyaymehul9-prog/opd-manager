@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { addDays, startOfDay } from "date-fns";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
+import { addDays, startOfDay, todayStr } from "@/lib/date-range";
 import {
   assertSlotAvailable,
   getClinicSchedule,
@@ -13,7 +13,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const date = searchParams.get("date") ?? startOfDay(new Date()).toISOString().slice(0, 10);
+    const date = searchParams.get("date") ?? todayStr();
     const doctorId = searchParams.get("doctor_id");
     const status = searchParams.get("status");
 

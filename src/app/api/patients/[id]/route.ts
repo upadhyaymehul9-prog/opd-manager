@@ -5,6 +5,7 @@ import {
   AUDIT_ACTIONS,
   diffFields,
   logAudit,
+  logAuditTx,
 } from "@/lib/audit";
 import { assertVisitReadyForDischarge } from "@/lib/discharge-gates";
 import { visitInclude } from "@/lib/db-includes";
@@ -256,7 +257,20 @@ export async function DELETE(
         pharmacy_bill: { select: { id: true } },
         consent: { select: { id: true } },
         mlc_record: true,
-        prescription: { select: { id: true, pharmacy_bill: { select: { id: true } } } },
+        prescription: {
+          select: {
+            id: true,
+            doctor_id: true,
+            notes: true,
+            status: true,
+            sent_to_pharmacy_at: true,
+            created_at: true,
+            pharmacy_bill: { select: { id: true } },
+            items: true,
+          },
+        },
+        procedures: true,
+        lab_tests: true,
         emr_revisions: { select: { id: true, snapshot: true, changed_by: true, created_at: true } },
       },
     });
@@ -272,9 +286,11 @@ export async function DELETE(
       );
     }
 
-    // MLC and EMR history are not silently discarded: the full content is
-    // snapshotted into the append-only audit log below before the visit (and
-    // its records) are removed, so the trail survives the deletion.
+    // Nothing here is silently discarded: MLC, EMR history, lab tests, and
+    // the prescription are all snapshotted into the append-only audit log
+    // in the SAME transaction as the delete (via logAuditTx), so either both
+    // the archive and the delete succeed, or neither does — a failed audit
+    // write can no longer leave data destroyed with no trace.
     await prisma.$transaction(async (tx) => {
       if (existing.mlc_record) {
         await tx.mlcRecordRevision.deleteMany({
@@ -291,25 +307,29 @@ export async function DELETE(
         await tx.patientConsent.delete({ where: { id: existing.consent.id } });
       }
       await tx.patientVisit.delete({ where: { id } });
-    });
 
-    await logAudit({
-      action: AUDIT_ACTIONS.VISIT_DELETE,
-      entity_type: "visit",
-      entity_id: id,
-      summary: `Visit removed for ${existing.patient_name} (token ${existing.token_number})${existing.mlc_record ? " — MLC record archived to audit log" : ""}`,
-      details: {
-        status: existing.status,
-        removed_by: session.displayName || session.username,
-        removed_by_role: session.role,
-        had_consent: Boolean(existing.consent),
-        // Full archived copies — the audit log is append-only, so the
-        // medico-legal and EMR trail remains recoverable after deletion.
-        mlc_record_archive: existing.mlc_record ?? undefined,
-        emr_revisions_archive:
-          existing.emr_revisions.length > 0 ? existing.emr_revisions : undefined,
-      },
-      session,
+      await logAuditTx(tx, {
+        action: AUDIT_ACTIONS.VISIT_DELETE,
+        entity_type: "visit",
+        entity_id: id,
+        summary: `Visit removed for ${existing.patient_name} (token ${existing.token_number})${existing.mlc_record ? " — MLC record archived to audit log" : ""}`,
+        details: {
+          status: existing.status,
+          removed_by: session.displayName || session.username,
+          removed_by_role: session.role,
+          had_consent: Boolean(existing.consent),
+          // Full archived copies — this insert is in the same transaction
+          // as the delete, so the medico-legal, EMR, lab, and prescription
+          // trail is guaranteed to remain recoverable after deletion.
+          mlc_record_archive: existing.mlc_record ?? undefined,
+          emr_revisions_archive:
+            existing.emr_revisions.length > 0 ? existing.emr_revisions : undefined,
+          lab_tests_archive: existing.lab_tests.length > 0 ? existing.lab_tests : undefined,
+          procedures_archive: existing.procedures.length > 0 ? existing.procedures : undefined,
+          prescription_archive: existing.prescription ?? undefined,
+        },
+        session,
+      });
     });
 
     return NextResponse.json({ ok: true });

@@ -1,5 +1,5 @@
-import { differenceInMinutes, startOfDay, subDays } from "date-fns";
-import { dateStrIST } from "@/lib/date-range";
+import { differenceInMinutes } from "date-fns";
+import { addDays, dateStrIST, istHourOfDay, istWeekday, startOfDay } from "@/lib/date-range";
 import type {
   AnalyticsAgeGroup,
   AnalyticsDept,
@@ -65,10 +65,6 @@ function median(values: number[]): number | null {
 function avg(values: number[]): number | null {
   if (values.length === 0) return null;
   return Math.round(values.reduce((a, b) => a + b, 0) / values.length);
-}
-
-function isToday(d: Date, todayStart: Date): boolean {
-  return d >= todayStart;
 }
 
 export function buildAnalytics(
@@ -145,7 +141,7 @@ export function buildAnalytics(
   const byDoctor = buildDoctorStats(periodVisits);
   const lab = buildDeptStats(periodVisits, "lab");
   const radiology = buildDeptStats(periodVisits, "radiology");
-  const hourlyToday = buildHourly(periodVisits, now);
+  const hourlyToday = buildHourly(periodVisits);
   const prediction = periodMeta.isToday
     ? buildPrediction(periodVisits, recentVisits, now)
     : {
@@ -284,10 +280,12 @@ function buildDeptStats(
   };
 }
 
-function buildHourly(visits: VisitForAnalytics[], now: Date): AnalyticsHourly[] {
+function buildHourly(visits: VisitForAnalytics[]): AnalyticsHourly[] {
   const hours: AnalyticsHourly[] = [];
   for (let h = 8; h <= 20; h++) {
-    const count = visits.filter((v) => v.registered_at.getHours() === h).length;
+    const count = visits.filter(
+      (v) => Math.floor(istHourOfDay(v.registered_at)) === h,
+    ).length;
     const period = h < 12 ? "AM" : "PM";
     const display = h <= 12 ? h : h - 12;
     hours.push({
@@ -306,7 +304,7 @@ function buildPrediction(
 ): AnalyticsPrediction {
   const opdOpenHour = 9;
   const opdCloseHour = 18;
-  const currentHour = now.getHours() + now.getMinutes() / 60;
+  const currentHour = istHourOfDay(now);
   const hoursElapsed = Math.max(0.5, currentHour - opdOpenHour);
   const hoursRemaining = Math.max(0, opdCloseHour - currentHour);
   const currentCount = todayVisits.length;
@@ -315,21 +313,19 @@ function buildPrediction(
   const expectedMore = Math.round(avgPerHour * hoursRemaining);
   const predictedEndOfDay = currentCount + expectedMore;
 
-  const hourly = buildHourly(todayVisits, now);
+  const hourly = buildHourly(todayVisits);
   const peak = [...hourly].sort((a, b) => b.count - a.count)[0];
   const peakHourLabel =
     peak && peak.count > 0 ? `${peak.label} (${peak.count} pts)` : null;
 
   const todayStart = startOfDay(now);
-  const weekday = now.getDay();
+  const weekday = istWeekday(now);
   const pastWeekdayCounts: number[] = [];
   for (let d = 1; d <= 14; d++) {
-    const day = subDays(todayStart, d);
-    if (day.getDay() !== weekday) continue;
+    const day = addDays(todayStart, -d);
+    if (istWeekday(day) !== weekday) continue;
     const count = recentVisits.filter(
-      (v) =>
-        v.registered_at >= startOfDay(day) &&
-        v.registered_at < startOfDay(subDays(day, -1)),
+      (v) => v.registered_at >= startOfDay(day) && v.registered_at < addDays(startOfDay(day), 1),
     ).length;
     pastWeekdayCounts.push(count);
   }
