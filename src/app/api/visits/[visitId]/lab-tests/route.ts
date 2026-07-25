@@ -151,19 +151,59 @@ type BulkResultLine = {
   notes?: string | null;
 };
 
-/** Bulk result entry — saves a whole report (e.g. all CBC rows) in one click. */
+/** Bulk result entry OR bulk cancel of ordered/collected tests. */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ visitId: string }> },
 ) {
   try {
     const session = await getSessionFromCookies();
-    if (!session || !RESULT_ROLES.has(session.role)) {
+    if (!session) {
       throw new AppError("Unauthorized", 401);
     }
 
     const { visitId } = await params;
-    const body = (await request.json()) as { results?: BulkResultLine[] };
+    const body = (await request.json()) as {
+      results?: BulkResultLine[];
+      cancel_ids?: string[];
+    };
+
+    const cancelIds = Array.isArray(body.cancel_ids)
+      ? body.cancel_ids.map(String).filter(Boolean)
+      : [];
+
+    if (cancelIds.length > 0) {
+      if (!ORDER_ROLES.has(session.role)) {
+        throw new AppError("Unauthorized", 401);
+      }
+
+      const result = await prisma.visitLabTest.updateMany({
+        where: {
+          patient_visit_id: visitId,
+          id: { in: cancelIds },
+          status: { in: ["ordered", "collected"] },
+        },
+        data: { status: "cancelled" },
+      });
+
+      if (result.count === 0) {
+        throw new AppError("No removable tests selected", 400);
+      }
+
+      const rows = await prisma.visitLabTest.findMany({
+        where: { patient_visit_id: visitId },
+        orderBy: [{ sort_order: "asc" }, { ordered_at: "asc" }],
+      });
+      return NextResponse.json({
+        cancelled: result.count,
+        tests: rows.map(serializeVisitLabTest),
+      });
+    }
+
+    if (!RESULT_ROLES.has(session.role)) {
+      throw new AppError("Unauthorized", 401);
+    }
+
     const lines = Array.isArray(body.results) ? body.results : [];
     if (lines.length === 0) {
       throw new AppError("No results to save", 400);

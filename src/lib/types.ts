@@ -129,6 +129,12 @@ export type UpdatePatientInput = {
   /** Doctor/admin/manager may bypass the "chief complaint + diagnosis" NABH
    * gate at discharge — logged to the audit trail when used. */
   override_emr_gate?: boolean;
+  /** Demographics editable by doctor/reception anytime during the visit */
+  patient_name?: string;
+  age?: number | null;
+  mobile?: string | null;
+  address?: string | null;
+  gender?: string | null;
 };
 
 export const PROCEDURE_TYPES = [

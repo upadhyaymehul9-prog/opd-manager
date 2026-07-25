@@ -123,6 +123,29 @@ export async function PATCH(
       }),
     };
 
+    if (clinicalRolesMayEditVisitMeta(role)) {
+      if (body.patient_name !== undefined) {
+        const name = String(body.patient_name ?? "").trim();
+        if (!name) throw new AppError("Patient name is required", 400);
+        data.patient_name = name;
+      }
+      if (body.age !== undefined) {
+        data.age =
+          body.age != null && Number(body.age) >= 0
+            ? Math.round(Number(body.age))
+            : null;
+      }
+      if (body.mobile !== undefined) {
+        data.mobile = body.mobile?.trim() || null;
+      }
+      if (body.address !== undefined) {
+        data.address = body.address?.trim() || null;
+      }
+      if (body.gender !== undefined) {
+        data.gender = body.gender?.trim() || null;
+      }
+    }
+
     if (status === "to_lab") data.lab_referred = true;
     if (status === "to_radiology") data.radio_referred = true;
     if (status === "completed") data.completed_at = now;
@@ -173,6 +196,34 @@ export async function PATCH(
       });
     }
 
+    // Keep the permanent patient file in sync when visit demographics change.
+    if (
+      existing.patient_id &&
+      clinicalRolesMayEditVisitMeta(role) &&
+      (body.patient_name !== undefined ||
+        body.mobile !== undefined ||
+        body.address !== undefined ||
+        body.gender !== undefined)
+    ) {
+      await prisma.patient.update({
+        where: { id: existing.patient_id },
+        data: {
+          ...(body.patient_name !== undefined && {
+            name: String(body.patient_name).trim(),
+          }),
+          ...(body.mobile !== undefined && {
+            mobile: body.mobile?.trim() || null,
+          }),
+          ...(body.address !== undefined && {
+            address: body.address?.trim() || null,
+          }),
+          ...(body.gender !== undefined && {
+            gender: body.gender?.trim() || null,
+          }),
+        },
+      });
+    }
+
     const visit = await prisma.patientVisit.update({
       where: { id },
       data,
@@ -190,6 +241,11 @@ export async function PATCH(
         "lab_eta",
         "radio_eta",
         "completed_at",
+        "patient_name",
+        "age",
+        "mobile",
+        "address",
+        "gender",
       ],
     );
 
