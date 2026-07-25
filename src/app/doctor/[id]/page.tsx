@@ -38,8 +38,13 @@ function WorkspaceTabs({
 }) {
   const atPharmacy = isAtPharmacy(visit.status);
 
+  // Keep Lab tests visible at pharmacy so unused orders can be cancelled
+  // and patients are not stuck if results are still pending.
   const tabs: { id: WorkspaceTab; label: string }[] = atPharmacy
-    ? [{ id: "prescription", label: "Prescription" }]
+    ? [
+        { id: "labs", label: "Lab tests" },
+        { id: "prescription", label: "Prescription" },
+      ]
     : [
         { id: "emr", label: "Consultation (EMR)" },
         ...(visit.medico_legal ? [{ id: "mlc" as const, label: "MLC" }] : []),

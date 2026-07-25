@@ -3,6 +3,7 @@ export type VisitVitals = {
   pulse: number | null;
   temp: number | null;
   weight: number | null;
+  height_cm: number | null;
   spo2: number | null;
 };
 
@@ -52,6 +53,7 @@ export type UpdateVisitEmrInput = {
   vitals_pulse?: number | null;
   vitals_temp?: number | null;
   vitals_weight?: number | null;
+  vitals_height_cm?: number | null;
   vitals_spo2?: number | null;
   patient_allergies?: string | null;
   patient_blood_group?: string | null;

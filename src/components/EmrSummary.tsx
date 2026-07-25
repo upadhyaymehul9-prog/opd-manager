@@ -1,15 +1,23 @@
 import type { PatientVisit } from "@/lib/types";
+import {
+  bmiCategory,
+  bmiCategoryLabel,
+  bmiCategoryTone,
+  calcBmi,
+} from "@/lib/bmi";
 
 // Chief complaint, diagnosis, examination notes, advice, and allergies are
 // already shown by OpdVisitSummary right below this on the records detail
 // page — this panel only carries what that one doesn't: vitals and blood
 // group. Don't re-add clinical notes here without removing them there.
 export function EmrSummary({ visit }: { visit: PatientVisit }) {
+  const bmi = calcBmi(visit.vitals_weight, visit.vitals_height_cm);
   const hasVitals =
     visit.vitals_bp ||
     visit.vitals_pulse != null ||
     visit.vitals_temp != null ||
     visit.vitals_weight != null ||
+    visit.vitals_height_cm != null ||
     visit.vitals_spo2 != null;
 
   if (!hasVitals && !visit.patient_blood_group) {
@@ -43,6 +51,18 @@ export function EmrSummary({ visit }: { visit: PatientVisit }) {
         {visit.vitals_weight != null && (
           <span className="rounded bg-white px-2 py-1">
             Weight: <strong>{visit.vitals_weight} kg</strong>
+          </span>
+        )}
+        {visit.vitals_height_cm != null && (
+          <span className="rounded bg-white px-2 py-1">
+            Height: <strong>{visit.vitals_height_cm} cm</strong>
+          </span>
+        )}
+        {bmi != null && (
+          <span
+            className={`rounded px-2 py-1 ${bmiCategoryTone(bmiCategory(bmi))}`}
+          >
+            BMI: <strong>{bmi}</strong> ({bmiCategoryLabel(bmiCategory(bmi))})
           </span>
         )}
         {visit.vitals_spo2 != null && (

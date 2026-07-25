@@ -125,6 +125,12 @@ export async function PATCH(
           ? body.vitals_weight
           : null;
     }
+    if (body.vitals_height_cm !== undefined) {
+      visitData.vitals_height_cm =
+        body.vitals_height_cm != null && body.vitals_height_cm > 0
+          ? body.vitals_height_cm
+          : null;
+    }
     if (body.vitals_spo2 !== undefined) {
       visitData.vitals_spo2 =
         body.vitals_spo2 != null && body.vitals_spo2 > 0
@@ -195,6 +201,7 @@ export async function PATCH(
       "vitals_pulse",
       "vitals_temp",
       "vitals_weight",
+      "vitals_height_cm",
       "vitals_spo2",
     ]);
 

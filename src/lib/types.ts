@@ -75,6 +75,7 @@ export type PatientVisit = {
   vitals_pulse: number | null;
   vitals_temp: number | null;
   vitals_weight: number | null;
+  vitals_height_cm: number | null;
   vitals_spo2: number | null;
   patient_allergies: string | null;
   patient_blood_group: string | null;
