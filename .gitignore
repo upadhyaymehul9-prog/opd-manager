@@ -24,6 +24,7 @@
 .DS_Store
 *.pem
 nabh-6th-guide.pdf
+NABH-Digital-Health-Standards-for-Clinic-Management-Systems*.pdf
 
 # debug
 npm-debug.log*
