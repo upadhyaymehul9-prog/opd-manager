@@ -127,4 +127,7 @@ export const AUDIT_ACTIONS = {
   MLC_RECORD_DELETE: "mlc_record_delete",
   PATIENT_MERGE: "patient_merge",
   ROI_RELEASE_CREATE: "roi_release_create",
+  SCREEN_LOCK: "screen_lock",
+  SCREEN_UNLOCK: "screen_unlock",
+  SCREEN_UNLOCK_FAILED: "screen_unlock_failed",
 } as const;
