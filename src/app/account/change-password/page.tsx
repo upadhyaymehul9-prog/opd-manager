@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ConsoleShell } from "@/components/ConsoleShell";
 import { useSession } from "@/hooks/useSession";
+import { IDLE_LOCK_TIMEOUT_MINUTES } from "@/lib/idle-lock-config";
 
 export default function ChangePasswordPage() {
   const { session } = useSession();
@@ -116,6 +117,14 @@ export default function ChangePasswordPage() {
           {saving ? "Saving…" : "Change password"}
         </button>
       </form>
+
+      <div className="mt-6 max-w-md rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <p className="text-sm font-medium text-slate-700">Session security</p>
+        <p className="mt-1 text-sm text-slate-500">
+          Screen locks after {IDLE_LOCK_TIMEOUT_MINUTES} minutes of inactivity on all
+          console roles.
+        </p>
+      </div>
     </ConsoleShell>
   );
 }
