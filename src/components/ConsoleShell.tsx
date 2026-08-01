@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { logout, useSession } from "@/hooks/useSession";
+import { useIdleLock } from "@/hooks/useIdleLock";
+import { LockScreen } from "@/components/LockScreen";
 
 type NavItem = { href: string; label: string };
 type NavGroup = { label: string; items: NavItem[] };
@@ -183,6 +185,7 @@ export function ConsoleShell({
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { session } = useSession();
+  const { locked, unlock } = useIdleLock(!publicMode && !!session);
 
   if (publicMode) {
     return (
@@ -209,6 +212,9 @@ export function ConsoleShell({
 
   return (
     <div className="flex min-h-screen bg-[var(--color-clinic-bg)]">
+      {locked && session && (
+        <LockScreen session={session} onUnlock={unlock} />
+      )}
       {session && (
         <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 shrink-0 bg-slate-900 lg:block">
           <SidebarContent current={current} />
