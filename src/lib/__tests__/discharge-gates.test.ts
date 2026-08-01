@@ -60,7 +60,7 @@ describe("assertVisitReadyForDischarge", () => {
     ).not.toThrow();
   });
 
-  it("blocks pending lab tests", () => {
+  it("does not block discharge when lab tests are still pending", () => {
     expect(() =>
       assertVisitReadyForDischarge({
         visit: emrOk,
@@ -69,7 +69,7 @@ describe("assertVisitReadyForDischarge", () => {
         hasMlcRecord: false,
         pendingLabTests: 2,
       }),
-    ).toThrow(/lab test/i);
+    ).not.toThrow();
   });
 });
 

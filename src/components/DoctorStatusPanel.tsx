@@ -36,48 +36,34 @@ export function DoctorStatusPanel({ doctorId }: { doctorId: string }) {
 
   if (!doctor) {
     return (
-      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-4 text-slate-600">
-        Loading your OPD status…
+      <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+        Loading OPD status…
       </div>
     );
   }
 
   return (
-    <section className="mb-6 rounded-xl border border-blue-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900">My OPD Status</h2>
-          <p className="text-sm text-slate-600">
-            Tap <strong>Available in OPD</strong> when you start clinic — shown
-            on the TV screen
-          </p>
-        </div>
-        <span
-          className={`rounded-full px-3 py-1 text-sm font-semibold ${DOCTOR_OPD_STATUS_TABLE_COLORS[doctor.opd_status]}`}
-        >
-          {DOCTOR_OPD_STATUS_LABELS[doctor.opd_status]}
-        </span>
-      </div>
-
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <section className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 shadow-sm">
+      <span className="text-sm font-medium text-slate-700">OPD status</span>
+      <span
+        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${DOCTOR_OPD_STATUS_TABLE_COLORS[doctor.opd_status]}`}
+      >
+        {DOCTOR_OPD_STATUS_LABELS[doctor.opd_status]}
+      </span>
+      <select
+        value={doctor.opd_status}
+        disabled={busy}
+        onChange={(e) => setStatus(e.target.value as DoctorOpdStatus)}
+        className="focus-ring min-w-[180px] rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm disabled:opacity-50"
+        aria-label="Change OPD status"
+      >
         {DOCTOR_OPD_STATUS_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            disabled={busy}
-            onClick={() => setStatus(opt.value)}
-            className={`rounded-lg border-2 px-3 py-3 text-sm font-medium transition disabled:opacity-50 ${
-              doctor.opd_status === opt.value
-                ? "border-blue-600 bg-blue-50 text-blue-900"
-                : "border-slate-200 bg-slate-50 text-slate-800 hover:border-blue-300"
-            }`}
-          >
+          <option key={opt.value} value={opt.value}>
             {opt.label}
-          </button>
+          </option>
         ))}
-      </div>
+      </select>
+      {error && <p className="w-full text-xs text-red-600">{error}</p>}
     </section>
   );
 }

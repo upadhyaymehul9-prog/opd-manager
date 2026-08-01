@@ -1,7 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ConsultationTemplate, VisitEmrView } from "@/lib/emr-types";
+import {
+  bmiCategory,
+  bmiCategoryLabel,
+  bmiCategoryTone,
+  calcBmi,
+} from "@/lib/bmi";
 
 type ConsultationEmrPanelProps = {
   visitId: string;
@@ -21,7 +27,6 @@ export function ConsultationEmrPanel({
   const [examinationNotes, setExaminationNotes] = useState("");
   const [advice, setAdvice] = useState("");
   const [lifestyleAdvice, setLifestyleAdvice] = useState("");
-  const [investigationsOrdered, setInvestigationsOrdered] = useState("");
   const [followUpInstructions, setFollowUpInstructions] = useState("");
   const [referralNotes, setReferralNotes] = useState("");
   const [followUpDate, setFollowUpDate] = useState("");
@@ -31,6 +36,7 @@ export function ConsultationEmrPanel({
   const [vitalsPulse, setVitalsPulse] = useState("");
   const [vitalsTemp, setVitalsTemp] = useState("");
   const [vitalsWeight, setVitalsWeight] = useState("");
+  const [vitalsHeightCm, setVitalsHeightCm] = useState("");
   const [vitalsSpo2, setVitalsSpo2] = useState("");
   const [templates, setTemplates] = useState<ConsultationTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +44,20 @@ export function ConsultationEmrPanel({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(true);
+
+  const bmi = useMemo(() => {
+    const w = vitalsWeight ? Number(vitalsWeight) : null;
+    const h = vitalsHeightCm ? Number(vitalsHeightCm) : null;
+    return calcBmi(w, h);
+  }, [vitalsWeight, vitalsHeightCm]);
+
+  const bmiInfo =
+    bmi != null
+      ? {
+          value: bmi,
+          category: bmiCategory(bmi),
+        }
+      : null;
 
   const applyEmr = useCallback((emr: VisitEmrView) => {
     setChiefComplaint(emr.chief_complaint ?? "");
@@ -47,7 +67,6 @@ export function ConsultationEmrPanel({
     setExaminationNotes(emr.examination_notes ?? "");
     setAdvice(emr.advice ?? "");
     setLifestyleAdvice(emr.lifestyle_advice ?? "");
-    setInvestigationsOrdered(emr.investigations_ordered ?? "");
     setFollowUpInstructions(emr.follow_up_instructions ?? "");
     setReferralNotes(emr.referral_notes ?? "");
     setFollowUpDate(emr.follow_up_date ?? "");
@@ -57,6 +76,9 @@ export function ConsultationEmrPanel({
     setVitalsPulse(emr.vitals.pulse != null ? String(emr.vitals.pulse) : "");
     setVitalsTemp(emr.vitals.temp != null ? String(emr.vitals.temp) : "");
     setVitalsWeight(emr.vitals.weight != null ? String(emr.vitals.weight) : "");
+    setVitalsHeightCm(
+      emr.vitals.height_cm != null ? String(emr.vitals.height_cm) : "",
+    );
     setVitalsSpo2(emr.vitals.spo2 != null ? String(emr.vitals.spo2) : "");
   }, []);
 
@@ -108,7 +130,6 @@ export function ConsultationEmrPanel({
           examination_notes: examinationNotes,
           advice,
           lifestyle_advice: lifestyleAdvice,
-          investigations_ordered: investigationsOrdered,
           follow_up_instructions: followUpInstructions,
           referral_notes: referralNotes,
           follow_up_date: followUpDate || null,
@@ -118,6 +139,7 @@ export function ConsultationEmrPanel({
           vitals_pulse: vitalsPulse ? Number(vitalsPulse) : null,
           vitals_temp: vitalsTemp ? Number(vitalsTemp) : null,
           vitals_weight: vitalsWeight ? Number(vitalsWeight) : null,
+          vitals_height_cm: vitalsHeightCm ? Number(vitalsHeightCm) : null,
           vitals_spo2: vitalsSpo2 ? Number(vitalsSpo2) : null,
         }),
       });
@@ -236,7 +258,7 @@ export function ConsultationEmrPanel({
           <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Vitals
           </p>
-          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
             <div>
               <label className="block text-xs text-slate-600">BP</label>
               <input
@@ -282,6 +304,18 @@ export function ConsultationEmrPanel({
               />
             </div>
             <div>
+              <label className="block text-xs text-slate-600">Height cm</label>
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                value={vitalsHeightCm}
+                onChange={(e) => setVitalsHeightCm(e.target.value)}
+                placeholder="165"
+                className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div>
               <label className="block text-xs text-slate-600">SpO₂ %</label>
               <input
                 type="number"
@@ -293,6 +327,18 @@ export function ConsultationEmrPanel({
               />
             </div>
           </div>
+          {bmiInfo && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-slate-600">
+                BMI: <strong>{bmiInfo.value}</strong>
+              </span>
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${bmiCategoryTone(bmiInfo.category)}`}
+              >
+                {bmiCategoryLabel(bmiInfo.category)}
+              </span>
+            </div>
+          )}
 
           <div className="mt-4 grid gap-3">
             <div>
@@ -326,18 +372,6 @@ export function ConsultationEmrPanel({
                   setDiagnosis(e.target.value);
                 }}
                 rows={2}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700">
-                Investigations ordered
-              </label>
-              <textarea
-                value={investigationsOrdered}
-                onChange={(e) => setInvestigationsOrdered(e.target.value)}
-                rows={2}
-                placeholder="CBC, LFT, X-ray chest…"
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
             </div>

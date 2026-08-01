@@ -201,6 +201,7 @@ model PatientVisit {
   vitals_pulse              Int?
   vitals_temp               Float?
   vitals_weight             Float?
+  vitals_height_cm          Float?
   vitals_spo2               Int?
   updated_at      DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
   patient         Patient?       @relation(fields: [patient_id], references: [id], onDelete: SetNull)

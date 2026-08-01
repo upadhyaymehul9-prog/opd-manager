@@ -48,6 +48,7 @@ type VisitWithDoctor = {
   vitals_pulse: number | null;
   vitals_temp: number | null;
   vitals_weight: number | null;
+  vitals_height_cm: number | null;
   vitals_spo2: number | null;
   doctors: {
     id: string;
@@ -129,6 +130,7 @@ export function serializeVisit(visit: VisitWithDoctor): PatientVisit {
     vitals_pulse: visit.vitals_pulse ?? null,
     vitals_temp: visit.vitals_temp ?? null,
     vitals_weight: visit.vitals_weight ?? null,
+    vitals_height_cm: visit.vitals_height_cm ?? null,
     vitals_spo2: visit.vitals_spo2 ?? null,
     patient_allergies: visit.patient?.allergies ?? null,
     patient_blood_group: visit.patient?.blood_group ?? null,

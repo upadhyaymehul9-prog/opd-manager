@@ -27,12 +27,14 @@ export type DischargeCheckInput = {
   hasPharmacyBill: boolean;
   /** True when medico_legal and a structured MlcRecord exists */
   hasMlcRecord: boolean;
-  /** Count of lab tests still ordered/collected (not resulted/cancelled) */
+  /** Count of lab tests still ordered/collected (not resulted/cancelled).
+   * Informational only — pending labs do not block pharmacy bill / exit so
+   * patients are not stuck when results are still pending. */
   pendingLabTests: number;
   /** Doctor/admin/manager explicitly chose to discharge without EMR notes
-   * on file. Only bypasses the EMR check below — MLC, pending labs, and
-   * pharmacy-billing gates are never overridable. Caller is responsible for
-   * restricting this to the allowed roles and logging the override. */
+   * on file. Only bypasses the EMR check below — MLC and pharmacy-billing
+   * gates are never overridable. Caller is responsible for restricting this
+   * to the allowed roles and logging the override. */
   overrideEmrGate?: boolean;
 };
 
@@ -55,12 +57,9 @@ export function assertVisitReadyForDischarge(input: DischargeCheckInput) {
     );
   }
 
-  if (input.pendingLabTests > 0) {
-    throw new AppError(
-      `${input.pendingLabTests} lab test(s) still pending — result or cancel before discharge`,
-      400,
-    );
-  }
+  // Pending lab tests are not a hard discharge block. OPD patients often
+  // collect medicines while samples are still processing; labs stay on the
+  // visit for the Lab console / doctor workspace to result or cancel later.
 
   const items = input.prescriptionItems;
   if (!items || activeRxItems(items).length === 0) {

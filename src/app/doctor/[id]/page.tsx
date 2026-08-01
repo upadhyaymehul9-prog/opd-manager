@@ -9,6 +9,7 @@ import { ConsultationEmrPanel } from "@/components/ConsultationEmrPanel";
 import { MlcDetailsPanel } from "@/components/MlcDetailsPanel";
 import { ProcedurePanel } from "@/components/ProcedurePanel";
 import { LabTestsPanel } from "@/components/LabTestsPanel";
+import { EditPatientDetailsPanel } from "@/components/EditPatientDetailsPanel";
 import { TransferDoctorPanel } from "@/components/TransferDoctorPanel";
 import { PatientCard } from "@/components/PatientCard";
 import { DoctorPatientQueueBar } from "@/components/DoctorPatientQueueBar";
@@ -38,8 +39,13 @@ function WorkspaceTabs({
 }) {
   const atPharmacy = isAtPharmacy(visit.status);
 
+  // Keep Lab tests visible at pharmacy so unused orders can be cancelled
+  // and patients are not stuck if results are still pending.
   const tabs: { id: WorkspaceTab; label: string }[] = atPharmacy
-    ? [{ id: "prescription", label: "Prescription" }]
+    ? [
+        { id: "labs", label: "Lab tests" },
+        { id: "prescription", label: "Prescription" },
+      ]
     : [
         { id: "emr", label: "Consultation (EMR)" },
         ...(visit.medico_legal ? [{ id: "mlc" as const, label: "MLC" }] : []),
@@ -180,7 +186,10 @@ export default function DoctorConsolePage({
         {myPatients.map((visit, idx) => (
           <div key={visit.id} className="space-y-2">
             {isAtPharmacy(visit.status) ? (
-              <DoctorPatientQueueBar visit={visit} queueIndex={idx + 1} />
+              <div className="space-y-2">
+                <DoctorPatientQueueBar visit={visit} queueIndex={idx + 1} />
+                <EditPatientDetailsPanel visit={visit} onUpdated={refresh} />
+              </div>
             ) : (
               <PatientCard
                 visit={visit}
@@ -192,6 +201,7 @@ export default function DoctorConsolePage({
                       role="doctor"
                       onUpdated={refresh}
                     />
+                    <EditPatientDetailsPanel visit={visit} onUpdated={refresh} />
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-200 pt-2">
                       <TransferDoctorPanel
                         visitId={visit.id}

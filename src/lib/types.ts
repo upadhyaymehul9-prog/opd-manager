@@ -75,6 +75,7 @@ export type PatientVisit = {
   vitals_pulse: number | null;
   vitals_temp: number | null;
   vitals_weight: number | null;
+  vitals_height_cm: number | null;
   vitals_spo2: number | null;
   patient_allergies: string | null;
   patient_blood_group: string | null;
@@ -128,6 +129,12 @@ export type UpdatePatientInput = {
   /** Doctor/admin/manager may bypass the "chief complaint + diagnosis" NABH
    * gate at discharge — logged to the audit trail when used. */
   override_emr_gate?: boolean;
+  /** Demographics editable by doctor/reception anytime during the visit */
+  patient_name?: string;
+  age?: number | null;
+  mobile?: string | null;
+  address?: string | null;
+  gender?: string | null;
 };
 
 export const PROCEDURE_TYPES = [

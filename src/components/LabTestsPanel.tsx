@@ -35,6 +35,11 @@ export function LabTestsPanel({
   const [drafts, setDrafts] = useState<
     Record<string, { value_numeric: string; value_text: string; notes: string }>
   >({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const removableTests = tests.filter(
+    (t) => t.status === "ordered" || t.status === "collected",
+  );
 
   const loadTests = useCallback(async () => {
     const res = await fetch(`/api/visits/${visitId}/lab-tests`);
@@ -244,9 +249,61 @@ export function LabTestsPanel({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not remove test");
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(testId);
+        return next;
+      });
       await loadTests();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not remove test");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllRemovable() {
+    setSelectedIds((prev) => {
+      if (removableTests.length === 0) return prev;
+      const allSelected = removableTests.every((t) => prev.has(t.id));
+      if (allSelected) return new Set();
+      return new Set(removableTests.map((t) => t.id));
+    });
+  }
+
+  async function removeSelected() {
+    const ids = removableTests
+      .filter((t) => selectedIds.has(t.id))
+      .map((t) => t.id);
+    if (ids.length === 0) {
+      setError("Select at least one ordered/collected test to remove");
+      return;
+    }
+    if (!window.confirm(`Cancel ${ids.length} selected lab test(s)?`)) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/visits/${visitId}/lab-tests`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cancel_ids: ids }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not remove selected tests");
+      setSelectedIds(new Set());
+      await loadTests();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not remove selected tests");
     } finally {
       setBusy(false);
     }
@@ -395,6 +452,32 @@ export function LabTestsPanel({
           </div>
         )}
 
+      {canOrder && removableTests.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+          <label className="flex items-center gap-2 text-xs font-medium text-amber-900">
+            <input
+              type="checkbox"
+              checked={
+                removableTests.length > 0 &&
+                removableTests.every((t) => selectedIds.has(t.id))
+              }
+              onChange={toggleSelectAllRemovable}
+            />
+            Select all pending ({removableTests.length})
+          </label>
+          <button
+            type="button"
+            onClick={removeSelected}
+            disabled={busy || selectedIds.size === 0}
+            className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+          >
+            Remove selected ({[...selectedIds].filter((id) =>
+              removableTests.some((t) => t.id === id),
+            ).length})
+          </button>
+        </div>
+      )}
+
       {tests.length === 0 ? (
         <p className="mt-3 text-sm text-slate-500">
           No lab tests added yet.
@@ -405,6 +488,7 @@ export function LabTestsPanel({
           <table className="w-full min-w-[520px] text-left text-sm">
             <thead className="border-b text-xs uppercase tracking-wide text-slate-500">
               <tr>
+                {canOrder && <th className="w-8 py-2 pr-2" />}
                 <th className="py-2 pr-3">Test</th>
                 <th className="py-2 pr-3">Ref range</th>
                 <th className="py-2 pr-3">Value</th>
@@ -420,9 +504,24 @@ export function LabTestsPanel({
                   notes: "",
                 };
                 const isResulted = test.status === "resulted";
+                const canRemove =
+                  canOrder &&
+                  (test.status === "ordered" || test.status === "collected");
 
                 return (
                   <tr key={test.id} className="border-b border-slate-100 align-top">
+                    {canOrder && (
+                      <td className="py-2 pr-2">
+                        {canRemove ? (
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(test.id)}
+                            onChange={() => toggleSelected(test.id)}
+                            aria-label={`Select ${test.test_name}`}
+                          />
+                        ) : null}
+                      </td>
+                    )}
                     <td className="py-2 pr-3">
                       <p className="font-medium text-slate-900">{test.test_name}</p>
                       {test.unit && (
