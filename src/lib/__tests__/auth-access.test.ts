@@ -86,3 +86,21 @@ describe("canAccessApi — previously-fallthrough routes stay reachable", () => 
     ).toBe(true);
   });
 });
+
+describe("canAccessApi — screen-lock routes", () => {
+  it("allows every role to POST to /api/auth/screen-lock", () => {
+    for (const role of USER_ROLES) {
+      expect(
+        canAccessApi(sessionFor(role), "/api/auth/screen-lock", "POST"),
+      ).toBe(true);
+    }
+  });
+
+  it("allows every role to POST to /api/auth/screen-unlock", () => {
+    for (const role of USER_ROLES) {
+      expect(
+        canAccessApi(sessionFor(role), "/api/auth/screen-unlock", "POST"),
+      ).toBe(true);
+    }
+  });
+});

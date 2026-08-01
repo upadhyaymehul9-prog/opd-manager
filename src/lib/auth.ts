@@ -178,6 +178,13 @@ export function canAccessApi(
     return true;
   }
 
+  if (
+    pathname === "/api/auth/screen-lock" ||
+    pathname === "/api/auth/screen-unlock"
+  ) {
+    return true;
+  }
+
   if (pathname === "/api/analytics") {
     return session.role === "admin" || session.role === "manager";
   }
