@@ -1,15 +1,20 @@
 import { NextResponse } from "next/server";
 import { verifyPassword } from "@/lib/auth";
-import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
+import { requireApi } from "@/lib/api-guard";
+import { AUDIT_ACTIONS, logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
-  const session = await getSessionFromCookies();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const guard = await requireApi(request);
+  if (guard.response) return guard.response;
+  const { session } = guard;
 
-  const body = await request.json();
+  let body: Record<string, unknown>;
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
   const password = String(body.password ?? "");
   if (!password) {
     return NextResponse.json({ error: "Password required" }, { status: 400 });

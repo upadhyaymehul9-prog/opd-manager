@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
+import { requireApi } from "@/lib/api-guard";
+import { AUDIT_ACTIONS, logAudit } from "@/lib/audit";
 
-export async function POST() {
-  const session = await getSessionFromCookies();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export async function POST(request: Request) {
+  const guard = await requireApi(request);
+  if (guard.response) return guard.response;
+  const { session } = guard;
 
   await logAudit({
     action: AUDIT_ACTIONS.SCREEN_LOCK,
