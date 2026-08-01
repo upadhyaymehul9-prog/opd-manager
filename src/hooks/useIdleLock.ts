@@ -16,15 +16,17 @@ export function useIdleLock(enabled: boolean) {
     setLocked(true);
   }, []);
 
-  const unlock = useCallback(() => {
-    sessionStorage.removeItem(SCREEN_LOCK_SESSION_KEY);
-    setLocked(false);
-  }, []);
-
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(lock, IDLE_LOCK_TIMEOUT_MS);
   }, [lock]);
+
+  // resetTimer must be declared before unlock (temporal dead zone).
+  const unlock = useCallback(() => {
+    sessionStorage.removeItem(SCREEN_LOCK_SESSION_KEY);
+    setLocked(false);
+    resetTimer();
+  }, [resetTimer]);
 
   // Restore lock state from sessionStorage whenever enabled becomes true
   // (covers page refreshes and initial mount after the session loads).
