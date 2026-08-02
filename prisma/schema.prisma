@@ -643,3 +643,18 @@ model VisitLabTest {
   @@index([status])
   @@map("visit_lab_tests")
 }
+
+model StaffAttendance {
+  id           String    @id @default(uuid()) @db.Uuid
+  user_id      String    @db.Uuid
+  username     String
+  role         String
+  display_name String?
+  clock_in     DateTime  @db.Timestamptz(6)
+  clock_out    DateTime? @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([user_id])
+  @@index([clock_in(sort: Desc)])
+  @@map("staff_attendance")
+}

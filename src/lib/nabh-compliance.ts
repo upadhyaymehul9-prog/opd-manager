@@ -1,4 +1,4 @@
-import { startOfDay } from "@/lib/date-range";
+import { addDays, startOfDay } from "@/lib/date-range";
 import { prisma } from "@/lib/prisma";
 import { buildNabhChecklist, visitHasEmr } from "@/lib/nabh";
 import { isPoliceIntimationOverdue } from "@/lib/mlc";
@@ -6,7 +6,7 @@ import { isPoliceIntimationOverdue } from "@/lib/mlc";
 export async function getNabhComplianceSnapshot() {
   const todayStart = startOfDay(new Date());
 
-  const [visits, auditCount, openIncidents, feedbackToday, feedbackAvg] =
+  const [visits, auditCount, openIncidents, feedbackToday, feedbackAvg, attendanceRecordedToday] =
     await Promise.all([
       prisma.patientVisit.findMany({
         where: { registered_at: { gte: todayStart } },
@@ -47,6 +47,14 @@ export async function getNabhComplianceSnapshot() {
           q3_communication: true,
           q4_environment: true,
           q5_registration: true,
+        },
+      }),
+      prisma.staffAttendance.count({
+        where: {
+          clock_in: {
+            gte: startOfDay(new Date()),
+            lt: addDays(startOfDay(new Date()), 1),
+          },
         },
       }),
     ]);
@@ -99,6 +107,7 @@ export async function getNabhComplianceSnapshot() {
       mlcDocumented,
       feedbackToday,
       visitsSigned,
+      attendanceRecordedToday,
     }),
     feedbackAverage,
     feedbackToday,
