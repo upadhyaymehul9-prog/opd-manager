@@ -42,6 +42,7 @@ const PAGE_ACCESS: Record<string, UserRole[]> = {
   "/appointments": ["reception", "admin", "manager", "doctor"],
   "/settings/doctors": ["admin", "manager", "doctor"],
   "/settings/patients/merge": ["admin", "manager"],
+  "/attendance": ["manager", "admin"],
   "/account/change-password": [...USER_ROLES],
 };
 
@@ -183,6 +184,18 @@ export function canAccessApi(
     pathname === "/api/auth/screen-unlock"
   ) {
     return true;
+  }
+
+  if (
+    pathname === "/api/attendance/status" ||
+    pathname === "/api/attendance/clock-in" ||
+    pathname === "/api/attendance/clock-out"
+  ) {
+    return session.role !== "display";
+  }
+
+  if (pathname === "/api/attendance/daily") {
+    return session.role === "admin" || session.role === "manager";
   }
 
   if (pathname === "/api/analytics") {
