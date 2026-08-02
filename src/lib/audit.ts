@@ -130,4 +130,6 @@ export const AUDIT_ACTIONS = {
   SCREEN_LOCK: "screen_lock",
   SCREEN_UNLOCK: "screen_unlock",
   SCREEN_UNLOCK_FAILED: "screen_unlock_failed",
+  CLOCK_IN: "clock_in",
+  CLOCK_OUT: "clock_out",
 } as const;
