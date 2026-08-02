@@ -1,9 +1,3 @@
--- DropForeignKey
-ALTER TABLE "visit_radiology_orders" DROP CONSTRAINT "visit_radiology_orders_patient_visit_id_fkey";
-
--- DropTable
-DROP TABLE "visit_radiology_orders";
-
 -- CreateTable
 CREATE TABLE "staff_attendance" (
     "id" UUID NOT NULL,
