@@ -27,15 +27,23 @@ export default function AttendancePage() {
   const [date, setDate] = useState(todayStr());
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
 
   useEffect(() => {
     setLoading(true);
+    setFetchError(false);
     fetch(`/api/attendance/daily?date=${date}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data: { records: AttendanceRecord[] }) => {
         setRecords(data.records ?? []);
       })
-      .catch(() => setRecords([]))
+      .catch(() => {
+        setFetchError(true);
+        setRecords([]);
+      })
       .finally(() => setLoading(false));
   }, [date]);
 
@@ -59,6 +67,8 @@ export default function AttendancePage() {
 
         {loading ? (
           <p className="text-sm text-slate-500">Loading…</p>
+        ) : fetchError ? (
+          <p className="text-sm text-red-500">Could not load attendance records — try refreshing.</p>
         ) : records.length === 0 ? (
           <p className="text-sm text-slate-500">No attendance records for this date.</p>
         ) : (
