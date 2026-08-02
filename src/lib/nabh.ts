@@ -19,6 +19,7 @@ export function buildNabhChecklist(input: {
   mlcDocumented: number;
   feedbackToday: number;
   visitsSigned: number;
+  attendanceRecordedToday: number;
 }): { score: number; items: NabhCheckItem[] } {
   const noneToday = input.todayVisits === 0;
 
@@ -188,6 +189,16 @@ export function buildNabhChecklist(input: {
         noneToday
           ? "No registrations today."
           : `${input.visitsWithAbhaToday}/${input.todayVisits} today's visits linked to ABHA; manual entry supported. Not itself an NABH OE (supports IMS.1h digital health, Excellence level).`,
+    },
+    {
+      id: "hrm-attendance",
+      standard: "HRM.1d",
+      requirement: "System has capability to capture staff attendance",
+      status: input.attendanceRecordedToday > 0 ? "met" : "partial",
+      note:
+        input.attendanceRecordedToday > 0
+          ? `${input.attendanceRecordedToday} staff attendance record(s) today.`
+          : "Attendance module active; no records for today yet.",
     },
   ];
 

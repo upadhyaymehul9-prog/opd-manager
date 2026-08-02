@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { visitEmrCompleteForDischarge, visitHasEmr } from "@/lib/nabh";
+import { buildNabhChecklist, visitEmrCompleteForDischarge, visitHasEmr } from "@/lib/nabh";
 
 const emptyVisit = {
   chief_complaint: null,
@@ -43,5 +43,49 @@ describe("nabh EMR helpers", () => {
         final_diagnosis: "Viral fever",
       }),
     ).toBe(true);
+  });
+});
+
+describe("buildNabhChecklist HRM.1d", () => {
+  const base = {
+    todayVisits: 0,
+    visitsWithConsent: 0,
+    visitsWithEmr: 0,
+    visitsWithAbhaToday: 0,
+    openIncidents: 0,
+    auditLogsToday: 0,
+    visitsCompleted: 0,
+    visitsWithTwoIdentifiers: 0,
+    mlcVisits: 0,
+    mlcDocumented: 0,
+    feedbackToday: 0,
+    visitsSigned: 0,
+    attendanceRecordedToday: 0,
+  };
+
+  it("HRM.1d is 'met' when at least one attendance record exists today", () => {
+    const { items } = buildNabhChecklist({ ...base, attendanceRecordedToday: 3 });
+    const item = items.find((i) => i.id === "hrm-attendance")!;
+    expect(item).toBeDefined();
+    expect(item.standard).toBe("HRM.1d");
+    expect(item.status).toBe("met");
+  });
+
+  it("HRM.1d is 'partial' when no attendance records exist today", () => {
+    const { items } = buildNabhChecklist({ ...base, attendanceRecordedToday: 0 });
+    const item = items.find((i) => i.id === "hrm-attendance")!;
+    expect(item.status).toBe("partial");
+  });
+
+  it("HRM.1d is never 'gap'", () => {
+    const { items } = buildNabhChecklist({ ...base, attendanceRecordedToday: 0 });
+    const item = items.find((i) => i.id === "hrm-attendance")!;
+    expect(item.status).not.toBe("gap");
+  });
+
+  it("score is higher with attendance data than without", () => {
+    const { score: withData } = buildNabhChecklist({ ...base, attendanceRecordedToday: 1 });
+    const { score: withoutData } = buildNabhChecklist({ ...base, attendanceRecordedToday: 0 });
+    expect(withData).toBeGreaterThan(withoutData);
   });
 });
