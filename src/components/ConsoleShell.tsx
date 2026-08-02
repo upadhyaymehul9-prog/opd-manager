@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { logout, useSession } from "@/hooks/useSession";
 import { useIdleLock } from "@/hooks/useIdleLock";
 import { LockScreen } from "@/components/LockScreen";
+import { AttendanceWidget } from "@/components/AttendanceWidget";
 
 type NavItem = { href: string; label: string };
 type NavGroup = { label: string; items: NavItem[] };
@@ -33,6 +34,7 @@ const ADMIN_GROUPS: NavGroup[] = [
       { href: "/records/release", label: "ROI log" },
       { href: "/reports", label: "Reports" },
       { href: "/reconciliation", label: "Day-end" },
+      { href: "/attendance", label: "Attendance" },
     ],
   },
   {
@@ -148,6 +150,7 @@ function SidebarContent({
             {session.displayName || session.username}
           </p>
           <p className="text-xs capitalize text-slate-400">{session.role}</p>
+          {session.role !== "display" && <AttendanceWidget />}
           <div className="mt-2.5 flex gap-2">
             <Link
               href="/account/change-password"
