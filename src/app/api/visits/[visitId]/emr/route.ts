@@ -3,6 +3,7 @@ import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
 import { prisma } from "@/lib/prisma";
 import { serializeVisitEmr, visitEmrSelect } from "@/lib/emr";
+import { findIcd10ByCode } from "@/lib/icd10";
 import { AUDIT_ACTIONS, diffFields, logAudit } from "@/lib/audit";
 import type { UpdateVisitEmrInput } from "@/lib/emr-types";
 
@@ -77,6 +78,23 @@ export async function PATCH(
       const finalDx = trimOrNull(body.final_diagnosis);
       visitData.final_diagnosis = finalDx;
       visitData.diagnosis = finalDx;
+    }
+    if (body.icd_code !== undefined) {
+      const rawCode = trimOrNull(body.icd_code);
+      if (rawCode === null) {
+        visitData.icd_code = null;
+        visitData.icd_description = null;
+      } else {
+        const entry = findIcd10ByCode(rawCode);
+        if (!entry) {
+          return NextResponse.json(
+            { error: `Unknown ICD-10 code: ${rawCode}` },
+            { status: 400 },
+          );
+        }
+        visitData.icd_code = entry.code;
+        visitData.icd_description = entry.description;
+      }
     }
     if (body.diagnosis !== undefined && body.final_diagnosis === undefined) {
       const dx = trimOrNull(body.diagnosis);

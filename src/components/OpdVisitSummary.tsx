@@ -141,6 +141,9 @@ export function OpdVisitSummary({ visitId }: { visitId: string }) {
               {lang === "hi" ? hi.finalDx : "Final diagnosis"}:
             </span>{" "}
             {dxFinal}
+            {visit.icd_code && (
+              <span className="text-slate-600"> (ICD-10: {visit.icd_code})</span>
+            )}
           </p>
         )}
         {visit.advice && (

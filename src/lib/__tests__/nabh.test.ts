@@ -61,6 +61,8 @@ describe("buildNabhChecklist HRM.1d", () => {
     feedbackToday: 0,
     visitsSigned: 0,
     attendanceRecordedToday: 0,
+    visitsWithDiagnosis: 0,
+    visitsWithIcdCode: 0,
   };
 
   it("HRM.1d is 'met' when at least one attendance record exists today", () => {
@@ -87,5 +89,58 @@ describe("buildNabhChecklist HRM.1d", () => {
     const { score: withData } = buildNabhChecklist({ ...base, attendanceRecordedToday: 1 });
     const { score: withoutData } = buildNabhChecklist({ ...base, attendanceRecordedToday: 0 });
     expect(withData).toBeGreaterThan(withoutData);
+  });
+});
+
+describe("buildNabhChecklist IMS.1d (ICD-10 coding)", () => {
+  const base = {
+    todayVisits: 10,
+    visitsWithConsent: 0,
+    visitsWithEmr: 0,
+    visitsWithAbhaToday: 0,
+    openIncidents: 0,
+    auditLogsToday: 0,
+    visitsCompleted: 0,
+    visitsWithTwoIdentifiers: 0,
+    mlcVisits: 0,
+    mlcDocumented: 0,
+    feedbackToday: 0,
+    visitsSigned: 0,
+    attendanceRecordedToday: 0,
+    visitsWithDiagnosis: 0,
+    visitsWithIcdCode: 0,
+  };
+
+  function icdItem(overrides: Partial<typeof base>) {
+    const { items } = buildNabhChecklist({ ...base, ...overrides });
+    return items.find((i) => i.id === "ims-icd-coding")!;
+  }
+
+  it("is 'partial' when no diagnosed visits exist today", () => {
+    const item = icdItem({});
+    expect(item).toBeDefined();
+    expect(item.standard).toBe("IMS.1d");
+    expect(item.status).toBe("partial");
+    expect(item.note).toBe("No diagnosed visits today.");
+  });
+
+  it("is 'met' when at least 80% of diagnosed visits are coded", () => {
+    expect(icdItem({ visitsWithDiagnosis: 10, visitsWithIcdCode: 8 }).status).toBe("met");
+    expect(icdItem({ visitsWithDiagnosis: 5, visitsWithIcdCode: 5 }).status).toBe("met");
+  });
+
+  it("is 'partial' when coding is below 80%", () => {
+    expect(icdItem({ visitsWithDiagnosis: 10, visitsWithIcdCode: 7 }).status).toBe("partial");
+    expect(icdItem({ visitsWithDiagnosis: 4, visitsWithIcdCode: 1 }).status).toBe("partial");
+  });
+
+  it("is never 'gap', even with zero coded diagnoses", () => {
+    expect(icdItem({ visitsWithDiagnosis: 10, visitsWithIcdCode: 0 }).status).toBe("partial");
+  });
+
+  it("reports the honest coded/diagnosed count in the note", () => {
+    expect(icdItem({ visitsWithDiagnosis: 7, visitsWithIcdCode: 0 }).note).toBe(
+      "0/7 diagnosed visits coded with ICD-10 today.",
+    );
   });
 });

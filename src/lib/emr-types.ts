@@ -11,6 +11,9 @@ export type VisitEmr = {
   chief_complaint: string | null;
   provisional_diagnosis: string | null;
   final_diagnosis: string | null;
+  /** ICD-10 code for the final diagnosis (NABH IMS.1d); null = free text only */
+  icd_code: string | null;
+  icd_description: string | null;
   diagnosis: string | null;
   examination_notes: string | null;
   advice: string | null;
@@ -40,6 +43,7 @@ export type UpdateVisitEmrInput = {
   chief_complaint?: string | null;
   provisional_diagnosis?: string | null;
   final_diagnosis?: string | null;
+  icd_code?: string | null;
   diagnosis?: string | null;
   examination_notes?: string | null;
   advice?: string | null;

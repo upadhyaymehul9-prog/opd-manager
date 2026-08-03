@@ -186,6 +186,10 @@ model PatientVisit {
   chief_complaint           String?
   provisional_diagnosis     String?
   final_diagnosis           String?
+  // ICD-10 coding of the final diagnosis (NABH IMS.1d). Description is a
+  // snapshot taken when coded so records stay stable if the curated list changes.
+  icd_code                  String?
+  icd_description           String?
   diagnosis                 String?
   examination_notes         String?
   advice                    String?
