@@ -20,6 +20,8 @@ export function buildNabhChecklist(input: {
   feedbackToday: number;
   visitsSigned: number;
   attendanceRecordedToday: number;
+  visitsWithDiagnosis: number;
+  visitsWithIcdCode: number;
 }): { score: number; items: NabhCheckItem[] } {
   const noneToday = input.todayVisits === 0;
 
@@ -78,6 +80,25 @@ export function buildNabhChecklist(input: {
             ? "partial"
             : "gap",
       note: `${input.visitsWithEmr}/${input.todayVisits} visits with EMR notes today.`,
+    },
+    {
+      id: "ims-icd-coding",
+      standard: "IMS.1d",
+      requirement: "Diagnoses coded using ICD-10",
+      // Measured against today's visits that HAVE a final diagnosis — a visit
+      // that was never diagnosed shouldn't count against coding compliance.
+      // Never "gap": like HRM.1d, the coding capability exists once deployed.
+      status:
+        input.visitsWithDiagnosis === 0
+          ? "partial"
+          : input.visitsWithIcdCode >=
+              Math.ceil(input.visitsWithDiagnosis * 0.8)
+            ? "met"
+            : "partial",
+      note:
+        input.visitsWithDiagnosis === 0
+          ? "No diagnosed visits today."
+          : `${input.visitsWithIcdCode}/${input.visitsWithDiagnosis} diagnosed visits coded with ICD-10 today.`,
     },
     {
       id: "ims-signed",

@@ -11,6 +11,8 @@ type VisitEmrRow = {
   chief_complaint: string | null;
   provisional_diagnosis: string | null;
   final_diagnosis: string | null;
+  icd_code: string | null;
+  icd_description: string | null;
   diagnosis: string | null;
   examination_notes: string | null;
   advice: string | null;
@@ -57,6 +59,8 @@ export function extractVisitEmr(row: VisitEmrRow): VisitEmr {
     chief_complaint: row.chief_complaint,
     provisional_diagnosis: row.provisional_diagnosis,
     final_diagnosis: row.final_diagnosis,
+    icd_code: row.icd_code,
+    icd_description: row.icd_description,
     diagnosis: row.final_diagnosis ?? row.diagnosis,
     examination_notes: row.examination_notes,
     advice: row.advice,
@@ -128,6 +132,8 @@ export const visitEmrSelect = {
   chief_complaint: true,
   provisional_diagnosis: true,
   final_diagnosis: true,
+  icd_code: true,
+  icd_description: true,
   diagnosis: true,
   examination_notes: true,
   advice: true,

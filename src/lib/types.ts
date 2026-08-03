@@ -83,6 +83,9 @@ export type PatientVisit = {
   point_of_origin: string | null;
   provisional_diagnosis: string | null;
   final_diagnosis: string | null;
+  /** ICD-10 code for the final diagnosis (NABH IMS.1d); null = free text only */
+  icd_code: string | null;
+  icd_description: string | null;
   lifestyle_advice: string | null;
   investigations_ordered: string | null;
   follow_up_instructions: string | null;

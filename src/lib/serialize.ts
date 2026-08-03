@@ -32,6 +32,8 @@ type VisitWithDoctor = {
   chief_complaint: string | null;
   provisional_diagnosis: string | null;
   final_diagnosis: string | null;
+  icd_code: string | null;
+  icd_description: string | null;
   diagnosis: string | null;
   examination_notes: string | null;
   advice: string | null;
@@ -115,6 +117,8 @@ export function serializeVisit(visit: VisitWithDoctor): PatientVisit {
     chief_complaint: visit.chief_complaint ?? null,
     provisional_diagnosis: visit.provisional_diagnosis ?? null,
     final_diagnosis: visit.final_diagnosis ?? null,
+    icd_code: visit.icd_code ?? null,
+    icd_description: visit.icd_description ?? null,
     diagnosis: visit.final_diagnosis ?? visit.diagnosis ?? null,
     examination_notes: visit.examination_notes ?? null,
     advice: visit.advice ?? null,

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ConsultationTemplate, VisitEmrView } from "@/lib/emr-types";
+import { searchIcd10, type Icd10Entry } from "@/lib/icd10";
 import {
   bmiCategory,
   bmiCategoryLabel,
@@ -24,6 +25,9 @@ export function ConsultationEmrPanel({
   const [provisionalDiagnosis, setProvisionalDiagnosis] = useState("");
   const [finalDiagnosis, setFinalDiagnosis] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
+  const [icdCode, setIcdCode] = useState<string | null>(null);
+  const [icdDescription, setIcdDescription] = useState<string | null>(null);
+  const [icdQuery, setIcdQuery] = useState("");
   const [examinationNotes, setExaminationNotes] = useState("");
   const [advice, setAdvice] = useState("");
   const [lifestyleAdvice, setLifestyleAdvice] = useState("");
@@ -45,6 +49,26 @@ export function ConsultationEmrPanel({
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(true);
 
+  const icdMatches = useMemo(() => searchIcd10(icdQuery), [icdQuery]);
+
+  function selectIcd(entry: Icd10Entry) {
+    setIcdCode(entry.code);
+    setIcdDescription(entry.description);
+    // Pre-fill the free text only when empty so an existing note isn't clobbered
+    if (!finalDiagnosis.trim()) {
+      setFinalDiagnosis(entry.description);
+      setDiagnosis(entry.description);
+    }
+    setIcdQuery("");
+    setSaved(false);
+  }
+
+  function clearIcd() {
+    setIcdCode(null);
+    setIcdDescription(null);
+    setSaved(false);
+  }
+
   const bmi = useMemo(() => {
     const w = vitalsWeight ? Number(vitalsWeight) : null;
     const h = vitalsHeightCm ? Number(vitalsHeightCm) : null;
@@ -64,6 +88,9 @@ export function ConsultationEmrPanel({
     setProvisionalDiagnosis(emr.provisional_diagnosis ?? "");
     setFinalDiagnosis(emr.final_diagnosis ?? emr.diagnosis ?? "");
     setDiagnosis(emr.diagnosis ?? "");
+    setIcdCode(emr.icd_code ?? null);
+    setIcdDescription(emr.icd_description ?? null);
+    setIcdQuery("");
     setExaminationNotes(emr.examination_notes ?? "");
     setAdvice(emr.advice ?? "");
     setLifestyleAdvice(emr.lifestyle_advice ?? "");
@@ -107,6 +134,10 @@ export function ConsultationEmrPanel({
       setProvisionalDiagnosis(template.diagnosis);
       setFinalDiagnosis(template.diagnosis);
       setDiagnosis(template.diagnosis);
+      // Template text replaces the diagnosis — drop any stale ICD code so the
+      // chip can't silently disagree with the new text.
+      setIcdCode(null);
+      setIcdDescription(null);
     }
     if (template.examination_notes) setExaminationNotes(template.examination_notes);
     if (template.advice) setAdvice(template.advice);
@@ -127,6 +158,7 @@ export function ConsultationEmrPanel({
           provisional_diagnosis: provisionalDiagnosis,
           final_diagnosis: finalDiagnosis || diagnosis,
           diagnosis: finalDiagnosis || diagnosis,
+          icd_code: icdCode,
           examination_notes: examinationNotes,
           advice,
           lifestyle_advice: lifestyleAdvice,
@@ -363,8 +395,52 @@ export function ConsultationEmrPanel({
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700">
-                Final diagnosis (NABH IMS.4a)
+                Final diagnosis (NABH IMS.4a) — ICD-10 coded (IMS.1d)
               </label>
+              <div className="relative mt-1">
+                <input
+                  type="text"
+                  value={icdQuery}
+                  onChange={(e) => setIcdQuery(e.target.value)}
+                  placeholder="Search ICD-10 by code or name (e.g. J02, sore throat, sugar)…"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+                {icdMatches.length > 0 && (
+                  <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                    {icdMatches.map((m) => (
+                      <li key={m.code}>
+                        <button
+                          type="button"
+                          onClick={() => selectIcd(m)}
+                          className="flex w-full items-baseline gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50"
+                        >
+                          <span className="font-mono font-semibold text-blue-800">
+                            {m.code}
+                          </span>
+                          <span className="text-slate-700">{m.description}</span>
+                          <span className="ml-auto text-xs text-slate-400">
+                            {m.category}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {icdCode && (
+                <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-900">
+                  <span className="font-mono font-semibold">{icdCode}</span>
+                  {icdDescription}
+                  <button
+                    type="button"
+                    onClick={clearIcd}
+                    aria-label="Remove ICD-10 code"
+                    className="ml-0.5 rounded-full px-1 text-blue-700 hover:bg-blue-200"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
               <textarea
                 value={finalDiagnosis}
                 onChange={(e) => {
@@ -372,7 +448,8 @@ export function ConsultationEmrPanel({
                   setDiagnosis(e.target.value);
                 }}
                 rows={2}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                placeholder="Free-text diagnosis (used as-is if no code selected)"
+                className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
             </div>
             <div>

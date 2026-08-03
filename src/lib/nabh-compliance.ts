@@ -15,6 +15,7 @@ export async function getNabhComplianceSnapshot() {
           chief_complaint: true,
           diagnosis: true,
           final_diagnosis: true,
+          icd_code: true,
           examination_notes: true,
           advice: true,
           vitals_bp: true,
@@ -75,6 +76,10 @@ export async function getNabhComplianceSnapshot() {
     (r) => !isPoliceIntimationOverdue(r),
   ).length;
   const visitsSigned = visits.filter((v) => v.signed_at).length;
+  const diagnosedVisits = visits.filter(
+    (v) => v.final_diagnosis?.trim() || v.diagnosis?.trim(),
+  );
+  const visitsWithIcdCode = diagnosedVisits.filter((v) => v.icd_code).length;
   const visitsWithTwoIdentifiers = visits.filter(
     (v) => v.mobile && v.age != null,
   ).length;
@@ -108,6 +113,8 @@ export async function getNabhComplianceSnapshot() {
       feedbackToday,
       visitsSigned,
       attendanceRecordedToday,
+      visitsWithDiagnosis: diagnosedVisits.length,
+      visitsWithIcdCode,
     }),
     feedbackAverage,
     feedbackToday,
