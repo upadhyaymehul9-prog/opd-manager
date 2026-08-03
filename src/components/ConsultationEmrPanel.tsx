@@ -134,6 +134,10 @@ export function ConsultationEmrPanel({
       setProvisionalDiagnosis(template.diagnosis);
       setFinalDiagnosis(template.diagnosis);
       setDiagnosis(template.diagnosis);
+      // Template text replaces the diagnosis — drop any stale ICD code so the
+      // chip can't silently disagree with the new text.
+      setIcdCode(null);
+      setIcdDescription(null);
     }
     if (template.examination_notes) setExaminationNotes(template.examination_notes);
     if (template.advice) setAdvice(template.advice);
