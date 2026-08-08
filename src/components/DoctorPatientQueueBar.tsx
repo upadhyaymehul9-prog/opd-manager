@@ -1,6 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { StatusBadge } from "@/components/PatientCard";
 import type { Prescription } from "@/lib/prescription-types";
@@ -9,9 +10,11 @@ import type { PatientVisit } from "@/lib/types";
 export function DoctorPatientQueueBar({
   visit,
   queueIndex,
+  doctorId,
 }: {
   visit: PatientVisit;
   queueIndex: number;
+  doctorId: string;
 }) {
   const [rx, setRx] = useState<{ total: number; pending: number } | null>(null);
 
@@ -29,10 +32,7 @@ export function DoctorPatientQueueBar({
       .catch(() => setRx(null));
   }, [visit.id, visit.status]);
 
-  const hint =
-    visit.status === "at_pharmacy"
-      ? "At pharmacy — edit Rx below"
-      : "En route to pharmacy — edit Rx below";
+  const hint = visit.status === "at_pharmacy" ? "At pharmacy" : "En route to pharmacy";
 
   return (
     <div className="card overflow-x-auto">
@@ -80,8 +80,14 @@ export function DoctorPatientQueueBar({
                 addSuffix: true,
               })}
             </td>
-            <td className="px-4 py-3 text-right text-xs font-medium text-teal-800">
-              {hint}
+            <td className="px-4 py-3 text-right text-xs">
+              <span className="mr-2 font-medium text-teal-800">{hint}</span>
+              <Link
+                href={`/doctor/${doctorId}/visit/${visit.id}`}
+                className="font-semibold text-teal-700 hover:underline"
+              >
+                Open →
+              </Link>
             </td>
           </tr>
         </tbody>

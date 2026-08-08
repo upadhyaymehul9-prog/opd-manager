@@ -273,7 +273,8 @@ export function canAccessApi(
     pathname.match(/^\/api\/visits\/[^/]+\/emr$/) ||
     pathname.match(/^\/api\/visits\/[^/]+\/emr\/history$/) ||
     pathname.match(/^\/api\/visits\/[^/]+\/mlc$/) ||
-    pathname.match(/^\/api\/visits\/[^/]+\/mlc\/history$/)
+    pathname.match(/^\/api\/visits\/[^/]+\/mlc\/history$/) ||
+    pathname.match(/^\/api\/visits\/[^/]+\/focus$/)
   ) {
     if (method === "GET") {
       return (

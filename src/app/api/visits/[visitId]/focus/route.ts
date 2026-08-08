@@ -1,0 +1,79 @@
+import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
+import { serializeBill } from "@/lib/billing";
+import { visitInclude } from "@/lib/db-includes";
+import { prisma } from "@/lib/prisma";
+import { serializePrescription, serializeVisit } from "@/lib/serialize";
+
+/**
+ * Everything the doctor "patient focus" view needs in one round trip: the
+ * visit, its current prescription/bill, whether it came from a booked
+ * appointment, and a short vitals history (for the BP trend) drawn from the
+ * same patient's other visits.
+ */
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ visitId: string }> },
+) {
+  try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+
+    const { visitId } = await params;
+
+    const visit = await prisma.patientVisit.findUnique({
+      where: { id: visitId },
+      include: {
+        ...visitInclude,
+        prescription: {
+          include: {
+            items: { where: { voided_at: null }, orderBy: { sort_order: "asc" } },
+          },
+        },
+        pharmacy_bill: { include: { items: true } },
+        appointment: { select: { scheduled_at: true, source: true } },
+      },
+    });
+
+    if (!visit) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const vitalsHistory = visit.patient_id
+      ? await prisma.patientVisit.findMany({
+          where: {
+            patient_id: visit.patient_id,
+            id: { not: visitId },
+            vitals_bp: { not: null },
+          },
+          select: { id: true, registered_at: true, vitals_bp: true },
+          orderBy: { registered_at: "desc" },
+          take: 8,
+        })
+      : [];
+
+    return NextResponse.json({
+      visit: serializeVisit({ ...visit, doctors: visit.doctors }),
+      prescription: visit.prescription
+        ? serializePrescription(visit.prescription)
+        : null,
+      bill: visit.pharmacy_bill ? serializeBill(visit.pharmacy_bill) : null,
+      appointment: visit.appointment
+        ? {
+            scheduled_at: visit.appointment.scheduled_at.toISOString(),
+            source: visit.appointment.source,
+          }
+        : null,
+      vitals_history: vitalsHistory
+        .map((v) => ({
+          id: v.id,
+          registered_at: v.registered_at.toISOString(),
+          vitals_bp: v.vitals_bp,
+        }))
+        .reverse(),
+    });
+  } catch (e) {
+    return errorResponse("visits/[visitId]/focus GET", e, "Failed to load patient focus view");
+  }
+}
