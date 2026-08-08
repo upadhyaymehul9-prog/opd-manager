@@ -31,6 +31,8 @@ export function PrescriptionDetail({
   const [unitPrices, setUnitPrices] = useState<Record<string, string>>({});
   const [gstRates, setGstRates] = useState<Record<string, number>>({});
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("cash");
+  const [discountAmount, setDiscountAmount] = useState("");
+  const [discountReason, setDiscountReason] = useState("");
   const [completedBill, setCompletedBill] = useState<PharmacyBillView | null>(
     null,
   );
@@ -130,13 +132,17 @@ export function PrescriptionDetail({
       });
     const subtotal = round2(lines.reduce((s, l) => s + l.taxable_amount, 0));
     const gst_total = round2(lines.reduce((s, l) => s + l.gst_amount, 0));
+    const grand_total = round2(subtotal + gst_total);
+    const discount = Math.min(Math.max(Number(discountAmount) || 0, 0), grand_total);
     return {
       lines,
       subtotal,
       gst_total,
-      grand_total: round2(subtotal + gst_total),
+      grand_total,
+      discount,
+      net_total: round2(grand_total - discount),
     };
-  }, [prescription, readyToBill, unitPrices, gstRates]);
+  }, [prescription, readyToBill, unitPrices, gstRates, discountAmount]);
 
   async function toggleDispensed(itemId: string, dispensed: boolean) {
     setBusy(true);
@@ -263,6 +269,10 @@ export function PrescriptionDetail({
             prescription_item_id: l.id,
             unit_price: l.unit_price,
           })),
+          ...(billTotals.discount > 0 && {
+            discount_amount: billTotals.discount,
+            discount_reason: discountReason.trim() || undefined,
+          }),
           ...(overrideEmrGate && { override_emr_gate: true }),
         }),
       });
@@ -562,6 +572,33 @@ export function PrescriptionDetail({
               ))}
             </tbody>
           </table>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <label className="text-xs text-slate-600" htmlFor="pharmacy-discount-amount">
+              Discount (₹)
+              <input
+                id="pharmacy-discount-amount"
+                type="number"
+                min={0}
+                step={0.01}
+                value={discountAmount}
+                onChange={(e) => setDiscountAmount(e.target.value)}
+                placeholder="0.00"
+                className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+              />
+            </label>
+            <label className="text-xs text-slate-600" htmlFor="pharmacy-discount-reason">
+              Discount reason
+              <input
+                id="pharmacy-discount-reason"
+                type="text"
+                value={discountReason}
+                onChange={(e) => setDiscountReason(e.target.value)}
+                placeholder="e.g. Senior citizen"
+                disabled={!Number(discountAmount)}
+                className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1.5 text-sm disabled:bg-slate-100"
+              />
+            </label>
+          </div>
           <div className="mt-3 space-y-1 text-sm">
             <div className="flex justify-between">
               <span>Taxable</span>
@@ -571,16 +608,23 @@ export function PrescriptionDetail({
               <span>GST</span>
               <span>₹{billTotals.gst_total.toFixed(2)}</span>
             </div>
+            {billTotals.discount > 0 && (
+              <div className="flex justify-between text-emerald-700">
+                <span>Discount</span>
+                <span>−₹{billTotals.discount.toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between font-bold text-slate-900">
               <span>Total</span>
-              <span>₹{billTotals.grand_total.toFixed(2)}</span>
+              <span>₹{billTotals.net_total.toFixed(2)}</span>
             </div>
           </div>
           <div className="mt-3">
-            <label className="text-sm font-medium text-slate-700">
+            <label className="text-sm font-medium text-slate-700" htmlFor="pharmacy-payment-mode">
               Payment mode
             </label>
             <select
+              id="pharmacy-payment-mode"
               value={paymentMode}
               onChange={(e) => setPaymentMode(e.target.value as PaymentMode)}
               className="ml-2 rounded border border-slate-300 px-2 py-1 text-sm"

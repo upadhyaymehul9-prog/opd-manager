@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * A user-facing business-rule error whose message is safe to show the caller
@@ -30,5 +31,6 @@ export function errorResponse(
     return NextResponse.json({ error: e.message }, { status: e.status });
   }
   console.error(`[${context}]`, e);
+  Sentry.captureException(e, { tags: { route: context } });
   return NextResponse.json({ error: fallback }, { status: 500 });
 }

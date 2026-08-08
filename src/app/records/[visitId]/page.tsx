@@ -14,6 +14,7 @@ import { isReadyForPharmacyBill } from "@/lib/prescription-status";
 import { EmrSummary } from "@/components/EmrSummary";
 import { OpdVisitSummary } from "@/components/OpdVisitSummary";
 import { LabTestsPanel } from "@/components/LabTestsPanel";
+import { useSession } from "@/hooks/useSession";
 
 export default function RecordDetailPage({
   params,
@@ -21,6 +22,8 @@ export default function RecordDetailPage({
   params: Promise<{ visitId: string }>;
 }) {
   const { visitId } = use(params);
+  const { session } = useSession();
+  const canVoidBill = session?.role === "admin" || session?.role === "manager";
   const [visit, setVisit] = useState<PatientVisit | null>(null);
   const [prescription, setPrescription] = useState<Prescription | null>(null);
   const [bill, setBill] = useState<PharmacyBillView | null>(null);
@@ -69,6 +72,30 @@ export default function RecordDetailPage({
       setBill(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not generate bill");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function voidBill() {
+    if (!bill) return;
+    const reason = window.prompt(
+      `Void bill ${bill.bill_no} (₹${bill.grand_total.toFixed(2)})?\n\nThis excludes it from revenue/reconciliation permanently but never deletes it. Reason:`,
+    );
+    if (!reason?.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/bills/${bill.id}/void`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: reason.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not void bill");
+      setBill(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not void bill");
     } finally {
       setBusy(false);
     }
@@ -178,7 +205,19 @@ export default function RecordDetailPage({
         <section className="space-y-4">
           <h2 className="font-semibold text-slate-900">Pharmacy bill</h2>
           <PharmacyBillReceipt bill={bill} visit={visit} />
-          <PrintActions label="Print bill" pdfLabel="Save bill as PDF" />
+          <div className="flex flex-wrap items-center gap-3 print:hidden">
+            <PrintActions label="Print bill" pdfLabel="Save bill as PDF" />
+            {canVoidBill && !bill.voided_at && (
+              <button
+                type="button"
+                onClick={voidBill}
+                disabled={busy}
+                className="text-sm font-medium text-red-600 hover:text-red-800 hover:underline disabled:opacity-50"
+              >
+                Void bill
+              </button>
+            )}
+          </div>
         </section>
       ) : readyForBill ? (
         <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">

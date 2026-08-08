@@ -440,8 +440,17 @@ model PharmacyBill {
   payment_mode     String
   subtotal         Float
   gst_total        Float
+  /// Flat deduction applied to (subtotal + gst_total) at bill time.
+  discount_amount  Float              @default(0)
+  discount_reason  String?
   grand_total      Float
   created_at       DateTime           @default(now()) @db.Timestamptz(6)
+  /// Never hard-deleted: a wrong/disputed bill is voided (kept, excluded
+  /// from revenue), not removed — matches this app's append-only policy.
+  voided_at        DateTime?          @db.Timestamptz(6)
+  voided_by        String?
+  voided_by_role   String?
+  void_reason      String?
   /// Restrict: financial records must not vanish if a visit is deleted.
   patient_visit    PatientVisit       @relation(fields: [patient_visit_id], references: [id], onDelete: Restrict)
   prescription     Prescription       @relation(fields: [prescription_id], references: [id], onDelete: Restrict)
@@ -456,6 +465,7 @@ model PharmacyBillItem {
   bill_id              String       @db.Uuid
   prescription_item_id String?      @db.Uuid
   medicine_name        String
+  hsn_code             String?
   quantity             Int
   unit_price           Float
   gst_rate             Float

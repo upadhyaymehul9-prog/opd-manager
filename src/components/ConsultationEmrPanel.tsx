@@ -267,10 +267,11 @@ export function ConsultationEmrPanel({
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <label className="block text-xs font-medium text-slate-700">
+              <label htmlFor="emr-allergies" className="block text-xs font-medium text-slate-700">
                 Known allergies (saved on patient file)
               </label>
               <input
+                id="emr-allergies"
                 type="text"
                 value={allergies}
                 onChange={(e) => setAllergies(e.target.value)}
@@ -279,8 +280,9 @@ export function ConsultationEmrPanel({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700">Blood group</label>
+              <label htmlFor="emr-blood-group" className="block text-xs font-medium text-slate-700">Blood group</label>
               <input
+                id="emr-blood-group"
                 type="text"
                 value={bloodGroup}
                 onChange={(e) => setBloodGroup(e.target.value)}
@@ -295,8 +297,9 @@ export function ConsultationEmrPanel({
           </p>
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
             <div>
-              <label className="block text-xs text-slate-600">BP</label>
+              <label htmlFor="emr-vitals-bp" className="block text-xs text-slate-600">BP</label>
               <input
+                id="emr-vitals-bp"
                 type="text"
                 value={vitalsBp}
                 onChange={(e) => setVitalsBp(e.target.value)}
@@ -305,8 +308,9 @@ export function ConsultationEmrPanel({
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-600">Pulse</label>
+              <label htmlFor="emr-vitals-pulse" className="block text-xs text-slate-600">Pulse</label>
               <input
+                id="emr-vitals-pulse"
                 type="number"
                 min={0}
                 value={vitalsPulse}
@@ -316,8 +320,9 @@ export function ConsultationEmrPanel({
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-600">Temp °F</label>
+              <label htmlFor="emr-vitals-temp" className="block text-xs text-slate-600">Temp °F</label>
               <input
+                id="emr-vitals-temp"
                 type="number"
                 min={0}
                 step={0.1}
@@ -328,8 +333,9 @@ export function ConsultationEmrPanel({
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-600">Weight kg</label>
+              <label htmlFor="emr-vitals-weight" className="block text-xs text-slate-600">Weight kg</label>
               <input
+                id="emr-vitals-weight"
                 type="number"
                 min={0}
                 step={0.1}
@@ -339,8 +345,9 @@ export function ConsultationEmrPanel({
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-600">Height cm</label>
+              <label htmlFor="emr-vitals-height" className="block text-xs text-slate-600">Height cm</label>
               <input
+                id="emr-vitals-height"
                 type="number"
                 min={0}
                 step={0.1}
@@ -351,8 +358,9 @@ export function ConsultationEmrPanel({
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-600">SpO₂ %</label>
+              <label htmlFor="emr-vitals-spo2" className="block text-xs text-slate-600">SpO₂ %</label>
               <input
+                id="emr-vitals-spo2"
                 type="number"
                 min={0}
                 max={100}
@@ -362,8 +370,9 @@ export function ConsultationEmrPanel({
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-600">RBS mg/dL</label>
+              <label htmlFor="emr-vitals-rbs" className="block text-xs text-slate-600">RBS mg/dL</label>
               <input
+                id="emr-vitals-rbs"
                 type="number"
                 min={0}
                 value={vitalsRbs}
@@ -388,8 +397,9 @@ export function ConsultationEmrPanel({
 
           <div className="mt-4 grid gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-700">Chief complaint</label>
+              <label htmlFor="emr-chief-complaint" className="block text-xs font-medium text-slate-700">Chief complaint</label>
               <textarea
+                id="emr-chief-complaint"
                 value={chiefComplaint}
                 onChange={(e) => setChiefComplaint(e.target.value)}
                 rows={2}
@@ -397,10 +407,11 @@ export function ConsultationEmrPanel({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700">
+              <label htmlFor="emr-provisional-dx" className="block text-xs font-medium text-slate-700">
                 Provisional diagnosis
               </label>
               <textarea
+                id="emr-provisional-dx"
                 value={provisionalDiagnosis}
                 onChange={(e) => setProvisionalDiagnosis(e.target.value)}
                 rows={2}
@@ -408,11 +419,12 @@ export function ConsultationEmrPanel({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700">
+              <label htmlFor="emr-icd-search" className="block text-xs font-medium text-slate-700">
                 Final diagnosis (NABH IMS.4a) — ICD-10 coded (IMS.1d)
               </label>
               <div className="relative mt-1">
                 <input
+                  id="emr-icd-search"
                   type="text"
                   value={icdQuery}
                   onChange={(e) => setIcdQuery(e.target.value)}
@@ -456,6 +468,7 @@ export function ConsultationEmrPanel({
                 </span>
               )}
               <textarea
+                aria-label="Final diagnosis free text"
                 value={finalDiagnosis}
                 onChange={(e) => {
                   setFinalDiagnosis(e.target.value);
@@ -467,8 +480,9 @@ export function ConsultationEmrPanel({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700">Examination notes</label>
+              <label htmlFor="emr-examination-notes" className="block text-xs font-medium text-slate-700">Examination notes</label>
               <textarea
+                id="emr-examination-notes"
                 value={examinationNotes}
                 onChange={(e) => setExaminationNotes(e.target.value)}
                 rows={2}
@@ -476,8 +490,9 @@ export function ConsultationEmrPanel({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700">Treatment / advice</label>
+              <label htmlFor="emr-advice" className="block text-xs font-medium text-slate-700">Treatment / advice</label>
               <textarea
+                id="emr-advice"
                 value={advice}
                 onChange={(e) => setAdvice(e.target.value)}
                 rows={2}
@@ -485,8 +500,9 @@ export function ConsultationEmrPanel({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700">Lifestyle advice</label>
+              <label htmlFor="emr-lifestyle-advice" className="block text-xs font-medium text-slate-700">Lifestyle advice</label>
               <textarea
+                id="emr-lifestyle-advice"
                 value={lifestyleAdvice}
                 onChange={(e) => setLifestyleAdvice(e.target.value)}
                 rows={2}
@@ -494,10 +510,11 @@ export function ConsultationEmrPanel({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700">
+              <label htmlFor="emr-followup-instructions" className="block text-xs font-medium text-slate-700">
                 Follow-up instructions
               </label>
               <textarea
+                id="emr-followup-instructions"
                 value={followUpInstructions}
                 onChange={(e) => setFollowUpInstructions(e.target.value)}
                 rows={2}
@@ -506,8 +523,9 @@ export function ConsultationEmrPanel({
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-xs font-medium text-slate-700">Follow-up date</label>
+                <label htmlFor="emr-followup-date" className="block text-xs font-medium text-slate-700">Follow-up date</label>
                 <input
+                  id="emr-followup-date"
                   type="date"
                   value={followUpDate}
                   onChange={(e) => setFollowUpDate(e.target.value)}
@@ -515,8 +533,9 @@ export function ConsultationEmrPanel({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700">Referral notes</label>
+                <label htmlFor="emr-referral-notes" className="block text-xs font-medium text-slate-700">Referral notes</label>
                 <input
+                  id="emr-referral-notes"
                   type="text"
                   value={referralNotes}
                   onChange={(e) => setReferralNotes(e.target.value)}

@@ -32,6 +32,11 @@ export async function POST(
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
     const payment_mode = String(body.payment_mode ?? "cash");
+    const discountAmount = Math.max(0, Number(body.discount_amount) || 0);
+    const discountReason =
+      typeof body.discount_reason === "string" && body.discount_reason.trim()
+        ? body.discount_reason.trim()
+        : null;
     const overrideEmrGate =
       Boolean(body.override_emr_gate) &&
       (session.role === "doctor" ||
@@ -147,7 +152,20 @@ export async function POST(
             id,
             payment_mode,
             priceOverrides.size > 0 ? priceOverrides : undefined,
+            undefined,
+            { amount: discountAmount, reason: discountReason },
           );
+
+          if (discountAmount > 0) {
+            await logAuditTx(tx, {
+              action: AUDIT_ACTIONS.BILL_DISCOUNT_APPLIED,
+              entity_type: "pharmacy_bill",
+              entity_id: bill.id,
+              summary: `Discount ₹${discountAmount.toFixed(2)} applied to bill ${bill.bill_no}${discountReason ? ` — ${discountReason}` : ""}`,
+              details: { discount_amount: discountAmount, discount_reason: discountReason },
+              session,
+            });
+          }
         }
 
         await tx.patientVisit.update({

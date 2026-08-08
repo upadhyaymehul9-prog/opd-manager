@@ -82,7 +82,7 @@ export async function buildReconciliation(date: Date): Promise<ReconciliationRep
       },
     }),
     prisma.pharmacyBill.findMany({
-      where: { created_at: { gte: dayStart, lt: dayEnd } },
+      where: { created_at: { gte: dayStart, lt: dayEnd }, voided_at: null },
       orderBy: { created_at: "asc" },
       include: {
         patient_visit: {

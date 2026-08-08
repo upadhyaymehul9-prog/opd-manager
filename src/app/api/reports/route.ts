@@ -73,7 +73,10 @@ export async function GET(request: Request) {
           },
         }),
         prisma.pharmacyBill.findMany({
-          where: { created_at: { gte: rangeStart, lt: rangeEndExclusive } },
+          where: {
+            created_at: { gte: rangeStart, lt: rangeEndExclusive },
+            voided_at: null,
+          },
           include: {
             patient_visit: {
               select: { patient_name: true, token_number: true },

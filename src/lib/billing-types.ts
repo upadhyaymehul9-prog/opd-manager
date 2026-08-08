@@ -7,6 +7,7 @@ export type PharmacyBillItemView = {
   id: string;
   prescription_item_id: string | null;
   medicine_name: string;
+  hsn_code: string | null;
   quantity: number;
   unit_price: number;
   gst_rate: number;
@@ -23,14 +24,21 @@ export type PharmacyBillView = {
   payment_mode: PaymentMode;
   subtotal: number;
   gst_total: number;
+  discount_amount: number;
+  discount_reason: string | null;
   grand_total: number;
   created_at: string;
+  voided_at: string | null;
+  voided_by: string | null;
+  voided_by_role: string | null;
+  void_reason: string | null;
   items: PharmacyBillItemView[];
 };
 
 export type BillPreviewLine = {
   prescription_item_id: string;
   medicine_name: string;
+  hsn_code: string | null;
   quantity: number;
   unit_price: number;
   gst_rate: number;
@@ -50,4 +58,6 @@ export type BillPreview = {
 export type CompleteWithBillInput = {
   payment_mode: PaymentMode;
   lines?: { prescription_item_id: string; unit_price: number }[];
+  discount_amount?: number;
+  discount_reason?: string;
 };

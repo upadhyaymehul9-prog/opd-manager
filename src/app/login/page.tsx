@@ -75,10 +75,11 @@ function LoginForm() {
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label htmlFor="login-username" className="block text-sm font-medium text-slate-700">
               User ID
             </label>
             <input
+              id="login-username"
               type="text"
               autoComplete="username"
               value={username}
@@ -89,10 +90,11 @@ function LoginForm() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label htmlFor="login-password" className="block text-sm font-medium text-slate-700">
               Password
             </label>
             <input
+              id="login-password"
               type="password"
               autoComplete="current-password"
               value={password}

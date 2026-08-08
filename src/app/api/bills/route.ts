@@ -133,12 +133,20 @@ export async function POST(request: Request) {
       }
     }
 
+    const discount_amount = Math.max(0, Number(body.discount_amount) || 0);
+    const discount_reason =
+      typeof body.discount_reason === "string" && body.discount_reason.trim()
+        ? body.discount_reason.trim()
+        : null;
+
     const bill = await prisma.$transaction((tx) =>
       createPharmacyBill(
         tx,
         visit.prescription!.id,
         payment_mode,
         priceOverrides.size > 0 ? priceOverrides : undefined,
+        undefined,
+        { amount: discount_amount, reason: discount_reason },
       ),
     );
 

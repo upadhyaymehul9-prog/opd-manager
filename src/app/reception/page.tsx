@@ -291,9 +291,9 @@ export default function ReceptionPage() {
         >
           <h2 className="text-lg font-semibold text-slate-900">Register patient</h2>
 
-          <label className="mt-4 block text-sm font-medium text-slate-700">
+          <p className="mt-4 block text-sm font-medium text-slate-700">
             Patient type
-          </label>
+          </p>
           <div className="mt-2 flex gap-3">
             {(["new", "old"] as PatientType[]).map((t) => (
               <button
@@ -313,10 +313,11 @@ export default function ReceptionPage() {
 
           {patientType === "old" && (
             <div className="mt-4">
-              <label className="block text-sm font-medium text-slate-700">
+              <label htmlFor="reception-patient-search" className="block text-sm font-medium text-slate-700">
                 Search by name, mobile, P-number, or ABHA
               </label>
               <input
+                id="reception-patient-search"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -417,10 +418,11 @@ export default function ReceptionPage() {
             </div>
           )}
 
-          <label className="mt-4 block text-sm font-medium text-slate-700">
+          <label htmlFor="reception-origin" className="mt-4 block text-sm font-medium text-slate-700">
             Point of origin
           </label>
           <select
+            id="reception-origin"
             value={pointOfOrigin}
             onChange={(e) => setPointOfOrigin(e.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3"
@@ -432,10 +434,11 @@ export default function ReceptionPage() {
             ))}
           </select>
 
-          <label className="mt-4 block text-sm font-medium text-slate-700">
+          <label htmlFor="reception-name" className="mt-4 block text-sm font-medium text-slate-700">
             Patient name
           </label>
           <input
+            id="reception-name"
             type="text"
             value={patientName}
             onChange={(e) => setPatientName(e.target.value)}
@@ -446,8 +449,9 @@ export default function ReceptionPage() {
 
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700">Age</label>
+              <label htmlFor="reception-age" className="block text-sm font-medium text-slate-700">Age</label>
               <input
+                id="reception-age"
                 type="number"
                 min={0}
                 max={120}
@@ -457,10 +461,11 @@ export default function ReceptionPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700">
+              <label htmlFor="reception-gender" className="block text-sm font-medium text-slate-700">
                 Gender
               </label>
               <select
+                id="reception-gender"
                 value={gender}
                 onChange={(e) => setGender(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3"
@@ -475,8 +480,9 @@ export default function ReceptionPage() {
 
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700">Date of birth</label>
+              <label htmlFor="reception-dob" className="block text-sm font-medium text-slate-700">Date of birth</label>
               <input
+                id="reception-dob"
                 type="date"
                 value={dateOfBirth}
                 onChange={(e) => setDateOfBirth(e.target.value)}
@@ -487,8 +493,9 @@ export default function ReceptionPage() {
 
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700">Occupation</label>
+              <label htmlFor="reception-occupation" className="block text-sm font-medium text-slate-700">Occupation</label>
               <input
+                id="reception-occupation"
                 type="text"
                 value={occupation}
                 onChange={(e) => setOccupation(e.target.value)}
@@ -496,8 +503,9 @@ export default function ReceptionPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700">National ID type</label>
+              <label htmlFor="reception-id-type" className="block text-sm font-medium text-slate-700">National ID type</label>
               <select
+                id="reception-id-type"
                 value={nationalIdType}
                 onChange={(e) => setNationalIdType(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3"
@@ -526,10 +534,11 @@ export default function ReceptionPage() {
 
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700">
+              <label htmlFor="reception-mobile" className="block text-sm font-medium text-slate-700">
                 Mobile
               </label>
               <input
+                id="reception-mobile"
                 type="tel"
                 value={mobile}
                 onChange={(e) => setMobile(e.target.value)}
@@ -537,10 +546,11 @@ export default function ReceptionPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700">
+              <label htmlFor="reception-emergency-contact" className="block text-sm font-medium text-slate-700">
                 Emergency contact
               </label>
               <input
+                id="reception-emergency-contact"
                 type="tel"
                 value={emergencyContact}
                 onChange={(e) => setEmergencyContact(e.target.value)}
@@ -559,10 +569,11 @@ export default function ReceptionPage() {
             Medico-legal case (assault, MLC, etc.)
           </label>
 
-          <label className="mt-4 block text-sm font-medium text-slate-700">
+          <label htmlFor="reception-abha" className="mt-4 block text-sm font-medium text-slate-700">
             ABHA ID (optional)
           </label>
           <input
+            id="reception-abha"
             type="text"
             value={abhaId}
             onChange={(e) => setAbhaId(e.target.value)}
@@ -570,10 +581,11 @@ export default function ReceptionPage() {
             className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3"
           />
 
-          <label className="mt-4 block text-sm font-medium text-slate-700">
+          <label htmlFor="reception-address" className="mt-4 block text-sm font-medium text-slate-700">
             Address
           </label>
           <textarea
+            id="reception-address"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             placeholder="Village, street, landmark (optional)"
@@ -581,10 +593,11 @@ export default function ReceptionPage() {
             className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3"
           />
 
-          <label className="mt-4 block text-sm font-medium text-slate-700">
+          <label htmlFor="reception-doctor" className="mt-4 block text-sm font-medium text-slate-700">
             Consultant
           </label>
           <select
+            id="reception-doctor"
             value={doctorId}
             onChange={(e) => setDoctorId(e.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-3 text-lg"

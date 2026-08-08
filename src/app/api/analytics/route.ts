@@ -34,6 +34,7 @@ export async function GET(request: Request) {
         prisma.pharmacyBill.findMany({
           where: {
             created_at: { gte: rangeStart, lt: rangeEndExclusive },
+            voided_at: null,
           },
           orderBy: { created_at: "asc" },
         }),

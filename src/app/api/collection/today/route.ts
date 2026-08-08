@@ -39,7 +39,7 @@ export async function GET() {
 
     if (["pharmacy", "admin", "manager"].includes(session.role)) {
       const bills = await prisma.pharmacyBill.findMany({
-        where: { created_at: { gte: todayStart, lt: todayEnd } },
+        where: { created_at: { gte: todayStart, lt: todayEnd }, voided_at: null },
       });
       payload.pharmacy = {
         bills: bills.length,

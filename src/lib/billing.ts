@@ -98,6 +98,7 @@ export async function buildBillPreview(
     lines.push({
       prescription_item_id: item.id,
       medicine_name: item.medicine_name,
+      hsn_code: item.medicine?.hsn_code ?? null,
       quantity,
       unit_price,
       gst_rate,
@@ -143,12 +144,19 @@ export function serializeBill(bill: {
   payment_mode: string;
   subtotal: number;
   gst_total: number;
+  discount_amount: number;
+  discount_reason: string | null;
   grand_total: number;
   created_at: Date;
+  voided_at: Date | null;
+  voided_by: string | null;
+  voided_by_role: string | null;
+  void_reason: string | null;
   items: {
     id: string;
     prescription_item_id: string | null;
     medicine_name: string;
+    hsn_code: string | null;
     quantity: number;
     unit_price: number;
     gst_rate: number;
@@ -165,12 +173,19 @@ export function serializeBill(bill: {
     payment_mode: bill.payment_mode as PaymentMode,
     subtotal: bill.subtotal,
     gst_total: bill.gst_total,
+    discount_amount: bill.discount_amount,
+    discount_reason: bill.discount_reason,
     grand_total: bill.grand_total,
     created_at: bill.created_at.toISOString(),
+    voided_at: bill.voided_at?.toISOString() ?? null,
+    voided_by: bill.voided_by,
+    voided_by_role: bill.voided_by_role,
+    void_reason: bill.void_reason,
     items: bill.items.map((i) => ({
       id: i.id,
       prescription_item_id: i.prescription_item_id,
       medicine_name: i.medicine_name,
+      hsn_code: i.hsn_code,
       quantity: i.quantity,
       unit_price: i.unit_price,
       gst_rate: i.gst_rate,
@@ -187,6 +202,7 @@ export async function createPharmacyBill(
   paymentMode: PaymentMode,
   priceOverrides?: Map<string, number>,
   previewOverride?: BillPreview,
+  discount?: { amount: number; reason: string | null },
 ) {
   const existing = await tx.pharmacyBill.findUnique({
     where: { prescription_id: prescriptionId },
@@ -208,6 +224,11 @@ export async function createPharmacyBill(
     (await buildBillPreview(tx, prescriptionId, priceOverrides));
   const bill_no = await generateBillNo(tx);
 
+  // Discount can never exceed the bill (no negative grand total).
+  const discountAmount = round2(
+    Math.min(Math.max(discount?.amount ?? 0, 0), preview.grand_total),
+  );
+
   return tx.pharmacyBill.create({
     data: {
       bill_no,
@@ -216,11 +237,14 @@ export async function createPharmacyBill(
       payment_mode: paymentMode,
       subtotal: preview.subtotal,
       gst_total: preview.gst_total,
-      grand_total: preview.grand_total,
+      discount_amount: discountAmount,
+      discount_reason: discountAmount > 0 ? discount?.reason ?? null : null,
+      grand_total: round2(preview.grand_total - discountAmount),
       items: {
         create: preview.lines.map((line) => ({
           prescription_item_id: line.prescription_item_id,
           medicine_name: line.medicine_name,
+          hsn_code: line.hsn_code,
           quantity: line.quantity,
           unit_price: line.unit_price,
           gst_rate: line.gst_rate,
