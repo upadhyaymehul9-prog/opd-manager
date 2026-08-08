@@ -155,6 +155,10 @@ export async function PATCH(
           ? Math.min(100, Math.round(body.vitals_spo2))
           : null;
     }
+    if (body.vitals_rbs !== undefined) {
+      visitData.vitals_rbs =
+        body.vitals_rbs != null && body.vitals_rbs > 0 ? body.vitals_rbs : null;
+    }
 
     const hasClinicalChanges = Object.keys(visitData).length > 0;
 
@@ -221,6 +225,7 @@ export async function PATCH(
       "vitals_weight",
       "vitals_height_cm",
       "vitals_spo2",
+      "vitals_rbs",
     ]);
 
     await logAudit({

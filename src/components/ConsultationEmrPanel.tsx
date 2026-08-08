@@ -42,6 +42,7 @@ export function ConsultationEmrPanel({
   const [vitalsWeight, setVitalsWeight] = useState("");
   const [vitalsHeightCm, setVitalsHeightCm] = useState("");
   const [vitalsSpo2, setVitalsSpo2] = useState("");
+  const [vitalsRbs, setVitalsRbs] = useState("");
   const [templates, setTemplates] = useState<ConsultationTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -107,6 +108,7 @@ export function ConsultationEmrPanel({
       emr.vitals.height_cm != null ? String(emr.vitals.height_cm) : "",
     );
     setVitalsSpo2(emr.vitals.spo2 != null ? String(emr.vitals.spo2) : "");
+    setVitalsRbs(emr.vitals.rbs != null ? String(emr.vitals.rbs) : "");
   }, []);
 
   useEffect(() => {
@@ -173,6 +175,7 @@ export function ConsultationEmrPanel({
           vitals_weight: vitalsWeight ? Number(vitalsWeight) : null,
           vitals_height_cm: vitalsHeightCm ? Number(vitalsHeightCm) : null,
           vitals_spo2: vitalsSpo2 ? Number(vitalsSpo2) : null,
+          vitals_rbs: vitalsRbs ? Number(vitalsRbs) : null,
         }),
       });
       const data = await res.json();
@@ -290,7 +293,7 @@ export function ConsultationEmrPanel({
           <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Vitals
           </p>
-          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
             <div>
               <label className="block text-xs text-slate-600">BP</label>
               <input
@@ -355,6 +358,17 @@ export function ConsultationEmrPanel({
                 max={100}
                 value={vitalsSpo2}
                 onChange={(e) => setVitalsSpo2(e.target.value)}
+                className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-600">RBS mg/dL</label>
+              <input
+                type="number"
+                min={0}
+                value={vitalsRbs}
+                onChange={(e) => setVitalsRbs(e.target.value)}
+                placeholder="Random Blood Sugar"
                 className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
               />
             </div>

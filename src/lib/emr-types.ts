@@ -5,6 +5,8 @@ export type VisitVitals = {
   weight: number | null;
   height_cm: number | null;
   spo2: number | null;
+  /** Random Blood Sugar, mg/dL */
+  rbs: number | null;
 };
 
 export type VisitEmr = {
@@ -59,6 +61,7 @@ export type UpdateVisitEmrInput = {
   vitals_weight?: number | null;
   vitals_height_cm?: number | null;
   vitals_spo2?: number | null;
+  vitals_rbs?: number | null;
   patient_allergies?: string | null;
   patient_blood_group?: string | null;
 };

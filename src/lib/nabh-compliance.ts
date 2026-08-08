@@ -23,6 +23,7 @@ export async function getNabhComplianceSnapshot() {
           vitals_temp: true,
           vitals_weight: true,
           vitals_spo2: true,
+          vitals_rbs: true,
           status: true,
           medico_legal: true,
           signed_at: true,

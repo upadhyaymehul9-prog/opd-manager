@@ -84,6 +84,7 @@ type VisitRow = {
   vitals_temp: number | null;
   vitals_weight: number | null;
   vitals_spo2: number | null;
+  vitals_rbs?: number | null;
   signed_at: Date | null;
   medico_legal: boolean;
   doctors: { name: string } | null;

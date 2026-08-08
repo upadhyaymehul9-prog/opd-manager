@@ -18,7 +18,8 @@ export function EmrSummary({ visit }: { visit: PatientVisit }) {
     visit.vitals_temp != null ||
     visit.vitals_weight != null ||
     visit.vitals_height_cm != null ||
-    visit.vitals_spo2 != null;
+    visit.vitals_spo2 != null ||
+    visit.vitals_rbs != null;
 
   if (!hasVitals && !visit.patient_blood_group) {
     return null;
@@ -68,6 +69,11 @@ export function EmrSummary({ visit }: { visit: PatientVisit }) {
         {visit.vitals_spo2 != null && (
           <span className="rounded bg-white px-2 py-1">
             SpO₂: <strong>{visit.vitals_spo2}%</strong>
+          </span>
+        )}
+        {visit.vitals_rbs != null && (
+          <span className="rounded bg-white px-2 py-1">
+            RBS: <strong>{visit.vitals_rbs} mg/dL</strong>
           </span>
         )}
       </div>

@@ -38,6 +38,7 @@ export async function GET(request: Request) {
         vitals_temp: true,
         vitals_weight: true,
         vitals_spo2: true,
+        vitals_rbs: true,
         signed_at: true,
         medico_legal: true,
         doctors: { select: { name: true } },

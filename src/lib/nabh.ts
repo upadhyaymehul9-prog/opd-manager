@@ -241,6 +241,7 @@ export function visitHasEmr(visit: {
   vitals_temp: number | null;
   vitals_weight: number | null;
   vitals_spo2: number | null;
+  vitals_rbs?: number | null;
 }): boolean {
   const dx = visit.final_diagnosis?.trim() || visit.diagnosis?.trim();
   return Boolean(
@@ -252,7 +253,8 @@ export function visitHasEmr(visit: {
       visit.vitals_pulse != null ||
       visit.vitals_temp != null ||
       visit.vitals_weight != null ||
-      visit.vitals_spo2 != null,
+      visit.vitals_spo2 != null ||
+      visit.vitals_rbs != null,
   );
 }
 

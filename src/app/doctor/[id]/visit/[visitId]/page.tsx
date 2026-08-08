@@ -23,7 +23,12 @@ type FocusData = {
   prescription: Prescription | null;
   bill: PharmacyBillView | null;
   appointment: { scheduled_at: string; source: string } | null;
-  vitals_history: { id: string; registered_at: string; vitals_bp: string | null }[];
+  vitals_history: {
+    id: string;
+    registered_at: string;
+    vitals_bp: string | null;
+    vitals_rbs: number | null;
+  }[];
 };
 
 const AVATAR_COLORS = [
@@ -179,28 +184,28 @@ function parseSystolic(bp: string | null): number | null {
 
 function VitalsTrendChart({
   points,
+  emptyMessage,
+  colorClass = "text-teal-600",
 }: {
-  points: { label: string; systolic: number }[];
+  points: { label: string; value: number }[];
+  emptyMessage: string;
+  colorClass?: string;
 }) {
   if (points.length < 2) {
-    return (
-      <p className="text-sm text-slate-500">
-        Not enough prior BP readings for this patient yet.
-      </p>
-    );
+    return <p className="text-sm text-slate-500">{emptyMessage}</p>;
   }
 
   const width = 260;
   const height = 90;
   const pad = 8;
-  const values = points.map((p) => p.systolic);
+  const values = points.map((p) => p.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
 
   const coords = points.map((p, i) => {
     const x = pad + (i / (points.length - 1)) * (width - pad * 2);
-    const y = height - pad - ((p.systolic - min) / range) * (height - pad * 2);
+    const y = height - pad - ((p.value - min) / range) * (height - pad * 2);
     return { x, y };
   });
 
@@ -210,13 +215,13 @@ function VitalsTrendChart({
 
   return (
     <div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full text-teal-600">
+      <svg viewBox={`0 0 ${width} ${height}`} className={`w-full ${colorClass}`}>
         <path d={path} fill="none" stroke="currentColor" strokeWidth={2} />
         {coords.map((c, i) => (
           <circle key={i} cx={c.x} cy={c.y} r={i === coords.length - 1 ? 3.5 : 2} fill="currentColor" />
         ))}
         <text x={lastCoord.x} y={lastCoord.y - 8} fontSize={11} fill="currentColor" textAnchor="end" fontWeight={600}>
-          {last.systolic}
+          {last.value}
         </text>
       </svg>
       <div className="mt-1 flex justify-between text-[11px] text-slate-400">
@@ -274,16 +279,26 @@ export default function DoctorPatientFocusPage({
 
   const { visit, prescription } = data;
 
-  const chartPoints = [
+  const bpPoints = [
     ...data.vitals_history
       .map((v) => ({
         label: formatDistanceToNow(new Date(v.registered_at), { addSuffix: false }),
-        systolic: parseSystolic(v.vitals_bp),
+        value: parseSystolic(v.vitals_bp),
       }))
-      .filter((p): p is { label: string; systolic: number } => p.systolic !== null),
+      .filter((p): p is { label: string; value: number } => p.value !== null),
     ...(parseSystolic(visit.vitals_bp) !== null
-      ? [{ label: "Today", systolic: parseSystolic(visit.vitals_bp)! }]
+      ? [{ label: "Today", value: parseSystolic(visit.vitals_bp)! }]
       : []),
+  ];
+
+  const rbsPoints = [
+    ...data.vitals_history
+      .map((v) => ({
+        label: formatDistanceToNow(new Date(v.registered_at), { addSuffix: false }),
+        value: v.vitals_rbs,
+      }))
+      .filter((p): p is { label: string; value: number } => p.value !== null),
+    ...(visit.vitals_rbs != null ? [{ label: "Today", value: visit.vitals_rbs }] : []),
   ];
 
   async function handleRemove() {
@@ -303,9 +318,14 @@ export default function DoctorPatientFocusPage({
 
   return (
     <ConsoleShell title={visit.patient_name} subtitle="Patient focus view" current="/doctor">
-      <Link href={`/doctor/${doctorId}`} className="mb-4 inline-block text-sm text-teal-700">
-        ← Back to queue
-      </Link>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <Link href={`/doctor/${doctorId}`} className="text-sm text-teal-700">
+          ← Back to queue
+        </Link>
+        <Link href={`/records/${visit.id}`} className="text-sm font-medium text-indigo-700 hover:underline">
+          Full patient history →
+        </Link>
+      </div>
 
       {error && (
         <p className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -354,8 +374,11 @@ export default function DoctorPatientFocusPage({
             </div>
           </div>
 
-          {(visit.vitals_bp || visit.vitals_pulse != null || visit.vitals_weight != null) && (
-            <div className="flex gap-5">
+          {(visit.vitals_bp ||
+            visit.vitals_pulse != null ||
+            visit.vitals_weight != null ||
+            visit.vitals_rbs != null) && (
+            <div className="flex flex-wrap gap-5">
               {visit.vitals_bp && (
                 <div>
                   <p className="text-[11px] uppercase tracking-wide text-slate-400">BP</p>
@@ -372,6 +395,12 @@ export default function DoctorPatientFocusPage({
                 <div>
                   <p className="text-[11px] uppercase tracking-wide text-slate-400">Weight</p>
                   <p className="text-lg font-bold text-slate-900">{visit.vitals_weight}kg</p>
+                </div>
+              )}
+              {visit.vitals_rbs != null && (
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-slate-400">RBS</p>
+                  <p className="text-lg font-bold text-slate-900">{visit.vitals_rbs}</p>
                 </div>
               )}
             </div>
@@ -427,7 +456,20 @@ export default function DoctorPatientFocusPage({
         <div className="space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <h3 className="mb-3 text-sm font-semibold text-slate-900">Systolic BP trend</h3>
-            <VitalsTrendChart points={chartPoints} />
+            <VitalsTrendChart
+              points={bpPoints}
+              emptyMessage="Not enough prior BP readings for this patient yet."
+              colorClass="text-teal-600"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h3 className="mb-3 text-sm font-semibold text-slate-900">RBS trend</h3>
+            <VitalsTrendChart
+              points={rbsPoints}
+              emptyMessage="Not enough prior RBS readings for this patient yet."
+              colorClass="text-rose-600"
+            />
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

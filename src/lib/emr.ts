@@ -29,6 +29,7 @@ type VisitEmrRow = {
   vitals_weight: number | null;
   vitals_height_cm: number | null;
   vitals_spo2: number | null;
+  vitals_rbs: number | null;
   updated_at: Date;
   patient?: {
     allergies: string | null;
@@ -43,6 +44,7 @@ export function extractVitals(row: {
   vitals_weight: number | null;
   vitals_height_cm: number | null;
   vitals_spo2: number | null;
+  vitals_rbs: number | null;
 }): VisitVitals {
   return {
     bp: row.vitals_bp,
@@ -51,6 +53,7 @@ export function extractVitals(row: {
     weight: row.vitals_weight,
     height_cm: row.vitals_height_cm,
     spo2: row.vitals_spo2,
+    rbs: row.vitals_rbs,
   };
 }
 
@@ -122,7 +125,8 @@ export function hasEmrData(emr: VisitEmr): boolean {
       emr.vitals.temp != null ||
       emr.vitals.weight != null ||
       emr.vitals.height_cm != null ||
-      emr.vitals.spo2 != null,
+      emr.vitals.spo2 != null ||
+      emr.vitals.rbs != null,
   );
 }
 
@@ -150,6 +154,7 @@ export const visitEmrSelect = {
   vitals_weight: true,
   vitals_height_cm: true,
   vitals_spo2: true,
+  vitals_rbs: true,
   updated_at: true,
   patient: {
     select: { allergies: true, blood_group: true },

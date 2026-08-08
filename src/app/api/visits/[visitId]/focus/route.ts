@@ -9,8 +9,8 @@ import { serializePrescription, serializeVisit } from "@/lib/serialize";
 /**
  * Everything the doctor "patient focus" view needs in one round trip: the
  * visit, its current prescription/bill, whether it came from a booked
- * appointment, and a short vitals history (for the BP trend) drawn from the
- * same patient's other visits.
+ * appointment, and a short vitals history (for the BP/RBS trends) drawn
+ * from the same patient's other visits.
  */
 export async function GET(
   request: Request,
@@ -45,9 +45,9 @@ export async function GET(
           where: {
             patient_id: visit.patient_id,
             id: { not: visitId },
-            vitals_bp: { not: null },
+            OR: [{ vitals_bp: { not: null } }, { vitals_rbs: { not: null } }],
           },
-          select: { id: true, registered_at: true, vitals_bp: true },
+          select: { id: true, registered_at: true, vitals_bp: true, vitals_rbs: true },
           orderBy: { registered_at: "desc" },
           take: 8,
         })
@@ -70,6 +70,7 @@ export async function GET(
           id: v.id,
           registered_at: v.registered_at.toISOString(),
           vitals_bp: v.vitals_bp,
+          vitals_rbs: v.vitals_rbs,
         }))
         .reverse(),
     });

@@ -207,6 +207,9 @@ model PatientVisit {
   vitals_weight             Float?
   vitals_height_cm          Float?
   vitals_spo2               Int?
+  /// Random Blood Sugar, mg/dL — captured as a vital (glucometer check at
+  /// consultation), not a lab-sent test.
+  vitals_rbs                Float?
   updated_at      DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
   patient         Patient?       @relation(fields: [patient_id], references: [id], onDelete: SetNull)
   doctors         Doctor         @relation(fields: [doctor_id], references: [id], onDelete: Restrict)
