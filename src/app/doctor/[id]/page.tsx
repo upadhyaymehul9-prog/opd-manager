@@ -4,14 +4,12 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { ConsoleShell } from "@/components/ConsoleShell";
 import { DoctorStatusPanel } from "@/components/DoctorStatusPanel";
-import { EditPatientDetailsPanel } from "@/components/EditPatientDetailsPanel";
 import { TransferDoctorPanel } from "@/components/TransferDoctorPanel";
 import { PatientCard } from "@/components/PatientCard";
 import { DoctorPatientQueueBar } from "@/components/DoctorPatientQueueBar";
-import { PatientActions } from "@/components/PatientActions";
 import { isAtPharmacy } from "@/components/DoctorWorkspaceTabs";
 import { deletePatient, usePatientVisits } from "@/hooks/usePatientVisits";
-import { canWritePrescription, getRelevantPatients } from "@/lib/status";
+import { getRelevantPatients } from "@/lib/status";
 import type { PatientVisit } from "@/lib/types";
 
 export default function DoctorConsolePage({
@@ -80,43 +78,32 @@ export default function DoctorConsolePage({
         {myPatients.map((visit, idx) => (
           <div key={visit.id} className="space-y-2">
             {isAtPharmacy(visit.status) ? (
-              <div className="space-y-2">
-                <DoctorPatientQueueBar visit={visit} queueIndex={idx + 1} doctorId={doctorId} />
-                <EditPatientDetailsPanel visit={visit} onUpdated={refresh} />
-              </div>
+              <DoctorPatientQueueBar visit={visit} queueIndex={idx + 1} doctorId={doctorId} />
             ) : (
               <PatientCard
                 visit={visit}
                 showDoctor={false}
                 actions={
-                  <div className="space-y-2.5">
-                    <PatientActions
-                      visit={visit}
-                      role="doctor"
-                      onUpdated={refresh}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <TransferDoctorPanel
+                      visitId={visit.id}
+                      currentDoctorId={doctorId}
+                      onTransferred={refresh}
                     />
-                    <EditPatientDetailsPanel visit={visit} onUpdated={refresh} />
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-200 pt-2">
-                      <TransferDoctorPanel
-                        visitId={visit.id}
-                        currentDoctorId={doctorId}
-                        onTransferred={refresh}
-                      />
-                      <span className="text-slate-300">·</span>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteVisit(visit)}
-                        disabled={busyDeleteId === visit.id}
-                        className="text-xs font-medium text-red-600 hover:text-red-800 hover:underline disabled:opacity-50"
-                      >
-                        {busyDeleteId === visit.id ? "Removing..." : "Remove patient"}
-                      </button>
-                    </div>
+                    <span className="text-slate-300">·</span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteVisit(visit)}
+                      disabled={busyDeleteId === visit.id}
+                      className="text-xs font-medium text-red-600 hover:text-red-800 hover:underline disabled:opacity-50"
+                    >
+                      {busyDeleteId === visit.id ? "Removing..." : "Remove patient"}
+                    </button>
                   </div>
                 }
               />
             )}
-            {canWritePrescription(visit.status) && !isAtPharmacy(visit.status) && (
+            {!isAtPharmacy(visit.status) && (
               <Link
                 href={`/doctor/${doctorId}/visit/${visit.id}`}
                 className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 hover:bg-slate-100"
