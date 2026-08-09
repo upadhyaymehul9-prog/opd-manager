@@ -5,8 +5,54 @@ import {
   getHomeForRole,
   getSessionFromRequest,
 } from "@/lib/auth";
+import { RESERVED_CLINIC_SLUGS } from "@/lib/clinic-slug";
+import { prisma } from "@/lib/prisma";
 
 const PUBLIC_PATHS = ["/login", "/api/auth/login", "/feedback"];
+
+const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "localhost";
+
+type CachedClinic = { id: string; status: string; expiresAt: number };
+const clinicCache = new Map<string, CachedClinic>();
+const CLINIC_CACHE_TTL_MS = 60_000;
+
+function extractSlug(host: string): string | null {
+  const hostname = host.split(":")[0];
+  if (hostname === BASE_DOMAIN || hostname === `www.${BASE_DOMAIN}`) return null;
+  if (!hostname.endsWith(`.${BASE_DOMAIN}`)) return null;
+  const slug = hostname.slice(0, -(`.${BASE_DOMAIN}`.length));
+  if ((RESERVED_CLINIC_SLUGS as readonly string[]).includes(slug)) return null;
+  return slug;
+}
+
+async function resolveClinicId(host: string): Promise<{ id: string; status: string } | null> {
+  const slug = extractSlug(host);
+  if (!slug) return null;
+
+  const cached = clinicCache.get(slug);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { id: cached.id, status: cached.status };
+  }
+
+  const clinic = await prisma.clinic.findUnique({
+    where: { slug },
+    select: { id: true, status: true },
+  });
+  if (!clinic) return null;
+
+  clinicCache.set(slug, {
+    id: clinic.id,
+    status: clinic.status,
+    expiresAt: Date.now() + CLINIC_CACHE_TTL_MS,
+  });
+  return clinic;
+}
+
+function nextWithClinic(request: NextRequest, clinicId: string | null) {
+  const headers = new Headers(request.headers);
+  if (clinicId) headers.set("x-clinic-id", clinicId);
+  return NextResponse.next({ request: { headers } });
+}
 
 function isPublicBookingApi(pathname: string) {
   return pathname.startsWith("/api/public/booking/");
@@ -21,6 +67,25 @@ function isPublicFeedbackSubmit(pathname: string, method: string) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  const host = request.headers.get("host") ?? "";
+  const slug = extractSlug(host);
+
+  // Base-domain requests (no clinic subdomain) only serve the future signup
+  // flow and marketing/base pages -- not built in this plan, so for now
+  // anything on the base domain other than the public paths 404s.
+  if (!slug && !PUBLIC_PATHS.includes(pathname) && pathname !== "/") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  let clinicId: string | null = null;
+  if (slug) {
+    const clinic = await resolveClinicId(host);
+    if (!clinic || clinic.status === "suspended") {
+      return NextResponse.json({ error: "Unknown clinic" }, { status: 404 });
+    }
+    clinicId = clinic.id;
+  }
+
   if (
     PUBLIC_PATHS.includes(pathname) ||
     isPublicFeedbackSubmit(pathname, request.method) ||
@@ -28,7 +93,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")
   ) {
-    return NextResponse.next();
+    return nextWithClinic(request, clinicId);
   }
 
   const session = await getSessionFromRequest(request);
@@ -38,7 +103,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     if (pathname === "/") {
-      return NextResponse.next();
+      return nextWithClinic(request, clinicId);
     }
     const login = new URL("/login", request.url);
     login.searchParams.set("next", pathname);
@@ -60,7 +125,7 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  return NextResponse.next();
+  return nextWithClinic(request, clinicId);
 }
 
 export const config = {
