@@ -15,6 +15,7 @@ import {
 import { assertVisitReadyForDischarge, canExitWithoutPharmacyBill } from "@/lib/discharge-gates";
 import { prisma } from "@/lib/prisma";
 import { serializePrescription } from "@/lib/serialize";
+import { isValidClinicId } from "@/lib/tenant";
 
 const prescriptionInclude = {
   items: { where: { voided_at: null }, orderBy: { sort_order: "asc" as const } },
@@ -62,8 +63,15 @@ export async function POST(
 
     const now = new Date();
 
+    if (!isValidClinicId(session.clinicId)) {
+      throw new Error(`prescriptions/[id]/complete: invalid clinicId "${session.clinicId}"`);
+    }
+
     const result = await prisma.$transaction(
       async (tx) => {
+        await tx.$executeRawUnsafe(
+          `SET LOCAL app.clinic_id = '${session.clinicId}'`,
+        );
         const prescription = await tx.prescription.findUnique({
           where: { id },
           include: prescriptionInclude,

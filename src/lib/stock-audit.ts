@@ -1,6 +1,8 @@
-import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { formatMedicineLabel } from "@/lib/medicine";
 import { startOfDay } from "@/lib/stock";
+
+type Tx = Prisma.TransactionClient;
 
 export const STOCK_AUDIT_DEPARTMENTS = [
   { id: "pharmacy", label: "Pharmacy" },
@@ -44,8 +46,10 @@ export type StockAuditView = {
   };
 };
 
-export async function getPharmacyStockSnapshot(): Promise<StockAuditSnapshotLine[]> {
-  const medicines = await prisma.medicine.findMany({
+export async function getPharmacyStockSnapshot(
+  tx: Tx,
+): Promise<StockAuditSnapshotLine[]> {
+  const medicines = await tx.medicine.findMany({
     where: { is_active: true },
     include: {
       stock_batches: {
@@ -73,19 +77,23 @@ export async function getPharmacyStockSnapshot(): Promise<StockAuditSnapshotLine
     .filter((row) => row.system_qty > 0);
 }
 
-export async function saveStockAudit(input: {
-  audit_date: string;
-  department: string;
-  created_by?: string | null;
-  notes?: string | null;
-  lines: {
-    medicine_id: string;
-    medicine_name: string;
-    system_qty: number;
-    physical_qty: number;
+export async function saveStockAudit(
+  tx: Tx,
+  clinicId: string,
+  input: {
+    audit_date: string;
+    department: string;
+    created_by?: string | null;
     notes?: string | null;
-  }[];
-}): Promise<StockAuditView> {
+    lines: {
+      medicine_id: string;
+      medicine_name: string;
+      system_qty: number;
+      physical_qty: number;
+      notes?: string | null;
+    }[];
+  },
+): Promise<StockAuditView> {
   if (input.department !== "pharmacy") {
     throw new Error("Only pharmacy stock audit is available right now");
   }
@@ -93,14 +101,16 @@ export async function saveStockAudit(input: {
     throw new Error("Enter physical count for at least one medicine");
   }
 
-  const audit = await prisma.stockAudit.create({
+  const audit = await tx.stockAudit.create({
     data: {
+      clinic_id: clinicId,
       audit_date: startOfDay(new Date(input.audit_date)),
       department: input.department,
       notes: input.notes?.trim() || null,
       created_by: input.created_by ?? null,
       lines: {
         create: input.lines.map((line) => ({
+          clinic_id: clinicId,
           medicine_id: line.medicine_id,
           medicine_name: line.medicine_name,
           system_qty: line.system_qty,
@@ -116,8 +126,8 @@ export async function saveStockAudit(input: {
   return serializeAudit(audit);
 }
 
-export async function listStockAudits(limit = 20) {
-  const rows = await prisma.stockAudit.findMany({
+export async function listStockAudits(tx: Tx, limit = 20) {
+  const rows = await tx.stockAudit.findMany({
     orderBy: { audit_date: "desc" },
     take: limit,
     include: { lines: true },
@@ -125,8 +135,8 @@ export async function listStockAudits(limit = 20) {
   return rows.map(serializeAudit);
 }
 
-export async function getStockAudit(id: string) {
-  const audit = await prisma.stockAudit.findUnique({
+export async function getStockAudit(tx: Tx, id: string) {
+  const audit = await tx.stockAudit.findUnique({
     where: { id },
     include: { lines: { orderBy: { medicine_name: "asc" } } },
   });

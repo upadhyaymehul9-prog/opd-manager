@@ -12,22 +12,25 @@ import {
   hasDispensedForBilling,
   pendingRxItems,
 } from "@/lib/prescription-status";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function GET(request: Request) {
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const { searchParams } = new URL(request.url);
     const visitId = searchParams.get("visit_id")?.trim();
     const prescriptionId = searchParams.get("prescription_id")?.trim();
 
     if (visitId) {
-      const bill = await prisma.pharmacyBill.findUnique({
-        where: { patient_visit_id: visitId },
-        include: { items: true },
-      });
+      const bill = await withClinicScope(session.clinicId, (tx) =>
+        tx.pharmacyBill.findUnique({
+          where: { patient_visit_id: visitId },
+          include: { items: true },
+        }),
+      );
       if (!bill) {
         return NextResponse.json(null);
       }
@@ -35,14 +38,16 @@ export async function GET(request: Request) {
     }
 
     if (prescriptionId) {
-      const bill = await prisma.pharmacyBill.findUnique({
-        where: { prescription_id: prescriptionId },
-        include: { items: true },
-      });
+      const bill = await withClinicScope(session.clinicId, (tx) =>
+        tx.pharmacyBill.findUnique({
+          where: { prescription_id: prescriptionId },
+          include: { items: true },
+        }),
+      );
       if (bill) {
         return NextResponse.json(serializeBill(bill));
       }
-      const preview = await prisma.$transaction((tx) =>
+      const preview = await withClinicScope(session.clinicId, (tx) =>
         buildBillPreview(tx, prescriptionId),
       );
       return NextResponse.json({ preview });
@@ -77,27 +82,31 @@ export async function POST(request: Request) {
       );
     }
 
-    const visit = await prisma.patientVisit.findUnique({
-      where: { id: visit_id },
-      include: {
-        prescription: {
-          include: {
-            items: { where: { voided_at: null }, orderBy: { sort_order: "asc" } },
+    const visit = await withClinicScope(session.clinicId, (tx) =>
+      tx.patientVisit.findUnique({
+        where: { id: visit_id },
+        include: {
+          prescription: {
+            include: {
+              items: { where: { voided_at: null }, orderBy: { sort_order: "asc" } },
+            },
           },
+          pharmacy_bill: true,
         },
-        pharmacy_bill: true,
-      },
-    });
+      }),
+    );
 
     if (!visit?.prescription) {
       return NextResponse.json({ error: "No prescription found" }, { status: 404 });
     }
 
     if (visit.pharmacy_bill) {
-      const bill = await prisma.pharmacyBill.findUniqueOrThrow({
-        where: { id: visit.pharmacy_bill.id },
-        include: { items: true },
-      });
+      const bill = await withClinicScope(session.clinicId, (tx) =>
+        tx.pharmacyBill.findUniqueOrThrow({
+          where: { id: visit.pharmacy_bill!.id },
+          include: { items: true },
+        }),
+      );
       return NextResponse.json(serializeBill(bill));
     }
 
@@ -140,7 +149,7 @@ export async function POST(request: Request) {
         ? body.discount_reason.trim()
         : null;
 
-    const bill = await prisma.$transaction((tx) =>
+    const bill = await withClinicScope(session.clinicId, (tx) =>
       createPharmacyBill(
         tx,
         session.clinicId,

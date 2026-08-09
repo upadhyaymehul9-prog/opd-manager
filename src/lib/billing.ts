@@ -232,6 +232,7 @@ export async function createPharmacyBill(
 
   return tx.pharmacyBill.create({
     data: {
+      clinic_id: clinicId,
       bill_no,
       patient_visit_id: prescription.patient_visit_id,
       prescription_id: prescriptionId,
@@ -243,6 +244,7 @@ export async function createPharmacyBill(
       grand_total: round2(preview.grand_total - discountAmount),
       items: {
         create: preview.lines.map((line) => ({
+          clinic_id: clinicId,
           prescription_item_id: line.prescription_item_id,
           medicine_name: line.medicine_name,
           hsn_code: line.hsn_code,

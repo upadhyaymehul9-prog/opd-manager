@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { errorResponse } from "@/lib/api-error";
+import { AppError, errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
-import { prisma } from "@/lib/prisma";
 import {
   LOW_STOCK_THRESHOLD,
   serializeBatch,
@@ -9,24 +8,31 @@ import {
   validateExpiryForReceiving,
 } from "@/lib/stock";
 import { serializeMedicine } from "@/lib/serialize";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function GET(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { searchParams } = new URL(request.url);
     const lowOnly = searchParams.get("low") === "true";
     const stockedOnly = searchParams.get("stocked") === "true";
 
-    const medicines = await prisma.medicine.findMany({
-      where: { is_active: true },
-      include: {
-        stock_batches: {
-          where: { quantity: { gt: 0 } },
-          orderBy: [{ expiry_date: "asc" }, { created_at: "asc" }],
+    const medicines = await withClinicScope(session.clinicId, (tx) =>
+      tx.medicine.findMany({
+        where: { is_active: true },
+        include: {
+          stock_batches: {
+            where: { quantity: { gt: 0 } },
+            orderBy: [{ expiry_date: "asc" }, { created_at: "asc" }],
+          },
+          _count: { select: { stock_batches: true } },
         },
-        _count: { select: { stock_batches: true } },
-      },
-      orderBy: { name: "asc" },
-    });
+        orderBy: { name: "asc" },
+      }),
+    );
 
     const rows = medicines.map((med) => {
       const usableBatches = med.stock_batches.filter((b) =>
@@ -64,6 +70,7 @@ export async function POST(request: Request) {
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const body = await request.json();
     const medicine_id = String(body.medicine_id ?? "").trim();
@@ -104,25 +111,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: expiryError }, { status: 400 });
     }
 
-    const medicine = await prisma.medicine.findUnique({
-      where: { id: medicine_id },
-    });
-    if (!medicine) {
-      return NextResponse.json({ error: "Medicine not found" }, { status: 404 });
-    }
+    const batch = await withClinicScope(session.clinicId, async (tx) => {
+      const medicine = await tx.medicine.findUnique({
+        where: { id: medicine_id },
+      });
+      if (!medicine) {
+        throw new AppError("Medicine not found", 404);
+      }
 
-    const batch = await prisma.stockBatch.create({
-      data: {
-        medicine_id,
-        quantity: Math.round(quantity),
-        batch_no,
-        expiry_date,
-        pack_size:
-          body.pack_size != null && Number(body.pack_size) > 0
-            ? Math.round(Number(body.pack_size))
-            : 1,
-        mrp: body.mrp != null && body.mrp !== "" ? Number(body.mrp) : null,
-      },
+      return tx.stockBatch.create({
+        data: {
+          clinic_id: session.clinicId,
+          medicine_id,
+          quantity: Math.round(quantity),
+          batch_no,
+          expiry_date,
+          pack_size:
+            body.pack_size != null && Number(body.pack_size) > 0
+              ? Math.round(Number(body.pack_size))
+              : 1,
+          mrp: body.mrp != null && body.mrp !== "" ? Number(body.mrp) : null,
+        },
+      });
     });
 
     return NextResponse.json(serializeBatch(batch), { status: 201 });

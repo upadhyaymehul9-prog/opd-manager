@@ -3,7 +3,7 @@ import { AppError, errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
 import { AUDIT_ACTIONS, logAuditTx } from "@/lib/audit";
 import { serializeBill } from "@/lib/billing";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 /**
  * Financial correction only: marks a bill voided so it drops out of revenue
@@ -33,10 +33,12 @@ export async function POST(
       throw new AppError("A reason is required to void a bill", 400);
     }
 
-    const existing = await prisma.pharmacyBill.findUnique({
-      where: { id },
-      include: { items: true },
-    });
+    const existing = await withClinicScope(session.clinicId, (tx) =>
+      tx.pharmacyBill.findUnique({
+        where: { id },
+        include: { items: true },
+      }),
+    );
     if (!existing) {
       return NextResponse.json({ error: "Bill not found" }, { status: 404 });
     }
@@ -44,7 +46,7 @@ export async function POST(
       throw new AppError("Bill is already voided", 409);
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await withClinicScope(session.clinicId, async (tx) => {
       const bill = await tx.pharmacyBill.update({
         where: { id },
         data: {

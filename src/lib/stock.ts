@@ -110,6 +110,7 @@ export async function deductFromStock(
 
 export async function restoreToStock(
   tx: Tx,
+  clinicId: string,
   medicineId: string,
   qty: number,
 ) {
@@ -154,6 +155,7 @@ export async function restoreToStock(
   const today = startOfDay(new Date());
   await tx.stockBatch.create({
     data: {
+      clinic_id: clinicId,
       medicine_id: medicineId,
       quantity: qty,
       batch_no: "RETURN-UNTRACKED",

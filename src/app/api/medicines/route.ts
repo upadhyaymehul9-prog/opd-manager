@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
-import { prisma } from "@/lib/prisma";
 import { serializeMedicine } from "@/lib/serialize";
 import { LOW_STOCK_THRESHOLD, startOfDay } from "@/lib/stock";
+import { withClinicScope } from "@/lib/tenant";
 
 function stockTotalsForMedicines(
   medicineIds: string[],
@@ -22,6 +22,10 @@ function stockTotalsForMedicines(
 
 export async function GET(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { searchParams } = new URL(request.url);
     const q = searchParams.get("q")?.trim() ?? "";
     const withStock = searchParams.get("stock") === "true";
@@ -33,39 +37,46 @@ export async function GET(request: Request) {
 
     const today = startOfDay(new Date());
 
-    const usableBatches = await prisma.stockBatch.findMany({
-      where: {
-        quantity: { gt: 0 },
-        expiry_date: { gte: today },
+    const { usableBatches, medicines } = await withClinicScope(
+      session.clinicId,
+      async (tx) => {
+        const usableBatches = await tx.stockBatch.findMany({
+          where: {
+            quantity: { gt: 0 },
+            expiry_date: { gte: today },
+          },
+          select: { medicine_id: true, quantity: true },
+        });
+
+        const stockedIds = [
+          ...new Set(usableBatches.map((b) => b.medicine_id)),
+        ];
+
+        if (inStockOnly && stockedIds.length === 0) {
+          return { usableBatches, medicines: [] };
+        }
+
+        const medicines = await tx.medicine.findMany({
+          where: {
+            is_active: true,
+            ...(inStockOnly ? { id: { in: stockedIds } } : {}),
+            ...(q
+              ? {
+                  OR: [
+                    { name: { contains: q, mode: "insensitive" } },
+                    { brand: { contains: q, mode: "insensitive" } },
+                    { strength: { contains: q, mode: "insensitive" } },
+                  ],
+                }
+              : {}),
+          },
+          orderBy: [{ name: "asc" }, { strength: "asc" }],
+          take: limit,
+        });
+
+        return { usableBatches, medicines };
       },
-      select: { medicine_id: true, quantity: true },
-    });
-
-    const stockedIds = [
-      ...new Set(usableBatches.map((b) => b.medicine_id)),
-    ];
-
-    if (inStockOnly && stockedIds.length === 0) {
-      return NextResponse.json([]);
-    }
-
-    const medicines = await prisma.medicine.findMany({
-      where: {
-        is_active: true,
-        ...(inStockOnly ? { id: { in: stockedIds } } : {}),
-        ...(q
-          ? {
-              OR: [
-                { name: { contains: q, mode: "insensitive" } },
-                { brand: { contains: q, mode: "insensitive" } },
-                { strength: { contains: q, mode: "insensitive" } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: [{ name: "asc" }, { strength: "asc" }],
-      take: limit,
-    });
+    );
 
     if (!withStock || medicines.length === 0) {
       return NextResponse.json(medicines.map(serializeMedicine));
@@ -107,6 +118,7 @@ export async function POST(request: Request) {
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const body = await request.json();
     const name = String(body.name ?? "").trim();
@@ -121,23 +133,29 @@ export async function POST(request: Request) {
     const form = body.form?.trim() || null;
     const strength = body.strength?.trim() || null;
 
-    const existing = await prisma.medicine.findFirst({
-      where: {
-        name: { equals: name, mode: "insensitive" },
-        brand: brand,
-        form: form,
-        strength: strength,
+    const { medicine, created } = await withClinicScope(
+      session.clinicId,
+      async (tx) => {
+        const existing = await tx.medicine.findFirst({
+          where: {
+            name: { equals: name, mode: "insensitive" },
+            brand: brand,
+            form: form,
+            strength: strength,
+          },
+        });
+        if (existing) return { medicine: existing, created: false };
+
+        const created = await tx.medicine.create({
+          data: { clinic_id: session.clinicId, name, brand, form, strength },
+        });
+        return { medicine: created, created: true };
       },
-    });
-    if (existing) {
-      return NextResponse.json(serializeMedicine(existing));
-    }
+    );
 
-    const medicine = await prisma.medicine.create({
-      data: { name, brand, form, strength },
+    return NextResponse.json(serializeMedicine(medicine), {
+      status: created ? 201 : 200,
     });
-
-    return NextResponse.json(serializeMedicine(medicine), { status: 201 });
   } catch (e) {
     return errorResponse("medicines POST", e, "Database error");
   }

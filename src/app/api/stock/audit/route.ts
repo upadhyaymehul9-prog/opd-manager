@@ -7,16 +7,25 @@ import {
   listStockAudits,
   saveStockAudit,
 } from "@/lib/stock-audit";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function GET(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { searchParams } = new URL(request.url);
     if (searchParams.get("snapshot") === "true") {
-      const snapshot = await getPharmacyStockSnapshot();
+      const snapshot = await withClinicScope(session.clinicId, (tx) =>
+        getPharmacyStockSnapshot(tx),
+      );
       return NextResponse.json({ lines: snapshot });
     }
 
-    const audits = await listStockAudits();
+    const audits = await withClinicScope(session.clinicId, (tx) =>
+      listStockAudits(tx),
+    );
     return NextResponse.json(audits);
   } catch (e) {
     return errorResponse("stock/audit GET", e, "Stock audit error");
@@ -30,13 +39,15 @@ export async function POST(request: Request) {
     const { session } = guard;
 
     const body = await request.json();
-    const audit = await saveStockAudit({
-      audit_date: String(body.audit_date ?? todayStr()),
-      department: String(body.department ?? "pharmacy"),
-      notes: body.notes ?? null,
-      created_by: session?.displayName || session?.username || null,
-      lines: Array.isArray(body.lines) ? body.lines : [],
-    });
+    const audit = await withClinicScope(session.clinicId, (tx) =>
+      saveStockAudit(tx, session.clinicId, {
+        audit_date: String(body.audit_date ?? todayStr()),
+        department: String(body.department ?? "pharmacy"),
+        notes: body.notes ?? null,
+        created_by: session?.displayName || session?.username || null,
+        lines: Array.isArray(body.lines) ? body.lines : [],
+      }),
+    );
     return NextResponse.json(audit, { status: 201 });
   } catch (e) {
     return errorResponse("stock/audit POST", e, "Stock audit error");

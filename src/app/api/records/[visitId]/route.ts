@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
 import { serializeBill } from "@/lib/billing";
-import { prisma } from "@/lib/prisma";
 import { serializePrescription, serializeVisit } from "@/lib/serialize";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function GET(
   request: Request,
@@ -12,45 +12,53 @@ export async function GET(
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const { visitId } = await params;
 
-    const visit = await prisma.patientVisit.findUnique({
-      where: { id: visitId },
-      include: {
-        doctors: true,
-        patient: true,
-        prescription: {
+    const { visit, priorVisits } = await withClinicScope(
+      session.clinicId,
+      async (tx) => {
+        const visit = await tx.patientVisit.findUnique({
+          where: { id: visitId },
           include: {
-            items: { where: { voided_at: null }, orderBy: { sort_order: "asc" } },
+            doctors: true,
+            patient: true,
+            prescription: {
+              include: {
+                items: { where: { voided_at: null }, orderBy: { sort_order: "asc" } },
+              },
+            },
+            pharmacy_bill: { include: { items: true } },
           },
-        },
-        pharmacy_bill: { include: { items: true } },
+        });
+
+        const priorVisits = visit?.patient_id
+          ? await tx.patientVisit.findMany({
+              where: {
+                patient_id: visit.patient_id,
+                id: { not: visitId },
+              },
+              include: {
+                doctors: true,
+                patient: true,
+                pharmacy_bill: { select: { grand_total: true, bill_no: true } },
+                prescription: {
+                  select: { items: { where: { voided_at: null }, select: { id: true } } },
+                },
+              },
+              orderBy: { registered_at: "desc" },
+              take: 20,
+            })
+          : [];
+
+        return { visit, priorVisits };
       },
-    });
+    );
 
     if (!visit) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-
-    const priorVisits = visit.patient_id
-      ? await prisma.patientVisit.findMany({
-          where: {
-            patient_id: visit.patient_id,
-            id: { not: visitId },
-          },
-          include: {
-            doctors: true,
-            patient: true,
-            pharmacy_bill: { select: { grand_total: true, bill_no: true } },
-            prescription: {
-              select: { items: { where: { voided_at: null }, select: { id: true } } },
-            },
-          },
-          orderBy: { registered_at: "desc" },
-          take: 20,
-        })
-      : [];
 
     return NextResponse.json({
       visit: serializeVisit({ ...visit, doctors: visit.doctors }),

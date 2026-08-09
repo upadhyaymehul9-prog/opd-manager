@@ -1,17 +1,23 @@
 import { NextResponse } from "next/server";
 import { AppError, errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
-import { prisma } from "@/lib/prisma";
 import { serializeMedicine } from "@/lib/serialize";
 import { serializeBatch } from "@/lib/stock";
+import { withClinicScope } from "@/lib/tenant";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const records = await prisma.stockWriteOff.findMany({
-      include: { medicine: true },
-      orderBy: { created_at: "desc" },
-      take: 100,
-    });
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
+    const records = await withClinicScope(session.clinicId, (tx) =>
+      tx.stockWriteOff.findMany({
+        include: { medicine: true },
+        orderBy: { created_at: "desc" },
+        take: 100,
+      }),
+    );
 
     return NextResponse.json(
       records.map((r) => ({
@@ -33,6 +39,7 @@ export async function POST(request: Request) {
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const body = await request.json();
     const batch_id = String(body.batch_id ?? "").trim();
@@ -45,7 +52,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "batch_id required" }, { status: 400 });
     }
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await withClinicScope(session.clinicId, async (tx) => {
       const batch = await tx.stockBatch.findUnique({
         where: { id: batch_id },
         include: { medicine: true },
@@ -68,6 +75,7 @@ export async function POST(request: Request) {
 
       const record = await tx.stockWriteOff.create({
         data: {
+          clinic_id: session.clinicId,
           medicine_id: batch.medicine_id,
           batch_id: batch.id,
           batch_no: batch.batch_no,

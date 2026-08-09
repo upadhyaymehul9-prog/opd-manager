@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
-import { prisma } from "@/lib/prisma";
+import { requireApi } from "@/lib/api-guard";
 import { LOW_STOCK_THRESHOLD, usableBatchWhere } from "@/lib/stock";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function GET(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { searchParams } = new URL(request.url);
     const ids = searchParams
       .get("ids")
@@ -19,12 +24,14 @@ export async function GET(request: Request) {
       );
     }
 
-    const batches = await prisma.stockBatch.findMany({
-      where: {
-        medicine_id: { in: ids },
-        ...usableBatchWhere(),
-      },
-    });
+    const batches = await withClinicScope(session.clinicId, (tx) =>
+      tx.stockBatch.findMany({
+        where: {
+          medicine_id: { in: ids },
+          ...usableBatchWhere(),
+        },
+      }),
+    );
 
     const totals = new Map<string, number>();
     for (const batch of batches) {

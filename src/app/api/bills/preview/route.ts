@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { buildBillPreview } from "@/lib/billing";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function GET(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { searchParams } = new URL(request.url);
     const prescriptionId = searchParams.get("prescription_id")?.trim();
 
@@ -15,7 +20,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const preview = await prisma.$transaction((tx) =>
+    const preview = await withClinicScope(session.clinicId, (tx) =>
       buildBillPreview(tx, prescriptionId),
     );
 

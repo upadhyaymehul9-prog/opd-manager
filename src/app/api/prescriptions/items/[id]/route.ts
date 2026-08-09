@@ -4,6 +4,7 @@ import { AppError, errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
 import { computePrescriptionStatus } from "@/lib/prescription-status";
 import { prisma } from "@/lib/prisma";
+import { isValidClinicId, withClinicScope } from "@/lib/tenant";
 import {
   deductFromStock,
   getAvailableQuantity,
@@ -17,12 +18,24 @@ import { serializePrescriptionItem } from "@/lib/serialize";
  * quantity and over-deduct. Postgres aborts the losing transaction with a
  * P2034 serialization error, which we retry a few times before giving up.
  */
-async function runSerializable<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>) {
+async function runSerializable<T>(
+  clinicId: string,
+  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+) {
+  if (!isValidClinicId(clinicId)) {
+    throw new Error(`runSerializable: invalid clinicId "${clinicId}"`);
+  }
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      return await prisma.$transaction(fn, {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-      });
+      return await prisma.$transaction(
+        async (tx) => {
+          await tx.$executeRawUnsafe(`SET LOCAL app.clinic_id = '${clinicId}'`);
+          return fn(tx);
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        },
+      );
     } catch (e) {
       const isConflict =
         e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2034";
@@ -39,23 +52,26 @@ export async function PATCH(
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const { id } = await params;
     const body = await request.json();
 
-    const item = await prisma.prescriptionItem.findUnique({
-      where: { id },
-      include: {
-        prescription: {
-          include: {
-            items: { where: { voided_at: null } },
-            patient_visit: {
-              select: { status: true, pharmacy_bill: { select: { id: true } } },
+    const item = await withClinicScope(session.clinicId, (tx) =>
+      tx.prescriptionItem.findUnique({
+        where: { id },
+        include: {
+          prescription: {
+            include: {
+              items: { where: { voided_at: null } },
+              patient_visit: {
+                select: { status: true, pharmacy_bill: { select: { id: true } } },
+              },
             },
           },
         },
-      },
-    });
+      }),
+    );
 
     if (!item) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -145,7 +161,7 @@ export async function PATCH(
 
     const qty = quantity;
 
-    const updatedItem = await runSerializable(async (tx) => {
+    const updatedItem = await runSerializable(session.clinicId, async (tx) => {
       if (dispensed && !item.dispensed && item.medicine_id) {
         const available = await getAvailableQuantity(tx, item.medicine_id);
         if (available < qty) {
@@ -157,7 +173,7 @@ export async function PATCH(
       }
 
       if (!dispensed && item.dispensed && item.medicine_id) {
-        await restoreToStock(tx, item.medicine_id, qty);
+        await restoreToStock(tx, session.clinicId, item.medicine_id, qty);
       }
 
       const saved = await tx.prescriptionItem.update({
@@ -228,12 +244,14 @@ export async function DELETE(
 
     const { id } = await params;
 
-    const item = await prisma.prescriptionItem.findUnique({
-      where: { id },
-      include: {
-        prescription: { include: { items: { where: { voided_at: null } } } },
-      },
-    });
+    const item = await withClinicScope(session.clinicId, (tx) =>
+      tx.prescriptionItem.findUnique({
+        where: { id },
+        include: {
+          prescription: { include: { items: { where: { voided_at: null } } } },
+        },
+      }),
+    );
 
     if (!item) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -266,7 +284,7 @@ export async function DELETE(
       );
     }
 
-    await prisma.$transaction(async (tx) => {
+    await withClinicScope(session.clinicId, async (tx) => {
       // Never hard-delete a prescribed medicine — void it so the fact it
       // was once prescribed (and by whom it was removed) is retained
       // permanently, just excluded from the active view.

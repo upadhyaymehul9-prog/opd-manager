@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 import { addDays, dateStrIST, startOfDay } from "@/lib/date-range";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function GET() {
   try {
@@ -25,12 +25,14 @@ export async function GET() {
     } = { date };
 
     if (["reception", "admin", "manager"].includes(session.role)) {
-      const visits = await prisma.patientVisit.findMany({
-        where: {
-          consultation_paid_at: { gte: todayStart, lt: todayEnd },
-          consultation_fee: { not: null },
-        },
-      });
+      const visits = await withClinicScope(session.clinicId, (tx) =>
+        tx.patientVisit.findMany({
+          where: {
+            consultation_paid_at: { gte: todayStart, lt: todayEnd },
+            consultation_fee: { not: null },
+          },
+        }),
+      );
       payload.reception = {
         bills: visits.length,
         amount: visits.reduce((s, v) => s + (v.consultation_fee ?? 0), 0),
@@ -38,9 +40,11 @@ export async function GET() {
     }
 
     if (["pharmacy", "admin", "manager"].includes(session.role)) {
-      const bills = await prisma.pharmacyBill.findMany({
-        where: { created_at: { gte: todayStart, lt: todayEnd }, voided_at: null },
-      });
+      const bills = await withClinicScope(session.clinicId, (tx) =>
+        tx.pharmacyBill.findMany({
+          where: { created_at: { gte: todayStart, lt: todayEnd }, voided_at: null },
+        }),
+      );
       payload.pharmacy = {
         bills: bills.length,
         amount: bills.reduce((s, b) => s + b.grand_total, 0),
