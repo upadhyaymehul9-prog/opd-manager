@@ -159,9 +159,12 @@ New public route `/signup`, served on the **base domain** (not a clinic subdomai
 2. Create `Clinic` (`status = "trial"`).
 3. Create first `User` (`role = "admin"`, `clinic_id` = new clinic).
 4. Create default `ClinicSettings` row.
-5. Redirect to `https://<slug>.yourapp.com/login`.
+5. Seed a starter `LabTestCatalog` and `Medicine` list scoped to the new clinic.
+6. Redirect to `https://<slug>.yourapp.com/login`.
 
 No email verification, no payment gate — matches the "free/trial for now" decision. (Existing app has no email-based password reset flow either, only logged-in "change password" — this spec doesn't need to add one, and isn't introducing a new gap relative to today.)
+
+**Why step 5 matters:** a self-serve clinic that signs up with nothing in `LabTestCatalog` or `Medicine` has nothing to order or prescribe on day one — the doctor and lab consoles would be functional but empty. This needs a small, static, hand-picked starter list (common generics + common lab panels), in the same spirit as this codebase's other hand-curated defaults — `src/lib/drug-safety.ts` ("a hand-curated safety net") and `src/lib/icd10.ts` (a curated 200–300 code list) are the existing precedents for this pattern on `main`, though neither is reused directly; this is a new, small, domain-appropriate list of its own. The implementation plan defines its exact contents.
 
 ---
 
@@ -169,7 +172,8 @@ No email verification, no payment gate — matches the "free/trial for now" deci
 
 - **Prisma RLS extension:** unit test that a query executed without `app.clinic_id` set fails closed (throws or returns zero rows, per whatever the extension implementation does).
 - **Cross-tenant isolation integration test:** seed two clinics with overlapping data shapes (e.g. both have a patient named the same), confirm clinic A's session never reads clinic B's rows even via a direct Prisma call bypassing route-level checks — this is the test that actually proves RLS is doing its job, not just the extension.
-- **Signup flow:** slug validation edge cases (reserved words, too short/long, duplicate), successful signup creates exactly one clinic/user/settings row.
+- **Both of the above must run against the actual pooled Neon connection string (the `-pooler` hostname), not only a direct connection.** This is a forward-looking precaution, not a report of a past failure: Neon's pooler runs PgBouncer in transaction mode, and the tenant-scoping mechanism (Section 1) sets `app.clinic_id` via `SET LOCAL` inside a Prisma `$transaction`. That combination *should* be safe under transaction-mode pooling — the whole transaction, including the `SET LOCAL`, is guaranteed to stay pinned to one physical connection for its duration — but "should be safe" is an assumption about pooler behavior, not a verified fact, and this is exactly the kind of interaction that fails silently and only under concurrent load. Prove it against the pooled connection string before relying on it; if pooled behavior ever diverges from direct, that is launch-blocking, not a minor finding.
+- **Signup flow:** slug validation edge cases (reserved words, too short/long, duplicate), successful signup creates exactly one clinic/user/settings row, and the new clinic has non-empty `LabTestCatalog`/`Medicine` rows after signup (Section 5, step 5).
 - **Existing 99 tests:** fixtures and mocks updated to carry `clinic_id` wherever they touch a tenant model.
 
 ---
