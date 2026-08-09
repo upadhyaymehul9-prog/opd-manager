@@ -18,4 +18,5 @@ export type SessionPayload = {
   displayName: string | null;
   doctorId: string | null;
   mustChangePassword: boolean;
+  clinicId: string;
 };

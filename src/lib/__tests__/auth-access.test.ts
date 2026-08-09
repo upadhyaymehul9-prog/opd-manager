@@ -6,6 +6,7 @@ import type { SessionPayload, UserRole } from "@/lib/auth-types";
 function sessionFor(role: UserRole, doctorId: string | null = null): SessionPayload {
   return {
     userId: "u1",
+    clinicId: "11111111-1111-1111-1111-111111111111",
     username: role,
     role,
     displayName: null,

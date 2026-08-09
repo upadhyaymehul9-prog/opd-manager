@@ -25,7 +25,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await prisma.user.findUnique({ where: { username } });
+    const clinicId = (request as any).headers.get("x-clinic-id");
+    if (!clinicId) {
+      return NextResponse.json(
+        { error: "Unknown clinic — check the URL" },
+        { status: 400 },
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { clinic_id_username: { clinic_id: clinicId, username } },
+    });
 
     if (user?.locked_until && user.locked_until > new Date()) {
       const minutesLeft = Math.ceil(
@@ -81,6 +91,7 @@ export async function POST(request: Request) {
       displayName: user.display_name,
       doctorId: user.doctor_id,
       mustChangePassword: user.must_change_password,
+      clinicId: user.clinic_id,
     };
     const token = await createSessionToken(sessionPayload, remember);
 

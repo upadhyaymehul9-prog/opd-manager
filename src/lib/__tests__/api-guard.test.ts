@@ -4,6 +4,7 @@ import type { SessionPayload } from "@/lib/auth-types";
 
 const doctor: SessionPayload = {
   userId: "u1",
+  clinicId: "11111111-1111-1111-1111-111111111111",
   username: "doctor",
   role: "doctor",
   displayName: null,
@@ -36,6 +37,7 @@ describe("apiGuardDecision", () => {
 describe("apiGuardDecision — attendance routes", () => {
   const makeSession = (role: SessionPayload["role"]): SessionPayload => ({
     userId: "u1",
+    clinicId: "11111111-1111-1111-1111-111111111111",
     username: role,
     role,
     displayName: null,

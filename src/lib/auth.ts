@@ -91,6 +91,7 @@ export async function verifySessionToken(
       displayName: payload.displayName ? String(payload.displayName) : null,
       doctorId: payload.doctorId ? String(payload.doctorId) : null,
       mustChangePassword: Boolean(payload.mustChangePassword),
+      clinicId: String(payload.clinicId),
     };
   } catch {
     return null;
