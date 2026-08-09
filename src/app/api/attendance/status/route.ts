@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
 import { addDays, startOfDay } from "@/lib/date-range";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function GET(request: Request) {
   try {
@@ -13,13 +13,15 @@ export async function GET(request: Request) {
     const todayStart = startOfDay(new Date());
     const tomorrowStart = addDays(todayStart, 1);
 
-    const record = await prisma.staffAttendance.findFirst({
-      where: {
-        user_id: session.userId,
-        clock_in: { gte: todayStart, lt: tomorrowStart },
-      },
-      select: { id: true, clock_in: true, clock_out: true },
-    });
+    const record = await withClinicScope(session.clinicId, (tx) =>
+      tx.staffAttendance.findFirst({
+        where: {
+          user_id: session.userId,
+          clock_in: { gte: todayStart, lt: tomorrowStart },
+        },
+        select: { id: true, clock_in: true, clock_out: true },
+      }),
+    );
 
     if (!record) {
       return NextResponse.json({ state: "absent" });

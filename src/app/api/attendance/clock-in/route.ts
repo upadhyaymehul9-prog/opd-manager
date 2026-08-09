@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { errorResponse } from "@/lib/api-error";
+import { AppError, errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
 import { AUDIT_ACTIONS, logAudit } from "@/lib/audit";
 import { addDays, startOfDay } from "@/lib/date-range";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function POST(request: Request) {
   try {
@@ -14,27 +14,30 @@ export async function POST(request: Request) {
     const todayStart = startOfDay(new Date());
     const tomorrowStart = addDays(todayStart, 1);
 
-    const existing = await prisma.staffAttendance.findFirst({
-      where: {
-        user_id: session.userId,
-        clock_in: { gte: todayStart, lt: tomorrowStart },
-      },
-      select: { id: true },
-    });
+    const record = await withClinicScope(session.clinicId, async (tx) => {
+      const existing = await tx.staffAttendance.findFirst({
+        where: {
+          user_id: session.userId,
+          clock_in: { gte: todayStart, lt: tomorrowStart },
+        },
+        select: { id: true },
+      });
 
-    if (existing) {
-      return NextResponse.json({ error: "Already clocked in today" }, { status: 409 });
-    }
+      if (existing) {
+        throw new AppError("Already clocked in today", 409);
+      }
 
-    const record = await prisma.staffAttendance.create({
-      data: {
-        user_id: session.userId,
-        username: session.username,
-        role: session.role,
-        display_name: session.displayName,
-        clock_in: new Date(),
-      },
-      select: { id: true, clock_in: true },
+      return tx.staffAttendance.create({
+        data: {
+          clinic_id: session.clinicId,
+          user_id: session.userId,
+          username: session.username,
+          role: session.role,
+          display_name: session.displayName,
+          clock_in: new Date(),
+        },
+        select: { id: true, clock_in: true },
+      });
     });
 
     await logAudit({

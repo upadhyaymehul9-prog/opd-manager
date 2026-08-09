@@ -7,7 +7,7 @@ import { CONSENT_TEXT_V1 } from "@/lib/nabh";
 import { findOrCreatePatient } from "@/lib/patients";
 import { serializeVisit } from "@/lib/serialize";
 import { nextTokenNumber } from "@/lib/tokens";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 import { serializeAppointment } from "@/lib/appointments";
 
 export async function POST(
@@ -33,20 +33,24 @@ export async function POST(
       );
     }
 
-    const appointment = await prisma.appointment.findUnique({
-      where: { id },
-      include: { doctor: { select: { name: true, room_number: true, consultation_fee: true } } },
-    });
+    const appointment = await withClinicScope(session.clinicId, (tx) =>
+      tx.appointment.findUnique({
+        where: { id },
+        include: { doctor: { select: { name: true, room_number: true, consultation_fee: true } } },
+      }),
+    );
 
     if (!appointment) {
       return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
     }
 
     if (appointment.visit_id) {
-      const visit = await prisma.patientVisit.findUnique({
-        where: { id: appointment.visit_id },
-        include: visitInclude,
-      });
+      const visit = await withClinicScope(session.clinicId, (tx) =>
+        tx.patientVisit.findUnique({
+          where: { id: appointment.visit_id! },
+          include: visitInclude,
+        }),
+      );
       return NextResponse.json({
         appointment: serializeAppointment(appointment),
         visit: visit ? serializeVisit(visit) : null,
@@ -58,13 +62,13 @@ export async function POST(
       return NextResponse.json({ error: "Cancelled appointment cannot be registered" }, { status: 400 });
     }
 
-    const token_number = await nextTokenNumber(session.clinicId);
     const fee =
       appointment.doctor.consultation_fee && appointment.doctor.consultation_fee > 0
         ? appointment.doctor.consultation_fee
         : null;
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await withClinicScope(session.clinicId, async (tx) => {
+      const token_number = await nextTokenNumber(tx, session.clinicId);
       let patient;
       if (appointment.patient_id) {
         patient = await tx.patient.findUnique({
@@ -92,6 +96,7 @@ export async function POST(
 
       const visit = await tx.patientVisit.create({
         data: {
+          clinic_id: session.clinicId,
           patient_name: appointment.patient_name,
           patient_id: patient.id,
           doctor_id: appointment.doctor_id,
@@ -117,6 +122,7 @@ export async function POST(
 
       await tx.patientConsent.create({
         data: {
+          clinic_id: session.clinicId,
           patient_visit_id: visit.id,
           patient_id: patient.id,
           accepted: true,

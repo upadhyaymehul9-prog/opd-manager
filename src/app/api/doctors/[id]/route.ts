@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 import { serializeDoctor } from "@/lib/serialize";
 import type { DoctorOpdStatus, UpdateDoctorInput } from "@/lib/types";
 
@@ -18,12 +18,18 @@ const VALID_STATUSES: DoctorOpdStatus[] = [
 ];
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { id } = await params;
-    const doctor = await prisma.doctor.findUnique({ where: { id } });
+    const doctor = await withClinicScope(session.clinicId, (tx) =>
+      tx.doctor.findUnique({ where: { id } }),
+    );
 
     if (!doctor) {
       return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
@@ -98,10 +104,12 @@ export async function PATCH(
       return NextResponse.json({ error: "No updates" }, { status: 400 });
     }
 
-    const doctor = await prisma.doctor.update({
-      where: { id },
-      data,
-    });
+    const doctor = await withClinicScope(guard.session.clinicId, (tx) =>
+      tx.doctor.update({
+        where: { id },
+        data,
+      }),
+    );
 
     return NextResponse.json(serializeDoctor(doctor));
   } catch (e) {

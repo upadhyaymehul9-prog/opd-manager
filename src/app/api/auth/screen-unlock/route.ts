@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyPassword } from "@/lib/auth";
 import { requireApi } from "@/lib/api-guard";
 import { AUDIT_ACTIONS, logAudit } from "@/lib/audit";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function POST(request: Request) {
   const guard = await requireApi(request);
@@ -20,7 +20,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Password required" }, { status: 400 });
   }
 
-  const user = await prisma.user.findUnique({ where: { id: session.userId } });
+  const user = await withClinicScope(session.clinicId, (tx) =>
+    tx.user.findUnique({ where: { id: session.userId } }),
+  );
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

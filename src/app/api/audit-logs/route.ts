@@ -1,33 +1,36 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function GET(request: Request) {
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const { searchParams } = new URL(request.url);
     const limit = Math.min(Number(searchParams.get("limit") ?? 50), 200);
     const action = searchParams.get("action");
 
-    const logs = await prisma.auditLog.findMany({
-      where: action ? { action } : undefined,
-      orderBy: { created_at: "desc" },
-      take: limit,
-      select: {
-        id: true,
-        username: true,
-        role: true,
-        action: true,
-        entity_type: true,
-        entity_id: true,
-        summary: true,
-        ip_address: true,
-        created_at: true,
-      },
-    });
+    const logs = await withClinicScope(session.clinicId, (tx) =>
+      tx.auditLog.findMany({
+        where: action ? { action } : undefined,
+        orderBy: { created_at: "desc" },
+        take: limit,
+        select: {
+          id: true,
+          username: true,
+          role: true,
+          action: true,
+          entity_type: true,
+          entity_id: true,
+          summary: true,
+          ip_address: true,
+          created_at: true,
+        },
+      }),
+    );
 
     return NextResponse.json(logs);
   } catch (e) {

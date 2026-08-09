@@ -41,11 +41,11 @@ export async function findOrCreatePatient(
   const date_of_birth = input.date_of_birth ?? null;
 
   if (abha_id) {
-    // NOTE: This lookup is not currently clinic-scoped (no clinic_id in WHERE).
-    // It is reachable from clinic-resolved callers (the public booking routes).
-    // A later task wires all Prisma calls through withClinicScope/Postgres RLS,
-    // which will enforce clinic isolation at the database level regardless of app-level filters.
-    // This is a known, tracked gap pending that migration — not silently unsafe forever.
+    // This lookup has no clinic_id in its WHERE clause, but every caller now
+    // runs inside withClinicScope (Task 9), so Postgres RLS (tenant_isolation
+    // policy, enable_rls migration) restricts it to the current clinic at the
+    // database level regardless of the app-level filter. The gap tracked here
+    // pending that migration is closed.
     const byAbha = await tx.patient.findUnique({ where: { abha_id } });
     if (byAbha) {
       const canonicalId = await resolveCanonicalPatientIdTx(tx, byAbha.id);
@@ -69,11 +69,8 @@ export async function findOrCreatePatient(
   }
 
   if (mobile) {
-    // NOTE: This lookup is not currently clinic-scoped (no clinic_id in WHERE).
-    // It is reachable from clinic-resolved callers (the public booking routes).
-    // A later task wires all Prisma calls through withClinicScope/Postgres RLS,
-    // which will enforce clinic isolation at the database level regardless of app-level filters.
-    // This is a known, tracked gap pending that migration — not silently unsafe forever.
+    // Same as the abha_id lookup above: no clinic_id in the WHERE clause, but
+    // RLS closes the gap now that every caller runs inside withClinicScope.
     const byMobile = await tx.patient.findFirst({
       where: { mobile, merged_into_patient_id: null },
     });
@@ -118,6 +115,7 @@ export async function findOrCreatePatient(
   const patient_number = await nextPatientNumber(tx, clinicId);
   return tx.patient.create({
     data: {
+      clinic_id: clinicId,
       patient_number,
       name,
       mobile,

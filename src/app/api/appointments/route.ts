@@ -8,10 +8,14 @@ import {
   runBookingTransaction,
   serializeAppointment,
 } from "@/lib/appointments";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function GET(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date") ?? todayStr();
     const doctorId = searchParams.get("doctor_id");
@@ -20,15 +24,17 @@ export async function GET(request: Request) {
     const dayStart = startOfDay(new Date(date));
     const dayEnd = addDays(dayStart, 1);
 
-    const appointments = await prisma.appointment.findMany({
-      where: {
-        scheduled_at: { gte: dayStart, lt: dayEnd },
-        ...(doctorId ? { doctor_id: doctorId } : {}),
-        ...(status ? { status } : {}),
-      },
-      include: { doctor: { select: { name: true } } },
-      orderBy: { scheduled_at: "asc" },
-    });
+    const appointments = await withClinicScope(session.clinicId, (tx) =>
+      tx.appointment.findMany({
+        where: {
+          scheduled_at: { gte: dayStart, lt: dayEnd },
+          ...(doctorId ? { doctor_id: doctorId } : {}),
+          ...(status ? { status } : {}),
+        },
+        include: { doctor: { select: { name: true } } },
+        orderBy: { scheduled_at: "asc" },
+      }),
+    );
 
     return NextResponse.json(appointments.map(serializeAppointment));
   } catch (e) {
@@ -62,28 +68,36 @@ export async function POST(request: Request) {
       );
     }
 
-    const schedule = await getClinicSchedule(session.clinicId);
+    const schedule = await withClinicScope(session.clinicId, (tx) =>
+      getClinicSchedule(session.clinicId, tx),
+    );
     const when = new Date(scheduled_at);
     if (Number.isNaN(when.getTime())) {
       return NextResponse.json({ error: "Invalid scheduled time" }, { status: 400 });
     }
 
     if (external_ref) {
-      const dup = await prisma.appointment.findUnique({
-        where: { external_ref },
-      });
+      const dup = await withClinicScope(session.clinicId, (tx) =>
+        tx.appointment.findUnique({
+          where: {
+            clinic_id_external_ref: { clinic_id: session.clinicId, external_ref },
+          },
+        }),
+      );
       if (dup) {
         return NextResponse.json(serializeAppointment({
           ...dup,
-          doctor: await prisma.doctor.findUniqueOrThrow({
-            where: { id: dup.doctor_id },
-            select: { name: true },
-          }),
+          doctor: await withClinicScope(session.clinicId, (tx) =>
+            tx.doctor.findUniqueOrThrow({
+              where: { id: dup.doctor_id },
+              select: { name: true },
+            }),
+          ),
         }));
       }
     }
 
-    const appointment = await runBookingTransaction(async (tx) => {
+    const appointment = await runBookingTransaction(session.clinicId, async (tx) => {
       await assertSlotAvailable(
         doctor_id,
         when,
@@ -94,6 +108,7 @@ export async function POST(request: Request) {
 
       return tx.appointment.create({
         data: {
+          clinic_id: session.clinicId,
           doctor_id,
           patient_id: patient_id ?? null,
           patient_name: patient_name.trim(),

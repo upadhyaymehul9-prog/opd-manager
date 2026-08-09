@@ -7,7 +7,7 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -41,7 +41,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await prisma.user.findUnique({ where: { id: session.userId } });
+    const user = await withClinicScope(session.clinicId, (tx) =>
+      tx.user.findUnique({ where: { id: session.userId } }),
+    );
     if (!user || !(await verifyPassword(currentPassword, user.password_hash))) {
       return NextResponse.json(
         { error: "Current password is incorrect" },
@@ -50,10 +52,12 @@ export async function POST(request: Request) {
     }
 
     const password_hash = await hashPassword(newPassword);
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { password_hash, must_change_password: false },
-    });
+    await withClinicScope(session.clinicId, (tx) =>
+      tx.user.update({
+        where: { id: user.id },
+        data: { password_hash, must_change_password: false },
+      }),
+    );
 
     await logAudit({
       action: AUDIT_ACTIONS.PASSWORD_CHANGE,

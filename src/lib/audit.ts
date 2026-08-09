@@ -2,7 +2,7 @@ import { cookies, headers } from "next/headers";
 import type { Prisma } from "@prisma/client";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 import type { SessionPayload } from "@/lib/auth-types";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function getSessionFromCookies(): Promise<SessionPayload | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -23,25 +23,41 @@ export async function logAudit(input: {
   details?: Record<string, unknown>;
   session?: SessionPayload | null;
   actor?: { userId?: string; username: string; role: string };
+  // Only needed when there is no session to source it from (e.g. a failed
+  // login attempt, where the actor is unauthenticated by definition).
+  clinicId?: string;
 }) {
   try {
     const session = input.session ?? (await getSessionFromCookies());
     const actor = session ?? input.actor;
     if (!actor) return;
 
-    await prisma.auditLog.create({
-      data: {
-        user_id: session?.userId ?? input.actor?.userId ?? null,
-        username: actor.username,
-        role: actor.role,
+    const clinicId = session?.clinicId ?? input.clinicId;
+    if (!clinicId) {
+      console.error("logAudit: no clinicId available", {
         action: input.action,
         entity_type: input.entity_type,
-        entity_id: input.entity_id ?? null,
-        summary: input.summary,
-        details: input.details ? JSON.stringify(input.details) : null,
-        ip_address: await clientIp(),
-      },
-    });
+      });
+      return;
+    }
+
+    const ip = await clientIp();
+    await withClinicScope(clinicId, (tx) =>
+      tx.auditLog.create({
+        data: {
+          clinic_id: clinicId,
+          user_id: session?.userId ?? input.actor?.userId ?? null,
+          username: actor.username,
+          role: actor.role,
+          action: input.action,
+          entity_type: input.entity_type,
+          entity_id: input.entity_id ?? null,
+          summary: input.summary,
+          details: input.details ? JSON.stringify(input.details) : null,
+          ip_address: ip,
+        },
+      }),
+    );
   } catch (e) {
     // Audit must not break clinical workflow — but a swallowed failure here
     // means the audit trail silently has a hole, so at least surface it.
@@ -65,14 +81,26 @@ export async function logAuditTx(
     details?: Record<string, unknown>;
     session?: SessionPayload | null;
     actor?: { userId?: string; username: string; role: string };
+    // Only needed when there is no session to source it from.
+    clinicId?: string;
   },
 ) {
   const session = input.session ?? (await getSessionFromCookies());
   const actor = session ?? input.actor;
   if (!actor) return;
 
+  const clinicId = session?.clinicId ?? input.clinicId;
+  if (!clinicId) {
+    console.error("logAuditTx: no clinicId available", {
+      action: input.action,
+      entity_type: input.entity_type,
+    });
+    return;
+  }
+
   await tx.auditLog.create({
     data: {
+      clinic_id: clinicId,
       user_id: session?.userId ?? input.actor?.userId ?? null,
       username: actor.username,
       role: actor.role,

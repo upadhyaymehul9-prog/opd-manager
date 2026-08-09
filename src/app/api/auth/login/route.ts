@@ -10,7 +10,7 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { AUDIT_ACTIONS, logAudit } from "@/lib/audit";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function POST(request: Request) {
   try {
@@ -33,9 +33,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { clinic_id_username: { clinic_id: clinicId, username } },
-    });
+    const user = await withClinicScope(clinicId, (tx) =>
+      tx.user.findUnique({
+        where: { clinic_id_username: { clinic_id: clinicId, username } },
+      }),
+    );
 
     if (user?.locked_until && user.locked_until > new Date()) {
       const minutesLeft = Math.ceil(
@@ -53,21 +55,24 @@ export async function POST(request: Request) {
       if (user) {
         const attempts = user.failed_login_attempts + 1;
         const lockingNow = attempts >= MAX_FAILED_LOGIN_ATTEMPTS;
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            failed_login_attempts: lockingNow ? 0 : attempts,
-            locked_until: lockingNow
-              ? new Date(Date.now() + LOCKOUT_MINUTES * 60_000)
-              : null,
-          },
-        });
+        await withClinicScope(clinicId, (tx) =>
+          tx.user.update({
+            where: { id: user.id },
+            data: {
+              failed_login_attempts: lockingNow ? 0 : attempts,
+              locked_until: lockingNow
+                ? new Date(Date.now() + LOCKOUT_MINUTES * 60_000)
+                : null,
+            },
+          }),
+        );
       }
       await logAudit({
         action: AUDIT_ACTIONS.LOGIN_FAILED,
         entity_type: "user",
         summary: `Failed login attempt for ${username}`,
         actor: { username, role: "unknown" },
+        clinicId,
       });
       return NextResponse.json(
         { error: "Invalid username or password" },
@@ -76,10 +81,12 @@ export async function POST(request: Request) {
     }
 
     if (user.failed_login_attempts > 0 || user.locked_until) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { failed_login_attempts: 0, locked_until: null },
-      });
+      await withClinicScope(clinicId, (tx) =>
+        tx.user.update({
+          where: { id: user.id },
+          data: { failed_login_attempts: 0, locked_until: null },
+        }),
+      );
     }
 
     const role = user.role as UserRole;

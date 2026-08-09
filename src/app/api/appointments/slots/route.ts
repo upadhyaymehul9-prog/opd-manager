@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { generateAvailableSlots } from "@/lib/appointments";
 import { getSessionFromCookies } from "@/lib/audit";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function GET(request: Request) {
   try {
@@ -21,7 +22,9 @@ export async function GET(request: Request) {
       );
     }
 
-    const slots = await generateAvailableSlots(doctorId, date, session.clinicId);
+    const slots = await withClinicScope(session.clinicId, (tx) =>
+      generateAvailableSlots(doctorId, date, session.clinicId, tx),
+    );
     return NextResponse.json({ doctor_id: doctorId, date, slots });
   } catch (e) {
     return errorResponse("appointments/slots GET", e, "Failed to load slots");

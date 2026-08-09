@@ -2,6 +2,7 @@ import { addMinutes } from "date-fns";
 import { Prisma } from "@prisma/client";
 import { addDays, dateStrIST, istTimeLabel, startOfDay, todayStr } from "@/lib/date-range";
 import { prisma } from "@/lib/prisma";
+import { isValidClinicId } from "@/lib/tenant";
 
 type Tx = Prisma.TransactionClient;
 const HOUR_MS = 60 * 60 * 1000;
@@ -45,8 +46,11 @@ const DEFAULT_SCHEDULE: ClinicSchedule = {
   opd_end_hour: 18,
 };
 
-export async function getClinicSchedule(clinicId: string): Promise<ClinicSchedule> {
-  const row = await prisma.clinicSettings.findUnique({
+export async function getClinicSchedule(
+  clinicId: string,
+  tx: Tx,
+): Promise<ClinicSchedule> {
+  const row = await tx.clinicSettings.findUnique({
     where: { clinic_id: clinicId },
   });
   return row ?? DEFAULT_SCHEDULE;
@@ -107,9 +111,9 @@ export async function getBookedAppointmentsForDoctor(
   doctorId: string,
   dayStart: Date,
   dayEnd: Date,
-  client: Tx | typeof prisma = prisma,
+  tx: Tx,
 ) {
-  return client.appointment.findMany({
+  return tx.appointment.findMany({
     where: {
       doctor_id: doctorId,
       scheduled_at: { gte: dayStart, lt: dayEnd },
@@ -122,9 +126,10 @@ export async function generateAvailableSlots(
   doctorId: string,
   dateStr: string,
   clinicId: string,
+  tx: Tx,
   schedule?: ClinicSchedule,
 ) {
-  const resolvedSchedule = schedule ?? (await getClinicSchedule(clinicId));
+  const resolvedSchedule = schedule ?? (await getClinicSchedule(clinicId, tx));
   const dayStart = startOfDay(new Date(dateStr));
   const dayEnd = addDays(dayStart, 1);
 
@@ -132,6 +137,7 @@ export async function generateAvailableSlots(
     doctorId,
     dayStart,
     dayEnd,
+    tx,
   );
 
   const slots: { time: string; label: string; available: boolean }[] = [];
@@ -162,8 +168,8 @@ export async function assertSlotAvailable(
   doctorId: string,
   scheduledAt: Date,
   durationMinutes: number,
-  excludeId?: string,
-  client: Tx | typeof prisma = prisma,
+  excludeId: string | undefined,
+  tx: Tx,
 ) {
   const dayStart = startOfDay(scheduledAt);
   const dayEnd = addDays(dayStart, 1);
@@ -171,7 +177,7 @@ export async function assertSlotAvailable(
     doctorId,
     dayStart,
     dayEnd,
-    client,
+    tx,
   );
 
   const conflict = booked.find(
@@ -192,13 +198,23 @@ export async function assertSlotAvailable(
  * Postgres aborts the losing transaction (P2034) and we retry it.
  */
 export async function runBookingTransaction<T>(
+  clinicId: string,
   fn: (tx: Tx) => Promise<T>,
 ) {
+  if (!isValidClinicId(clinicId)) {
+    throw new Error(`runBookingTransaction: invalid clinicId "${clinicId}"`);
+  }
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      return await prisma.$transaction(fn, {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-      });
+      return await prisma.$transaction(
+        async (tx) => {
+          await tx.$executeRawUnsafe(`SET LOCAL app.clinic_id = '${clinicId}'`);
+          return fn(tx);
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        },
+      );
     } catch (e) {
       const isConflict =
         e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2034";

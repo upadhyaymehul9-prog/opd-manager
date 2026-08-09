@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { findDuplicatePatients } from "@/lib/duplicate-patients";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function GET(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { searchParams } = new URL(request.url);
     const name = searchParams.get("name") ?? "";
     const mobile = searchParams.get("mobile");
@@ -15,13 +21,15 @@ export async function GET(request: Request) {
       return NextResponse.json([]);
     }
 
-    const matches = await findDuplicatePatients({
-      name: name.trim() || " ",
-      mobile,
-      abha_id,
-      national_id,
-      exclude_patient_id: exclude ?? undefined,
-    });
+    const matches = await withClinicScope(session.clinicId, (tx) =>
+      findDuplicatePatients(tx, {
+        name: name.trim() || " ",
+        mobile,
+        abha_id,
+        national_id,
+        exclude_patient_id: exclude ?? undefined,
+      }),
+    );
 
     return NextResponse.json(
       matches.map((p) => ({

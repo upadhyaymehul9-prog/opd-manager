@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { AppError, errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 import { visitInclude } from "@/lib/db-includes";
 import { nextConsultationBillNo } from "@/lib/consultation-billing";
 import { addDays, parseDateParam, startOfDay } from "@/lib/date-range";
@@ -24,6 +24,10 @@ const ACTIVE_LOOKBACK_DAYS = 30;
 
 export async function GET(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { searchParams } = new URL(request.url);
     const activeOnly = searchParams.get("active") === "true";
     const todayOnly = searchParams.get("today") === "true";
@@ -58,12 +62,14 @@ export async function GET(request: Request) {
       );
     }
 
-    const visits = await prisma.patientVisit.findMany({
-      where,
-      include: visitInclude,
-      orderBy: { registered_at: "desc" },
-      take: 500,
-    });
+    const visits = await withClinicScope(session.clinicId, (tx) =>
+      tx.patientVisit.findMany({
+        where,
+        include: visitInclude,
+        orderBy: { registered_at: "desc" },
+        take: 500,
+      }),
+    );
 
     return NextResponse.json(visits.map(serializeVisit));
   } catch (e) {
@@ -126,12 +132,14 @@ export async function POST(request: Request) {
     const normalizedAbha = abha_id ? parseAbhaInput(abha_id) : null;
 
     if (normalizedAbha) {
-      const abhaTaken = await prisma.patient.findFirst({
-        where: {
-          abha_id: normalizedAbha,
-          ...(patient_id ? { NOT: { id: patient_id } } : {}),
-        },
-      });
+      const abhaTaken = await withClinicScope(session.clinicId, (tx) =>
+        tx.patient.findFirst({
+          where: {
+            abha_id: normalizedAbha,
+            ...(patient_id ? { NOT: { id: patient_id } } : {}),
+          },
+        }),
+      );
       if (abhaTaken) {
         return NextResponse.json(
           { error: "This ABHA ID is already registered to another patient" },
@@ -141,13 +149,15 @@ export async function POST(request: Request) {
     }
 
     if (!patient_id && !duplicate_confirmed) {
-      const duplicates = await findDuplicatePatients({
-        name: patient_name.trim(),
-        mobile: mobile?.trim() || null,
-        abha_id: normalizedAbha,
-        national_id: national_id?.trim() || null,
-        date_of_birth: date_of_birth || null,
-      });
+      const duplicates = await withClinicScope(session.clinicId, (tx) =>
+        findDuplicatePatients(tx, {
+          name: patient_name.trim(),
+          mobile: mobile?.trim() || null,
+          abha_id: normalizedAbha,
+          national_id: national_id?.trim() || null,
+          date_of_birth: date_of_birth || null,
+        }),
+      );
       if (duplicates.length > 0) {
         return NextResponse.json(
           {
@@ -159,10 +169,12 @@ export async function POST(request: Request) {
       }
     }
 
-    const doctor = await prisma.doctor.findUnique({
-      where: { id: doctor_id },
-      select: { room_number: true, consultation_fee: true },
-    });
+    const doctor = await withClinicScope(session.clinicId, (tx) =>
+      tx.doctor.findUnique({
+        where: { id: doctor_id },
+        select: { room_number: true, consultation_fee: true },
+      }),
+    );
 
     if (!doctor) {
       return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
@@ -171,12 +183,14 @@ export async function POST(request: Request) {
     let resolvedType = patient_type ?? (patient_id ? "old" : "new");
 
     if (!patient_type && !patient_id) {
-      const prior = await prisma.patientVisit.findFirst({
-        where: {
-          patient_name: { equals: patient_name.trim(), mode: "insensitive" },
-        },
-        select: { id: true },
-      });
+      const prior = await withClinicScope(session.clinicId, (tx) =>
+        tx.patientVisit.findFirst({
+          where: {
+            patient_name: { equals: patient_name.trim(), mode: "insensitive" },
+          },
+          select: { id: true },
+        }),
+      );
       if (prior) resolvedType = "old";
     }
 
@@ -187,10 +201,10 @@ export async function POST(request: Request) {
           ? doctor.consultation_fee
           : null;
 
-    const token_number = await nextTokenNumber(session.clinicId);
     const dob = date_of_birth ? new Date(date_of_birth) : null;
 
-    const visit = await prisma.$transaction(async (tx) => {
+    const visit = await withClinicScope(session.clinicId, async (tx) => {
+      const token_number = await nextTokenNumber(tx, session.clinicId);
       let patient;
       if (patient_id) {
         patient = await tx.patient.findUnique({ where: { id: patient_id } });
@@ -265,6 +279,7 @@ export async function POST(request: Request) {
 
       const created = await tx.patientVisit.create({
         data: {
+          clinic_id: session.clinicId,
           patient_name: patient_name.trim(),
           patient_id: patient.id,
           doctor_id,
@@ -291,6 +306,7 @@ export async function POST(request: Request) {
 
       await tx.patientConsent.create({
         data: {
+          clinic_id: session.clinicId,
           patient_visit_id: created.id,
           patient_id: patient.id,
           accepted: true,

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 import {
   assertSlotAvailable,
   runBookingTransaction,
@@ -17,6 +17,7 @@ export async function PATCH(
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const { id } = await params;
     const body = await request.json();
@@ -26,12 +27,14 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const existing = await prisma.appointment.findUnique({ where: { id } });
+    const existing = await withClinicScope(session.clinicId, (tx) =>
+      tx.appointment.findUnique({ where: { id } }),
+    );
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const appointment = await runBookingTransaction(async (tx) => {
+    const appointment = await runBookingTransaction(session.clinicId, async (tx) => {
       // Reverting a cancelled/no-show appointment back to booked can only
       // happen if the slot hasn't since been taken by someone else.
       if (status === "booked" && existing.status !== "booked") {

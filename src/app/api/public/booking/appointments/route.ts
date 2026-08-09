@@ -8,7 +8,7 @@ import {
 } from "@/lib/appointments";
 import { BOOKMYCLINIC_SOURCE, verifyBookMyClinicKey } from "@/lib/bookmyclinic";
 import { findOrCreatePatient } from "@/lib/patients";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function POST(request: Request) {
   if (!verifyBookMyClinicKey(request as import("next/server").NextRequest)) {
@@ -16,6 +16,11 @@ export async function POST(request: Request) {
   }
 
   try {
+    const clinicId = request.headers.get("x-clinic-id");
+    if (!clinicId) {
+      return NextResponse.json({ error: "Unknown clinic" }, { status: 400 });
+    }
+
     const body = await request.json();
     const {
       doctor_id,
@@ -34,36 +39,39 @@ export async function POST(request: Request) {
       );
     }
 
-    // Interim: derive clinicId from doctor's clinic_id.
-    // A later task adds subdomain-based tenant-resolution middleware that will forward
-    // a trusted clinic-id header on every request, including unauthenticated ones.
-    // Once that lands, prefer reading the header over inferring clinicId from the doctor lookup.
-    // Note: this derivation alone does not close the Finding-1 gap in findOrCreatePatient.
-    const doctor = await prisma.doctor.findUnique({
-      where: { id: doctor_id },
-      select: { clinic_id: true },
-    });
+    const doctor = await withClinicScope(clinicId, (tx) =>
+      tx.doctor.findUnique({
+        where: { id: doctor_id },
+        select: { id: true },
+      }),
+    );
     if (!doctor) {
       return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
     }
 
-    const schedule = await getClinicSchedule(doctor.clinic_id);
+    const schedule = await withClinicScope(clinicId, (tx) =>
+      getClinicSchedule(clinicId, tx),
+    );
     const when = new Date(scheduled_at);
     if (Number.isNaN(when.getTime())) {
       return NextResponse.json({ error: "Invalid scheduled_at" }, { status: 400 });
     }
 
     if (external_ref) {
-      const existing = await prisma.appointment.findUnique({
-        where: { external_ref: String(external_ref) },
-        include: { doctor: { select: { name: true } } },
-      });
+      const existing = await withClinicScope(clinicId, (tx) =>
+        tx.appointment.findUnique({
+          where: {
+            clinic_id_external_ref: { clinic_id: clinicId, external_ref: String(external_ref) },
+          },
+          include: { doctor: { select: { name: true } } },
+        }),
+      );
       if (existing) {
         return NextResponse.json(serializeAppointment(existing));
       }
     }
 
-    const appointment = await runBookingTransaction(async (tx) => {
+    const appointment = await runBookingTransaction(clinicId, async (tx) => {
       await assertSlotAvailable(
         doctor_id,
         when,
@@ -72,13 +80,14 @@ export async function POST(request: Request) {
         tx,
       );
 
-      const patient = await findOrCreatePatient(tx, doctor.clinic_id, {
+      const patient = await findOrCreatePatient(tx, clinicId, {
         name: patient_name.trim(),
         mobile: mobile?.trim() || null,
       });
 
       return tx.appointment.create({
         data: {
+          clinic_id: clinicId,
           doctor_id,
           patient_id: patient.id,
           patient_name: patient_name.trim(),

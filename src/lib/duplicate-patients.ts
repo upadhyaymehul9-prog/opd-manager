@@ -1,5 +1,6 @@
-import { prisma } from "@/lib/prisma";
-import { resolveCanonicalPatientIdTx } from "@/lib/patient-merge";
+import type { Prisma } from "@prisma/client";
+
+type Tx = Prisma.TransactionClient;
 
 function activePatientFilter(excludeId?: string) {
   return {
@@ -8,14 +9,17 @@ function activePatientFilter(excludeId?: string) {
   };
 }
 
-export async function findDuplicatePatients(input: {
-  name: string;
-  mobile?: string | null;
-  abha_id?: string | null;
-  national_id?: string | null;
-  date_of_birth?: string | Date | null;
-  exclude_patient_id?: string;
-}) {
+export async function findDuplicatePatients(
+  tx: Tx,
+  input: {
+    name: string;
+    mobile?: string | null;
+    abha_id?: string | null;
+    national_id?: string | null;
+    date_of_birth?: string | Date | null;
+    exclude_patient_id?: string;
+  },
+) {
   const name = input.name.trim();
   const mobile = input.mobile?.trim() || null;
   const abha_id = input.abha_id?.trim() || null;
@@ -56,7 +60,7 @@ export async function findDuplicatePatients(input: {
 
   if (or.length === 0) return [];
 
-  return prisma.patient.findMany({
+  return tx.patient.findMany({
     where: {
       OR: or,
       ...activePatientFilter(input.exclude_patient_id),
@@ -73,10 +77,4 @@ export async function findDuplicatePatients(input: {
     take: 8,
     orderBy: { patient_number: "desc" },
   });
-}
-
-export async function resolveCanonicalPatientId(
-  patientId: string,
-): Promise<string> {
-  return resolveCanonicalPatientIdTx(prisma, patientId);
 }
