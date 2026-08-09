@@ -1,14 +1,16 @@
+import type { Prisma } from "@prisma/client";
 import { addDays, startOfDay } from "@/lib/date-range";
-import { prisma } from "@/lib/prisma";
 import { buildNabhChecklist, visitHasEmr } from "@/lib/nabh";
 import { isPoliceIntimationOverdue } from "@/lib/mlc";
 
-export async function getNabhComplianceSnapshot() {
+type Tx = Prisma.TransactionClient;
+
+export async function getNabhComplianceSnapshot(tx: Tx) {
   const todayStart = startOfDay(new Date());
 
   const [visits, auditCount, openIncidents, feedbackToday, feedbackAvg, attendanceRecordedToday] =
     await Promise.all([
-      prisma.patientVisit.findMany({
+      tx.patientVisit.findMany({
         where: { registered_at: { gte: todayStart } },
         select: {
           id: true,
@@ -35,14 +37,14 @@ export async function getNabhComplianceSnapshot() {
           },
         },
       }),
-      prisma.auditLog.count({
+      tx.auditLog.count({
         where: { created_at: { gte: todayStart } },
       }),
-      prisma.incidentReport.count({ where: { status: "open" } }),
-      prisma.patientFeedback.count({
+      tx.incidentReport.count({ where: { status: "open" } }),
+      tx.patientFeedback.count({
         where: { created_at: { gte: todayStart } },
       }),
-      prisma.patientFeedback.aggregate({
+      tx.patientFeedback.aggregate({
         _avg: {
           q1_overall: true,
           q2_care_quality: true,
@@ -51,7 +53,7 @@ export async function getNabhComplianceSnapshot() {
           q5_registration: true,
         },
       }),
-      prisma.staffAttendance.count({
+      tx.staffAttendance.count({
         where: {
           clock_in: {
             gte: startOfDay(new Date()),
@@ -68,7 +70,7 @@ export async function getNabhComplianceSnapshot() {
   const mlcVisits = visits.filter((v) => v.medico_legal);
   const mlcRecords =
     mlcVisits.length > 0
-      ? await prisma.mlcRecord.findMany({
+      ? await tx.mlcRecord.findMany({
           where: { patient_visit_id: { in: mlcVisits.map((v) => v.id) } },
           select: { arrival_at: true, police_intimated_at: true },
         })

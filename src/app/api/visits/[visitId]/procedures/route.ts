@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 import { PROCEDURE_TYPES, type ProcedureType } from "@/lib/types";
 
 export async function GET(
@@ -11,12 +11,15 @@ export async function GET(
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const { visitId } = await params;
-    const rows = await prisma.visitProcedure.findMany({
-      where: { patient_visit_id: visitId },
-      orderBy: { created_at: "asc" },
-    });
+    const rows = await withClinicScope(session.clinicId, (tx) =>
+      tx.visitProcedure.findMany({
+        where: { patient_visit_id: visitId },
+        orderBy: { created_at: "asc" },
+      }),
+    );
     return NextResponse.json(
       rows.map((r) => ({
         id: r.id,
@@ -38,6 +41,7 @@ export async function POST(
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const { visitId } = await params;
     const body = await request.json();
@@ -50,24 +54,31 @@ export async function POST(
       );
     }
 
-    const visit = await prisma.patientVisit.findUnique({
-      where: { id: visitId },
+    const row = await withClinicScope(session.clinicId, async (tx) => {
+      const visit = await tx.patientVisit.findUnique({
+        where: { id: visitId },
+      });
+      if (!visit) {
+        return null;
+      }
+
+      return tx.visitProcedure.create({
+        data: {
+          clinic_id: session.clinicId,
+          patient_visit_id: visitId,
+          procedure_type,
+          notes: body.notes?.trim() || null,
+          fee:
+            body.fee != null && body.fee !== "" && Number(body.fee) > 0
+              ? Number(body.fee)
+              : null,
+        },
+      });
     });
-    if (!visit) {
+
+    if (!row) {
       return NextResponse.json({ error: "Visit not found" }, { status: 404 });
     }
-
-    const row = await prisma.visitProcedure.create({
-      data: {
-        patient_visit_id: visitId,
-        procedure_type,
-        notes: body.notes?.trim() || null,
-        fee:
-          body.fee != null && body.fee !== "" && Number(body.fee) > 0
-            ? Number(body.fee)
-            : null,
-      },
-    });
 
     return NextResponse.json(
       {

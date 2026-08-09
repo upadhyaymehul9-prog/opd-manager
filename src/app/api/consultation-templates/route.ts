@@ -2,20 +2,26 @@ import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
 import { DEFAULT_CONSULTATION_TEMPLATES } from "@/lib/emr-types";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 import { serializeTemplate } from "@/lib/emr";
 
 export async function GET(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { searchParams } = new URL(request.url);
     const doctorId = searchParams.get("doctor_id");
 
-    const templates = await prisma.consultationTemplate.findMany({
-      where: {
-        OR: [{ doctor_id: null }, ...(doctorId ? [{ doctor_id: doctorId }] : [])],
-      },
-      orderBy: [{ sort_order: "asc" }, { title: "asc" }],
-    });
+    const templates = await withClinicScope(session.clinicId, (tx) =>
+      tx.consultationTemplate.findMany({
+        where: {
+          OR: [{ doctor_id: null }, ...(doctorId ? [{ doctor_id: doctorId }] : [])],
+        },
+        orderBy: [{ sort_order: "asc" }, { title: "asc" }],
+      }),
+    );
 
     if (templates.length === 0) {
       return NextResponse.json(
@@ -37,6 +43,7 @@ export async function POST(request: Request) {
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const body = await request.json();
     const {
@@ -52,16 +59,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
-    const template = await prisma.consultationTemplate.create({
-      data: {
-        doctor_id: doctor_id ?? null,
-        title: title.trim(),
-        chief_complaint: chief_complaint?.trim() || null,
-        diagnosis: diagnosis?.trim() || null,
-        examination_notes: examination_notes?.trim() || null,
-        advice: advice?.trim() || null,
-      },
-    });
+    const template = await withClinicScope(session.clinicId, (tx) =>
+      tx.consultationTemplate.create({
+        data: {
+          clinic_id: session.clinicId,
+          doctor_id: doctor_id ?? null,
+          title: title.trim(),
+          chief_complaint: chief_complaint?.trim() || null,
+          diagnosis: diagnosis?.trim() || null,
+          examination_notes: examination_notes?.trim() || null,
+          advice: advice?.trim() || null,
+        },
+      }),
+    );
 
     return NextResponse.json(serializeTemplate(template), { status: 201 });
   } catch (e) {

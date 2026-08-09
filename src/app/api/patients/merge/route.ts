@@ -1,21 +1,15 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
-import { prisma } from "@/lib/prisma";
-import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
+import { requireApi } from "@/lib/api-guard";
+import { withClinicScope } from "@/lib/tenant";
+import { AUDIT_ACTIONS, logAudit } from "@/lib/audit";
 import { mergePatients } from "@/lib/patient-merge";
 
 export async function POST(request: Request) {
   try {
-    const session = await getSessionFromCookies();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    if (session.role !== "admin" && session.role !== "manager") {
-      return NextResponse.json(
-        { error: "Only manager/admin can merge patient records" },
-        { status: 403 },
-      );
-    }
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
 
     const body = await request.json();
     const sourceId = String(body.source_patient_id ?? "").trim();
@@ -35,19 +29,24 @@ export async function POST(request: Request) {
       );
     }
 
-    const summary = await prisma.$transaction((tx) =>
-      mergePatients(tx, {
-        sourceId,
-        targetId,
-        mergedBy: session.displayName || session.username,
-        reason,
-      }),
-    );
+    const { summary, source, target } = await withClinicScope(
+      session.clinicId,
+      async (tx) => {
+        const summary = await mergePatients(tx, {
+          sourceId,
+          targetId,
+          mergedBy: session.displayName || session.username,
+          reason,
+        });
 
-    const [source, target] = await Promise.all([
-      prisma.patient.findUnique({ where: { id: sourceId } }),
-      prisma.patient.findUnique({ where: { id: targetId } }),
-    ]);
+        const [source, target] = await Promise.all([
+          tx.patient.findUnique({ where: { id: sourceId } }),
+          tx.patient.findUnique({ where: { id: targetId } }),
+        ]);
+
+        return { summary, source, target };
+      },
+    );
 
     await logAudit({
       action: AUDIT_ACTIONS.PATIENT_MERGE,

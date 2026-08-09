@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { istDateOnly } from "@/lib/date-range";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 import { parseAbhaInput } from "@/lib/abha";
 
 /**
@@ -23,6 +24,10 @@ function ageFromDob(dob: Date | null | undefined): number | null {
 
 export async function GET(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { searchParams } = new URL(request.url);
     const q = searchParams.get("q")?.trim() ?? "";
     const includeMerged = searchParams.get("include_merged") === "true";
@@ -34,37 +39,39 @@ export async function GET(request: Request) {
     const num = /^\d+$/.test(q) ? Number(q) : null;
     const abhaFormatted = parseAbhaInput(q);
 
-    const patients = await prisma.patient.findMany({
-      where: {
-        ...(includeMerged ? {} : { merged_into_patient_id: null }),
-        OR: [
-          { name: { contains: q, mode: "insensitive" as const } },
-          ...(q.length >= 3
-            ? [{ mobile: { contains: q, mode: "insensitive" as const } }]
-            : []),
-          ...(num != null ? [{ patient_number: num }] : []),
-          ...(abhaFormatted ? [{ abha_id: abhaFormatted }] : []),
-        ],
-      },
-      orderBy: [{ patient_number: "desc" }],
-      take: 20,
-      include: {
-        merged_into: {
-          select: { patient_number: true, name: true },
+    const patients = await withClinicScope(session.clinicId, (tx) =>
+      tx.patient.findMany({
+        where: {
+          ...(includeMerged ? {} : { merged_into_patient_id: null }),
+          OR: [
+            { name: { contains: q, mode: "insensitive" as const } },
+            ...(q.length >= 3
+              ? [{ mobile: { contains: q, mode: "insensitive" as const } }]
+              : []),
+            ...(num != null ? [{ patient_number: num }] : []),
+            ...(abhaFormatted ? [{ abha_id: abhaFormatted }] : []),
+          ],
         },
-        visits: {
-          orderBy: { registered_at: "desc" },
-          take: 1,
-          select: {
-            age: true,
-            gender: true,
-            mobile: true,
-            address: true,
-            patient_name: true,
+        orderBy: [{ patient_number: "desc" }],
+        take: 20,
+        include: {
+          merged_into: {
+            select: { patient_number: true, name: true },
+          },
+          visits: {
+            orderBy: { registered_at: "desc" },
+            take: 1,
+            select: {
+              age: true,
+              gender: true,
+              mobile: true,
+              address: true,
+              patient_name: true,
+            },
           },
         },
-      },
-    });
+      }),
+    );
 
     return NextResponse.json(
       patients.map((p) => {

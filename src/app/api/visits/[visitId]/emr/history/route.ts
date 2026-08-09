@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function GET(
   request: Request,
@@ -10,12 +10,15 @@ export async function GET(
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const { visitId } = await params;
-    const revisions = await prisma.visitEmrRevision.findMany({
-      where: { patient_visit_id: visitId },
-      orderBy: { created_at: "desc" },
-    });
+    const revisions = await withClinicScope(session.clinicId, (tx) =>
+      tx.visitEmrRevision.findMany({
+        where: { patient_visit_id: visitId },
+        orderBy: { created_at: "desc" },
+      }),
+    );
 
     return NextResponse.json(
       revisions.map((r) => ({

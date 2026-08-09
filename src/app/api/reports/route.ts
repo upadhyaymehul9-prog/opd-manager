@@ -1,9 +1,8 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
-import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
+import { requireApi } from "@/lib/api-guard";
 import { resolveRange, todayStr } from "@/lib/date-range";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 const LAB_STATUSES = new Set([
   "to_lab",
@@ -22,11 +21,12 @@ const RADIO_STATUSES = new Set([
 
 export async function GET(request: Request) {
   try {
-    const token = (await cookies()).get(SESSION_COOKIE)?.value;
-    const session = token ? await verifySessionToken(token) : null;
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
 
     let { searchParams } = new URL(request.url);
-    if (session?.role === "pharmacy" || session?.role === "reception") {
+    if (session.role === "pharmacy" || session.role === "reception") {
       const today = todayStr();
       searchParams = new URLSearchParams({ from: today, to: today });
     }
@@ -35,56 +35,58 @@ export async function GET(request: Request) {
       resolveRange(searchParams);
 
     const [visits, dispensedItems, procedures, pharmacyBills] =
-      await Promise.all([
-        prisma.patientVisit.findMany({
-          where: {
-            registered_at: { gte: rangeStart, lt: rangeEndExclusive },
-          },
-          include: { doctors: { select: { id: true, name: true } } },
-        }),
-        prisma.prescriptionItem.findMany({
-          where: {
-            dispensed: true,
-            dispensed_at: { gte: rangeStart, lt: rangeEndExclusive },
-          },
-          include: {
-            prescription: {
-              include: {
-                patient_visit: {
-                  select: {
-                    id: true,
-                    token_number: true,
-                    patient_name: true,
-                    doctors: { select: { name: true } },
-                    patient: { select: { patient_number: true } },
+      await withClinicScope(session.clinicId, (tx) =>
+        Promise.all([
+          tx.patientVisit.findMany({
+            where: {
+              registered_at: { gte: rangeStart, lt: rangeEndExclusive },
+            },
+            include: { doctors: { select: { id: true, name: true } } },
+          }),
+          tx.prescriptionItem.findMany({
+            where: {
+              dispensed: true,
+              dispensed_at: { gte: rangeStart, lt: rangeEndExclusive },
+            },
+            include: {
+              prescription: {
+                include: {
+                  patient_visit: {
+                    select: {
+                      id: true,
+                      token_number: true,
+                      patient_name: true,
+                      doctors: { select: { name: true } },
+                      patient: { select: { patient_number: true } },
+                    },
                   },
                 },
               },
             },
-          },
-          orderBy: { dispensed_at: "desc" },
-        }),
-        prisma.visitProcedure.findMany({
-          where: { created_at: { gte: rangeStart, lt: rangeEndExclusive } },
-          include: {
-            patient_visit: {
-              select: { patient_name: true, token_number: true },
+            orderBy: { dispensed_at: "desc" },
+          }),
+          tx.visitProcedure.findMany({
+            where: { created_at: { gte: rangeStart, lt: rangeEndExclusive } },
+            include: {
+              patient_visit: {
+                select: { patient_name: true, token_number: true },
+              },
             },
-          },
-        }),
-        prisma.pharmacyBill.findMany({
-          where: {
-            created_at: { gte: rangeStart, lt: rangeEndExclusive },
-            voided_at: null,
-          },
-          include: {
-            patient_visit: {
-              select: { patient_name: true, token_number: true },
+          }),
+          tx.pharmacyBill.findMany({
+            where: {
+              created_at: { gte: rangeStart, lt: rangeEndExclusive },
+              voided_at: null,
             },
-          },
-          orderBy: { created_at: "desc" },
-        }),
-      ]);
+            include: {
+              patient_visit: {
+                select: { patient_name: true, token_number: true },
+              },
+            },
+            orderBy: { created_at: "desc" },
+          }),
+        ]),
+      );
 
     const medicineMap = new Map<
       string,

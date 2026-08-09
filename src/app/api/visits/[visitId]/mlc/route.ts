@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { AppError, errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 import {
   AUDIT_ACTIONS,
-  getSessionFromCookies,
   logAudit,
   logAuditTx,
 } from "@/lib/audit";
@@ -22,11 +21,14 @@ export async function GET(
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const { visitId } = await params;
-    const record = await prisma.mlcRecord.findUnique({
-      where: { patient_visit_id: visitId },
-    });
+    const record = await withClinicScope(session.clinicId, (tx) =>
+      tx.mlcRecord.findUnique({
+        where: { patient_visit_id: visitId },
+      }),
+    );
     return NextResponse.json(record ? serializeMlcRecord(record) : null);
   } catch (e) {
     return errorResponse("visits/[visitId]/mlc GET", e, "Failed to load MLC record");
@@ -38,39 +40,37 @@ export async function POST(
   { params }: { params: Promise<{ visitId: string }> },
 ) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { visitId } = await params;
-    const session = await getSessionFromCookies();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const visit = await prisma.patientVisit.findUnique({
-      where: { id: visitId },
-      select: { id: true, registered_at: true },
-    });
-    if (!visit) {
-      return NextResponse.json({ error: "Visit not found" }, { status: 404 });
-    }
-
-    const existing = await prisma.mlcRecord.findUnique({
-      where: { patient_visit_id: visitId },
-    });
-    if (existing) {
-      return NextResponse.json(
-        { error: "MLC record already exists for this visit" },
-        { status: 400 },
-      );
-    }
 
     const rawBody = await request.text();
     const body = rawBody
       ? (JSON.parse(rawBody) as { arrival_at?: string })
       : {};
 
-    const record = await prisma.$transaction(async (tx) => {
+    const record = await withClinicScope(session.clinicId, async (tx) => {
+      const visit = await tx.patientVisit.findUnique({
+        where: { id: visitId },
+        select: { id: true, registered_at: true },
+      });
+      if (!visit) {
+        throw new AppError("Visit not found", 404);
+      }
+
+      const existing = await tx.mlcRecord.findUnique({
+        where: { patient_visit_id: visitId },
+      });
+      if (existing) {
+        throw new AppError("MLC record already exists for this visit", 400);
+      }
+
       const casualty_number = await nextCasualtyNumber(tx, session.clinicId);
-      return tx.mlcRecord.create({
+      const created = await tx.mlcRecord.create({
         data: {
+          clinic_id: session.clinicId,
           patient_visit_id: visitId,
           casualty_number,
           arrival_at: body.arrival_at ? new Date(body.arrival_at) : visit.registered_at,
@@ -78,11 +78,13 @@ export async function POST(
           created_by_role: session.role,
         },
       });
-    });
 
-    await prisma.patientVisit.update({
-      where: { id: visitId },
-      data: { medico_legal: true },
+      await tx.patientVisit.update({
+        where: { id: visitId },
+        data: { medico_legal: true },
+      });
+
+      return created;
     });
 
     await logAudit({
@@ -104,20 +106,13 @@ export async function PATCH(
   { params }: { params: Promise<{ visitId: string }> },
 ) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { visitId } = await params;
-    const session = await getSessionFromCookies();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const existing = await prisma.mlcRecord.findUnique({
-      where: { patient_visit_id: visitId },
-    });
-    if (!existing) {
-      return NextResponse.json({ error: "MLC record not found" }, { status: 404 });
-    }
-
     const body = (await request.json()) as UpdateMlcRecordInput;
+
     const data: Record<string, unknown> = {};
 
     if (body.arrival_at !== undefined) data.arrival_at = new Date(body.arrival_at);
@@ -144,16 +139,26 @@ export async function PATCH(
         : null;
     }
 
-    if (Object.keys(data).length === 0) {
-      return NextResponse.json(serializeMlcRecord(existing));
-    }
+    const hasChanges = Object.keys(data).length > 0;
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const { existing, updated } = await withClinicScope(session.clinicId, async (tx) => {
+      const existing = await tx.mlcRecord.findUnique({
+        where: { patient_visit_id: visitId },
+      });
+      if (!existing) {
+        throw new AppError("MLC record not found", 404);
+      }
+
+      if (!hasChanges) {
+        return { existing, updated: existing };
+      }
+
       // Append-only: snapshot the pre-edit state before overwriting, same
       // pattern as EMR revisions — an MLC record must never silently change
       // without a retained trace of what it said before.
       await tx.mlcRecordRevision.create({
         data: {
+          clinic_id: session.clinicId,
           mlc_record_id: existing.id,
           snapshot: JSON.stringify(serializeMlcRecord(existing)),
           changed_by: session.displayName || session.username,
@@ -161,11 +166,17 @@ export async function PATCH(
         },
       });
 
-      return tx.mlcRecord.update({
+      const updated = await tx.mlcRecord.update({
         where: { id: existing.id },
         data,
       });
+
+      return { existing, updated };
     });
+
+    if (!hasChanges) {
+      return NextResponse.json(serializeMlcRecord(existing));
+    }
 
     await logAudit({
       action: AUDIT_ACTIONS.MLC_RECORD_UPDATE,
@@ -196,20 +207,21 @@ export async function DELETE(
     }
 
     const { visitId } = await params;
-    const existing = await prisma.mlcRecord.findUnique({
-      where: { patient_visit_id: visitId },
-      include: { revisions: true },
-    });
-    if (!existing) {
-      return NextResponse.json({ error: "MLC record not found" }, { status: 404 });
-    }
 
-    // Opened by mistake or a mislabeled MLC — deletable, but nothing is
-    // silently lost: the full record and its edit history are archived to
-    // the audit log in the same transaction that removes them, and the
-    // visit's medico_legal flag is cleared so discharge isn't stuck
-    // requiring a record that no longer exists.
-    await prisma.$transaction(async (tx) => {
+    await withClinicScope(session.clinicId, async (tx) => {
+      const existing = await tx.mlcRecord.findUnique({
+        where: { patient_visit_id: visitId },
+        include: { revisions: true },
+      });
+      if (!existing) {
+        throw new AppError("MLC record not found", 404);
+      }
+
+      // Opened by mistake or a mislabeled MLC — deletable, but nothing is
+      // silently lost: the full record and its edit history are archived to
+      // the audit log in the same transaction that removes them, and the
+      // visit's medico_legal flag is cleared so discharge isn't stuck
+      // requiring a record that no longer exists.
       await tx.mlcRecordRevision.deleteMany({
         where: { mlc_record_id: existing.id },
       });

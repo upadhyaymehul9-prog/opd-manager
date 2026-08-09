@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
+import type { Prisma } from "@prisma/client";
 import { DEFAULT_LAB_TESTS, serializeLabCatalog } from "@/lib/lab-tests";
 
-async function ensureDefaultCatalog() {
-  const existing = await prisma.labTestCatalog.findMany({
+async function ensureDefaultCatalog(tx: Prisma.TransactionClient, clinicId: string) {
+  const existing = await tx.labTestCatalog.findMany({
     select: { name: true },
   });
   const have = new Set(existing.map((r) => r.name.trim().toLowerCase()));
@@ -13,8 +14,9 @@ async function ensureDefaultCatalog() {
     (t) => !have.has(t.name.trim().toLowerCase()),
   );
   if (missing.length === 0) return;
-  await prisma.labTestCatalog.createMany({
+  await tx.labTestCatalog.createMany({
     data: missing.map((t) => ({
+      clinic_id: clinicId,
       name: t.name,
       unit: t.unit,
       ref_range: t.ref_range,
@@ -25,20 +27,26 @@ async function ensureDefaultCatalog() {
 
 export async function GET(request: Request) {
   try {
-    await ensureDefaultCatalog();
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { searchParams } = new URL(request.url);
     const q = searchParams.get("q")?.trim() ?? "";
     const limit = Math.min(Number(searchParams.get("limit") ?? (q ? 50 : 200)), 500);
 
-    const rows = await prisma.labTestCatalog.findMany({
-      where: {
-        is_active: true,
-        ...(q
-          ? { name: { contains: q, mode: "insensitive" } }
-          : {}),
-      },
-      orderBy: { name: "asc" },
-      take: limit,
+    const rows = await withClinicScope(session.clinicId, async (tx) => {
+      await ensureDefaultCatalog(tx, session.clinicId);
+      return tx.labTestCatalog.findMany({
+        where: {
+          is_active: true,
+          ...(q
+            ? { name: { contains: q, mode: "insensitive" } }
+            : {}),
+        },
+        orderBy: { name: "asc" },
+        take: limit,
+      });
     });
 
     return NextResponse.json(rows.map(serializeLabCatalog));
@@ -51,6 +59,7 @@ export async function POST(request: Request) {
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const body = await request.json();
     const name = String(body.name ?? "").trim();
@@ -62,17 +71,24 @@ export async function POST(request: Request) {
     const ref_range = body.ref_range?.trim() || null;
     const value_type = body.value_type === "text" ? "text" : body.value_type === "both" ? "both" : "numeric";
 
-    const existing = await prisma.labTestCatalog.findFirst({
-      where: { name: { equals: name, mode: "insensitive" } },
-    });
-    if (existing) {
-      return NextResponse.json(serializeLabCatalog(existing));
-    }
+    const result = await withClinicScope(session.clinicId, async (tx) => {
+      const existing = await tx.labTestCatalog.findFirst({
+        where: { name: { equals: name, mode: "insensitive" } },
+      });
+      if (existing) {
+        return { row: existing, created: false };
+      }
 
-    const row = await prisma.labTestCatalog.create({
-      data: { name, unit, ref_range, value_type },
+      const row = await tx.labTestCatalog.create({
+        data: { clinic_id: session.clinicId, name, unit, ref_range, value_type },
+      });
+      return { row, created: true };
     });
-    return NextResponse.json(serializeLabCatalog(row), { status: 201 });
+
+    return NextResponse.json(
+      serializeLabCatalog(result.row),
+      { status: result.created ? 201 : 200 },
+    );
   } catch (e) {
     return errorResponse("lab-tests/catalog POST", e, "Catalog error");
   }

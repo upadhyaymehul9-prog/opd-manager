@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
-import { prisma } from "@/lib/prisma";
-import { AUDIT_ACTIONS, diffFields, getSessionFromCookies, logAudit } from "@/lib/audit";
+import { requireApi } from "@/lib/api-guard";
+import { AUDIT_ACTIONS, diffFields, logAudit } from "@/lib/audit";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await getSessionFromCookies();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
     if (session.role !== "admin" && session.role !== "manager") {
       return NextResponse.json(
         { error: "Only manager/admin can review or close incidents" },
@@ -27,18 +27,23 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const existing = await prisma.incidentReport.findUnique({ where: { id } });
-    if (!existing) {
+    const { existing, incident } = await withClinicScope(session.clinicId, async (tx) => {
+      const existing = await tx.incidentReport.findUnique({ where: { id } });
+      if (!existing) return { existing: null, incident: null };
+
+      const incident = await tx.incidentReport.update({
+        where: { id },
+        data: {
+          status,
+          closed_at: status === "closed" ? new Date() : null,
+        },
+      });
+      return { existing, incident };
+    });
+
+    if (!existing || !incident) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-
-    const incident = await prisma.incidentReport.update({
-      where: { id },
-      data: {
-        status,
-        closed_at: status === "closed" ? new Date() : null,
-      },
-    });
 
     const diff = diffFields(existing, incident, ["status", "closed_at"]);
     if (Object.keys(diff).length > 0) {

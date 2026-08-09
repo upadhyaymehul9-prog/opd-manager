@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
 import { canWritePrescription } from "@/lib/status";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 import { serializePrescription } from "@/lib/serialize";
 import { AUDIT_ACTIONS, logAudit } from "@/lib/audit";
 import type { PatientStatus } from "@/lib/types";
@@ -24,13 +24,15 @@ export async function POST(
       ? (JSON.parse(rawBody) as { acknowledged_warnings?: unknown[] })
       : {};
 
-    const prescription = await prisma.prescription.findUnique({
-      where: { id },
-      include: {
-        ...prescriptionInclude,
-        patient_visit: { select: { status: true } },
-      },
-    });
+    const prescription = await withClinicScope(session.clinicId, (tx) =>
+      tx.prescription.findUnique({
+        where: { id },
+        include: {
+          ...prescriptionInclude,
+          patient_visit: { select: { status: true } },
+        },
+      }),
+    );
 
     if (!prescription) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -67,7 +69,7 @@ export async function POST(
 
     const now = new Date();
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await withClinicScope(session.clinicId, async (tx) => {
       if (!alreadyAtPharmacy) {
         await tx.patientVisit.update({
           where: { id: prescription.patient_visit_id },

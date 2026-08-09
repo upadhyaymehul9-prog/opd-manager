@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 function rating(v: unknown): number | null {
   const n = Number(v);
@@ -12,8 +12,15 @@ function rating(v: unknown): number | null {
 // Deliberately anonymous: this is the patient-facing feedback kiosk/form.
 // Middleware (isPublicFeedbackSubmit) lets POST through without a session —
 // do not add a requireApi() call here, it would 401 every real submitter.
+// The clinic is instead resolved from the x-clinic-id header the middleware
+// attaches to every request (nextWithClinic), based on the subdomain.
 export async function POST(request: Request) {
   try {
+    const clinicId = request.headers.get("x-clinic-id");
+    if (!clinicId) {
+      return NextResponse.json({ error: "Unknown clinic" }, { status: 404 });
+    }
+
     const body = await request.json();
     const patient_name = String(body.patient_name ?? "").trim();
     const q1 = rating(body.q1_overall);
@@ -29,19 +36,22 @@ export async function POST(request: Request) {
       );
     }
 
-    const feedback = await prisma.patientFeedback.create({
-      data: {
-        patient_visit_id: body.patient_visit_id || null,
-        patient_name,
-        mobile: body.mobile?.trim() || null,
-        q1_overall: q1,
-        q2_care_quality: q2,
-        q3_communication: q3,
-        q4_environment: q4,
-        q5_registration: q5,
-        comments: body.comments?.trim() || null,
-      },
-    });
+    const feedback = await withClinicScope(clinicId, (tx) =>
+      tx.patientFeedback.create({
+        data: {
+          clinic_id: clinicId,
+          patient_visit_id: body.patient_visit_id || null,
+          patient_name,
+          mobile: body.mobile?.trim() || null,
+          q1_overall: q1,
+          q2_care_quality: q2,
+          q3_communication: q3,
+          q4_environment: q4,
+          q5_registration: q5,
+          comments: body.comments?.trim() || null,
+        },
+      }),
+    );
 
     const avg = (q1 + q2 + q3 + q4 + q5) / 5;
 
@@ -55,11 +65,14 @@ export async function GET(request: Request) {
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
-    const rows = await prisma.patientFeedback.findMany({
-      orderBy: { created_at: "desc" },
-      take: 50,
-    });
+    const rows = await withClinicScope(session.clinicId, (tx) =>
+      tx.patientFeedback.findMany({
+        orderBy: { created_at: "desc" },
+        take: 50,
+      }),
+    );
 
     const avg =
       rows.length === 0

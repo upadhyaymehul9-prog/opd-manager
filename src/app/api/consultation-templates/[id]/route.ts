@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function DELETE(
   request: Request,
@@ -10,9 +10,12 @@ export async function DELETE(
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const { id } = await params;
-    await prisma.consultationTemplate.delete({ where: { id } });
+    await withClinicScope(session.clinicId, (tx) =>
+      tx.consultationTemplate.delete({ where: { id } }),
+    );
     return NextResponse.json({ ok: true });
   } catch (e) {
     return errorResponse("consultation-templates/[id] DELETE", e, "Delete failed");

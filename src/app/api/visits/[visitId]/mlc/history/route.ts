@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function GET(
   request: Request,
@@ -10,19 +10,21 @@ export async function GET(
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const { visitId } = await params;
-    const record = await prisma.mlcRecord.findUnique({
-      where: { patient_visit_id: visitId },
-      select: { id: true },
-    });
-    if (!record) {
-      return NextResponse.json([]);
-    }
 
-    const revisions = await prisma.mlcRecordRevision.findMany({
-      where: { mlc_record_id: record.id },
-      orderBy: { created_at: "desc" },
+    const revisions = await withClinicScope(session.clinicId, async (tx) => {
+      const record = await tx.mlcRecord.findUnique({
+        where: { patient_visit_id: visitId },
+        select: { id: true },
+      });
+      if (!record) return [];
+
+      return tx.mlcRecordRevision.findMany({
+        where: { mlc_record_id: record.id },
+        orderBy: { created_at: "desc" },
+      });
     });
 
     return NextResponse.json(

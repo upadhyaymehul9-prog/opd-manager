@@ -1,27 +1,34 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
+import { requireApi } from "@/lib/api-guard";
 import { resolveRange } from "@/lib/date-range";
-import { AUDIT_ACTIONS, getSessionFromCookies, logAudit } from "@/lib/audit";
-import { prisma } from "@/lib/prisma";
+import { AUDIT_ACTIONS, logAudit } from "@/lib/audit";
+import { withClinicScope } from "@/lib/tenant";
 
 export async function GET(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { searchParams } = new URL(request.url);
     const { rangeStart, rangeEndExclusive } = resolveRange(searchParams);
 
-    const rows = await prisma.roiRelease.findMany({
-      where: {
-        released_at: {
-          gte: rangeStart,
-          lt: rangeEndExclusive,
+    const rows = await withClinicScope(session.clinicId, (tx) =>
+      tx.roiRelease.findMany({
+        where: {
+          released_at: {
+            gte: rangeStart,
+            lt: rangeEndExclusive,
+          },
         },
-      },
-      orderBy: { released_at: "desc" },
-      include: {
-        visit: { select: { token_number: true } },
-      },
-      take: 300,
-    });
+        orderBy: { released_at: "desc" },
+        include: {
+          visit: { select: { token_number: true } },
+        },
+        take: 300,
+      }),
+    );
 
     return NextResponse.json(rows);
   } catch (e) {
@@ -31,10 +38,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const session = await getSessionFromCookies();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
 
     const body = await request.json();
     const patient_name = String(body.patient_name ?? "").trim();
@@ -62,38 +68,41 @@ export async function POST(request: Request) {
       );
     }
 
-    let patient_id: string | null = null;
-    let patient_number: number | null = null;
-    if (visit_id) {
-      const visit = await prisma.patientVisit.findUnique({
-        where: { id: visit_id },
-        select: { patient_id: true, patient: { select: { patient_number: true } } },
-      });
-      patient_id = visit?.patient_id ?? null;
-      patient_number = visit?.patient?.patient_number ?? null;
-    }
+    const row = await withClinicScope(session.clinicId, async (tx) => {
+      let patient_id: string | null = null;
+      let patient_number: number | null = null;
+      if (visit_id) {
+        const visit = await tx.patientVisit.findUnique({
+          where: { id: visit_id },
+          select: { patient_id: true, patient: { select: { patient_number: true } } },
+        });
+        patient_id = visit?.patient_id ?? null;
+        patient_number = visit?.patient?.patient_number ?? null;
+      }
 
-    const row = await prisma.roiRelease.create({
-      data: {
-        patient_visit_id: visit_id,
-        patient_id,
-        patient_name,
-        patient_number,
-        requested_by,
-        requester_relation: body.requester_relation?.trim() || null,
-        purpose,
-        information_released,
-        release_mode,
-        identity_verified: Boolean(body.identity_verified),
-        id_proof_type: body.id_proof_type?.trim() || null,
-        id_proof_ref: body.id_proof_ref?.trim() || null,
-        approved_by: body.approved_by?.trim() || null,
-        released_by: session.displayName || session.username,
-        released_by_role: session.role,
-        released_at,
-        remarks: body.remarks?.trim() || null,
-      },
-      include: { visit: { select: { token_number: true } } },
+      return tx.roiRelease.create({
+        data: {
+          clinic_id: session.clinicId,
+          patient_visit_id: visit_id,
+          patient_id,
+          patient_name,
+          patient_number,
+          requested_by,
+          requester_relation: body.requester_relation?.trim() || null,
+          purpose,
+          information_released,
+          release_mode,
+          identity_verified: Boolean(body.identity_verified),
+          id_proof_type: body.id_proof_type?.trim() || null,
+          id_proof_ref: body.id_proof_ref?.trim() || null,
+          approved_by: body.approved_by?.trim() || null,
+          released_by: session.displayName || session.username,
+          released_by_role: session.role,
+          released_at,
+          remarks: body.remarks?.trim() || null,
+        },
+        include: { visit: { select: { token_number: true } } },
+      });
     });
 
     await logAudit({

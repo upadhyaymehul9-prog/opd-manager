@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { AppError, errorResponse } from "@/lib/api-error";
-import { getSessionFromCookies } from "@/lib/audit";
+import { requireApi } from "@/lib/api-guard";
+import { withClinicScope } from "@/lib/tenant";
 import type { VisitLabTestInput } from "@/lib/lab-test-types";
 import { matchLabPanelByName } from "@/lib/lab-panels";
 import { serializeVisitLabTest } from "@/lib/lab-tests";
-import { prisma } from "@/lib/prisma";
 
 const ORDER_ROLES = new Set(["doctor", "lab", "admin", "manager"]);
 const RESULT_ROLES = new Set(["lab", "admin", "manager"]);
@@ -20,20 +20,25 @@ const VIEW_ROLES = new Set([
 
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ visitId: string }> },
 ) {
   try {
-    const session = await getSessionFromCookies();
-    if (!session || !VIEW_ROLES.has(session.role)) {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
+    if (!VIEW_ROLES.has(session.role)) {
       throw new AppError("Unauthorized", 401);
     }
 
     const { visitId } = await params;
-    const rows = await prisma.visitLabTest.findMany({
-      where: { patient_visit_id: visitId },
-      orderBy: [{ sort_order: "asc" }, { ordered_at: "asc" }],
-    });
+    const rows = await withClinicScope(session.clinicId, (tx) =>
+      tx.visitLabTest.findMany({
+        where: { patient_visit_id: visitId },
+        orderBy: [{ sort_order: "asc" }, { ordered_at: "asc" }],
+      }),
+    );
 
     return NextResponse.json(rows.map(serializeVisitLabTest));
   } catch (e) {
@@ -46,8 +51,11 @@ export async function POST(
   { params }: { params: Promise<{ visitId: string }> },
 ) {
   try {
-    const session = await getSessionFromCookies();
-    if (!session || !ORDER_ROLES.has(session.role)) {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
+    if (!ORDER_ROLES.has(session.role)) {
       throw new AppError("Unauthorized", 401);
     }
 
@@ -55,11 +63,6 @@ export async function POST(
     const body = (await request.json()) as VisitLabTestInput & {
       items?: VisitLabTestInput[];
     };
-
-    const visit = await prisma.patientVisit.findUnique({ where: { id: visitId } });
-    if (!visit) {
-      throw new AppError("Visit not found", 404);
-    }
 
     const requested = Array.isArray(body.items)
       ? body.items
@@ -85,11 +88,16 @@ export async function POST(
       }));
     });
 
-    const existingCount = await prisma.visitLabTest.count({
-      where: { patient_visit_id: visitId },
-    });
+    const created = await withClinicScope(session.clinicId, async (tx) => {
+      const visit = await tx.patientVisit.findUnique({ where: { id: visitId } });
+      if (!visit) {
+        throw new AppError("Visit not found", 404);
+      }
 
-    const created = await prisma.$transaction(async (tx) => {
+      const existingCount = await tx.visitLabTest.count({
+        where: { patient_visit_id: visitId },
+      });
+
       const rows = [];
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
@@ -105,6 +113,7 @@ export async function POST(
 
         const row = await tx.visitLabTest.create({
           data: {
+            clinic_id: session.clinicId,
             patient_visit_id: visitId,
             catalog_id: catalog?.id ?? item.catalog_id ?? null,
             test_name: catalog?.name ?? testName,
@@ -157,10 +166,9 @@ export async function PATCH(
   { params }: { params: Promise<{ visitId: string }> },
 ) {
   try {
-    const session = await getSessionFromCookies();
-    if (!session) {
-      throw new AppError("Unauthorized", 401);
-    }
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
 
     const { visitId } = await params;
     const body = (await request.json()) as {
@@ -177,26 +185,30 @@ export async function PATCH(
         throw new AppError("Unauthorized", 401);
       }
 
-      const result = await prisma.visitLabTest.updateMany({
-        where: {
-          patient_visit_id: visitId,
-          id: { in: cancelIds },
-          status: { in: ["ordered", "collected"] },
-        },
-        data: { status: "cancelled" },
+      const rows = await withClinicScope(session.clinicId, async (tx) => {
+        const result = await tx.visitLabTest.updateMany({
+          where: {
+            patient_visit_id: visitId,
+            id: { in: cancelIds },
+            status: { in: ["ordered", "collected"] },
+          },
+          data: { status: "cancelled" },
+        });
+
+        if (result.count === 0) {
+          throw new AppError("No removable tests selected", 400);
+        }
+
+        const rows = await tx.visitLabTest.findMany({
+          where: { patient_visit_id: visitId },
+          orderBy: [{ sort_order: "asc" }, { ordered_at: "asc" }],
+        });
+        return { cancelled: result.count, rows };
       });
 
-      if (result.count === 0) {
-        throw new AppError("No removable tests selected", 400);
-      }
-
-      const rows = await prisma.visitLabTest.findMany({
-        where: { patient_visit_id: visitId },
-        orderBy: [{ sort_order: "asc" }, { ordered_at: "asc" }],
-      });
       return NextResponse.json({
-        cancelled: result.count,
-        tests: rows.map(serializeVisitLabTest),
+        cancelled: rows.cancelled,
+        tests: rows.rows.map(serializeVisitLabTest),
       });
     }
 
@@ -212,7 +224,7 @@ export async function PATCH(
     const now = new Date();
     const by = session.displayName || session.username;
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await withClinicScope(session.clinicId, async (tx) => {
       const rows = [];
       for (const line of lines) {
         if (!line.id) continue;
