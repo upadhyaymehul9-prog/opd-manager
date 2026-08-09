@@ -20,14 +20,17 @@ function extractSlug(host: string): string | null {
   const hostname = host.split(":")[0];
   if (hostname === BASE_DOMAIN || hostname === `www.${BASE_DOMAIN}`) return null;
   if (!hostname.endsWith(`.${BASE_DOMAIN}`)) return null;
-  const slug = hostname.slice(0, -(`.${BASE_DOMAIN}`.length));
-  if ((RESERVED_CLINIC_SLUGS as readonly string[]).includes(slug)) return null;
-  return slug;
+  return hostname.slice(0, -(`.${BASE_DOMAIN}`.length));
 }
 
 async function resolveClinicId(host: string): Promise<{ id: string; status: string } | null> {
   const slug = extractSlug(host);
   if (!slug) return null;
+
+  // A reserved word can never be claimed by a real clinic — treat it exactly
+  // like "not found in the DB" so a reserved subdomain and a genuinely
+  // unregistered one are indistinguishable to the caller, at every path.
+  if ((RESERVED_CLINIC_SLUGS as readonly string[]).includes(slug)) return null;
 
   const cached = clinicCache.get(slug);
   if (cached && cached.expiresAt > Date.now()) {
