@@ -187,7 +187,7 @@ export async function POST(request: Request) {
           ? doctor.consultation_fee
           : null;
 
-    const token_number = await nextTokenNumber();
+    const token_number = await nextTokenNumber(session.clinicId);
     const dob = date_of_birth ? new Date(date_of_birth) : null;
 
     const visit = await prisma.$transaction(async (tx) => {
@@ -242,7 +242,7 @@ export async function POST(request: Request) {
           });
         }
       } else {
-        patient = await findOrCreatePatient(tx, {
+        patient = await findOrCreatePatient(tx, session.clinicId, {
           name: patient_name.trim(),
           mobile: mobile?.trim() || null,
           address: address?.trim() || null,
@@ -259,7 +259,7 @@ export async function POST(request: Request) {
       let billNo: string | null = null;
       let paidAt: Date | null = null;
       if (fee != null && fee > 0) {
-        billNo = await nextConsultationBillNo(tx);
+        billNo = await nextConsultationBillNo(tx, session.clinicId);
         paidAt = new Date();
       }
 

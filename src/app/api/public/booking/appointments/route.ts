@@ -34,7 +34,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const schedule = await getClinicSchedule();
+    const doctor = await prisma.doctor.findUnique({
+      where: { id: doctor_id },
+      select: { clinic_id: true },
+    });
+    if (!doctor) {
+      return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
+    }
+
+    const schedule = await getClinicSchedule(doctor.clinic_id);
     const when = new Date(scheduled_at);
     if (Number.isNaN(when.getTime())) {
       return NextResponse.json({ error: "Invalid scheduled_at" }, { status: 400 });
@@ -59,7 +67,7 @@ export async function POST(request: Request) {
         tx,
       );
 
-      const patient = await findOrCreatePatient(tx, {
+      const patient = await findOrCreatePatient(tx, doctor.clinic_id, {
         name: patient_name.trim(),
         mobile: mobile?.trim() || null,
       });

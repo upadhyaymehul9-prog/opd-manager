@@ -40,6 +40,7 @@ export async function POST(request: Request) {
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const body = await request.json();
     const {
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const schedule = await getClinicSchedule();
+    const schedule = await getClinicSchedule(session.clinicId);
     const when = new Date(scheduled_at);
     if (Number.isNaN(when.getTime())) {
       return NextResponse.json({ error: "Invalid scheduled time" }, { status: 400 });

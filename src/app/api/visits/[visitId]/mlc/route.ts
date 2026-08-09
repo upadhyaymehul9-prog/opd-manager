@@ -68,7 +68,7 @@ export async function POST(
       : {};
 
     const record = await prisma.$transaction(async (tx) => {
-      const casualty_number = await nextCasualtyNumber(tx);
+      const casualty_number = await nextCasualtyNumber(tx, session.clinicId);
       return tx.mlcRecord.create({
         data: {
           patient_visit_id: visitId,

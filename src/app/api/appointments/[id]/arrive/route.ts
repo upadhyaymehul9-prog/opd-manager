@@ -58,7 +58,7 @@ export async function POST(
       return NextResponse.json({ error: "Cancelled appointment cannot be registered" }, { status: 400 });
     }
 
-    const token_number = await nextTokenNumber();
+    const token_number = await nextTokenNumber(session.clinicId);
     const fee =
       appointment.doctor.consultation_fee && appointment.doctor.consultation_fee > 0
         ? appointment.doctor.consultation_fee
@@ -72,7 +72,7 @@ export async function POST(
         });
       }
       if (!patient) {
-        patient = await findOrCreatePatient(tx, {
+        patient = await findOrCreatePatient(tx, session.clinicId, {
           name: appointment.patient_name,
           mobile: appointment.mobile,
         });
@@ -86,7 +86,7 @@ export async function POST(
       let billNo: string | null = null;
       let paidAt: Date | null = null;
       if (fee != null) {
-        billNo = await nextConsultationBillNo(tx);
+        billNo = await nextConsultationBillNo(tx, session.clinicId);
         paidAt = new Date();
       }
 

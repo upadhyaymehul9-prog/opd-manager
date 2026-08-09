@@ -5,10 +5,10 @@ type Tx = Prisma.TransactionClient;
 /** Police must be intimated within 24 hours of an MLC arrival, regardless of patient consent. */
 export const POLICE_INTIMATION_WINDOW_HOURS = 24;
 
-export async function nextCasualtyNumber(tx: Tx): Promise<number> {
+export async function nextCasualtyNumber(tx: Tx, clinicId: string): Promise<number> {
   const row = await tx.mlcRegistry.upsert({
-    where: { id: "default" },
-    create: { id: "default", last_number: 1 },
+    where: { clinic_id: clinicId },
+    create: { clinic_id: clinicId, last_number: 1 },
     update: { last_number: { increment: 1 } },
   });
   return row.last_number;

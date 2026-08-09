@@ -45,9 +45,9 @@ const DEFAULT_SCHEDULE: ClinicSchedule = {
   opd_end_hour: 18,
 };
 
-export async function getClinicSchedule(): Promise<ClinicSchedule> {
+export async function getClinicSchedule(clinicId: string): Promise<ClinicSchedule> {
   const row = await prisma.clinicSettings.findUnique({
-    where: { id: "default" },
+    where: { clinic_id: clinicId },
   });
   return row ?? DEFAULT_SCHEDULE;
 }
@@ -121,9 +121,10 @@ export async function getBookedAppointmentsForDoctor(
 export async function generateAvailableSlots(
   doctorId: string,
   dateStr: string,
+  clinicId: string,
   schedule?: ClinicSchedule,
 ) {
-  const resolvedSchedule = schedule ?? (await getClinicSchedule());
+  const resolvedSchedule = schedule ?? (await getClinicSchedule(clinicId));
   const dayStart = startOfDay(new Date(dateStr));
   const dayEnd = addDays(dayStart, 1);
 

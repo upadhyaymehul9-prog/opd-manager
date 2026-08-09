@@ -149,6 +149,7 @@ export async function POST(
           // concurrent un-dispense cannot produce a stale bill.
           bill = await createPharmacyBill(
             tx,
+            session.clinicId,
             id,
             payment_mode,
             priceOverrides.size > 0 ? priceOverrides : undefined,

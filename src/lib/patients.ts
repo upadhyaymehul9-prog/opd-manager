@@ -4,10 +4,10 @@ import { resolveCanonicalPatientIdTx } from "@/lib/patient-merge";
 
 type Tx = Prisma.TransactionClient;
 
-export async function nextPatientNumber(tx: Tx): Promise<number> {
+export async function nextPatientNumber(tx: Tx, clinicId: string): Promise<number> {
   const row = await tx.patientRegistry.upsert({
-    where: { id: "default" },
-    create: { id: "default", last_number: 1 },
+    where: { clinic_id: clinicId },
+    create: { clinic_id: clinicId, last_number: 1 },
     update: { last_number: { increment: 1 } },
   });
   return row.last_number;
@@ -15,6 +15,7 @@ export async function nextPatientNumber(tx: Tx): Promise<number> {
 
 export async function findOrCreatePatient(
   tx: Tx,
+  clinicId: string,
   input: {
     name: string;
     mobile: string | null;
@@ -104,7 +105,7 @@ export async function findOrCreatePatient(
     }
   }
 
-  const patient_number = await nextPatientNumber(tx);
+  const patient_number = await nextPatientNumber(tx, clinicId);
   return tx.patient.create({
     data: {
       patient_number,

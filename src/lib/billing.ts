@@ -123,14 +123,14 @@ export function formatPharmacyBillNo(day: Date, seq: number): string {
   return `PH-${datePart}-${String(seq).padStart(3, "0")}`;
 }
 
-export async function generateBillNo(tx: Tx): Promise<string> {
+export async function generateBillNo(tx: Tx, clinicId: string): Promise<string> {
   // Per-IST-day atomic counter. The previous count(today)+1 approach raced:
   // two bills generated in the same instant read the same count and collided
   // on the bill_no unique constraint. The counter row serializes them.
   const today = istDateOnly();
   const row = await tx.pharmacyBillCounter.upsert({
-    where: { bill_date: today },
-    create: { bill_date: today, last_no: 1 },
+    where: { clinic_id_bill_date: { clinic_id: clinicId, bill_date: today } },
+    create: { clinic_id: clinicId, bill_date: today, last_no: 1 },
     update: { last_no: { increment: 1 } },
   });
   return formatPharmacyBillNo(today, row.last_no);
@@ -198,6 +198,7 @@ export function serializeBill(bill: {
 
 export async function createPharmacyBill(
   tx: Tx,
+  clinicId: string,
   prescriptionId: string,
   paymentMode: PaymentMode,
   priceOverrides?: Map<string, number>,
@@ -222,7 +223,7 @@ export async function createPharmacyBill(
   const preview =
     previewOverride ??
     (await buildBillPreview(tx, prescriptionId, priceOverrides));
-  const bill_no = await generateBillNo(tx);
+  const bill_no = await generateBillNo(tx, clinicId);
 
   // Discount can never exceed the bill (no negative grand total).
   const discountAmount = round2(

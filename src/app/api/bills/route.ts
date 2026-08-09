@@ -61,6 +61,7 @@ export async function POST(request: Request) {
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const body = await request.json();
     const visit_id = String(body.visit_id ?? "").trim();
@@ -142,6 +143,7 @@ export async function POST(request: Request) {
     const bill = await prisma.$transaction((tx) =>
       createPharmacyBill(
         tx,
+        session.clinicId,
         visit.prescription!.id,
         payment_mode,
         priceOverrides.size > 0 ? priceOverrides : undefined,

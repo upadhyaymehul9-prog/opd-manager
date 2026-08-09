@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { generateAvailableSlots } from "@/lib/appointments";
 import { verifyBookMyClinicKey } from "@/lib/bookmyclinic";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
   if (!verifyBookMyClinicKey(request as import("next/server").NextRequest)) {
@@ -20,7 +21,15 @@ export async function GET(request: Request) {
       );
     }
 
-    const slots = await generateAvailableSlots(doctorId, date);
+    const doctor = await prisma.doctor.findUnique({
+      where: { id: doctorId },
+      select: { clinic_id: true },
+    });
+    if (!doctor) {
+      return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
+    }
+
+    const slots = await generateAvailableSlots(doctorId, date, doctor.clinic_id);
     return NextResponse.json({
       doctor_id: doctorId,
       date,

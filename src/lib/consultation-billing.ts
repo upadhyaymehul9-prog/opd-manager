@@ -2,10 +2,10 @@ import type { Prisma } from "@prisma/client";
 
 type Tx = Prisma.TransactionClient;
 
-export async function nextConsultationBillNo(tx: Tx): Promise<string> {
+export async function nextConsultationBillNo(tx: Tx, clinicId: string): Promise<string> {
   const row = await tx.consultationBillCounter.upsert({
-    where: { id: "default" },
-    create: { id: "default", last_no: 1 },
+    where: { clinic_id: clinicId },
+    create: { clinic_id: clinicId, last_no: 1 },
     update: { last_no: { increment: 1 } },
   });
   const year = new Date().getFullYear();
