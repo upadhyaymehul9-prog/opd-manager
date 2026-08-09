@@ -16,12 +16,47 @@ model Clinic {
   plan       String?
   created_at DateTime @default(now()) @db.Timestamptz(6)
 
+  patients                 Patient[]
+  patient_registry         PatientRegistry?
+  mlc_registry             MlcRegistry?
+  mlc_records               MlcRecord[]
+  mlc_record_revisions     MlcRecordRevision[]
+  doctors                  Doctor[]
+  users                    User[]
+  patient_visits           PatientVisit[]
+  roi_releases             RoiRelease[]
+  visit_emr_revisions      VisitEmrRevision[]
+  daily_tokens             DailyToken[]
+  medicines                Medicine[]
+  stock_batches            StockBatch[]
+  stock_write_offs         StockWriteOff[]
+  stock_audits             StockAudit[]
+  stock_audit_lines        StockAuditLine[]
+  consultation_bill_counter ConsultationBillCounter?
+  pharmacy_bill_counters   PharmacyBillCounter[]
+  prescriptions            Prescription[]
+  prescription_items       PrescriptionItem[]
+  pharmacy_bills           PharmacyBill[]
+  pharmacy_bill_items      PharmacyBillItem[]
+  visit_procedures         VisitProcedure[]
+  clinic_settings          ClinicSettings?
+  appointments             Appointment[]
+  consultation_templates   ConsultationTemplate[]
+  audit_logs               AuditLog[]
+  patient_consents         PatientConsent[]
+  incident_reports         IncidentReport[]
+  patient_feedback         PatientFeedback[]
+  lab_test_catalog         LabTestCatalog[]
+  visit_lab_tests          VisitLabTest[]
+  staff_attendance         StaffAttendance[]
+
   @@map("clinics")
 }
 
 model Patient {
   id             String         @id @default(uuid()) @db.Uuid
-  patient_number Int            @unique
+  clinic_id      String         @db.Uuid
+  patient_number Int
   name           String
   mobile         String?
   address        String?
@@ -51,23 +86,28 @@ model Patient {
   merged_at              DateTime? @db.Timestamptz(6)
   merge_reason           String?
   merged_by              String?
+  clinic                 Clinic    @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([mobile])
   @@index([name])
   @@index([abha_id])
   @@index([merged_into_patient_id])
+  @@index([clinic_id])
+  @@unique([clinic_id, patient_number])
   @@map("patients")
 }
 
 model PatientRegistry {
-  id          String @id @default("default")
+  clinic_id   String @id @db.Uuid
+  clinic      Clinic @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
   last_number Int    @default(0)
 
   @@map("patient_registry")
 }
 
 model MlcRegistry {
-  id          String @id @default("default")
+  clinic_id   String @id @db.Uuid
+  clinic      Clinic @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
   last_number Int    @default(0)
 
   @@map("mlc_registry")
@@ -81,8 +121,9 @@ model MlcRegistry {
 /// (see MlcRecordRevision); the record itself is never deleted.
 model MlcRecord {
   id                         String              @id @default(uuid()) @db.Uuid
+  clinic_id                  String              @db.Uuid
   patient_visit_id           String              @unique @db.Uuid
-  casualty_number             Int                @unique
+  casualty_number             Int
   arrival_at                 DateTime            @db.Timestamptz(6)
   brought_by_name            String?
   brought_by_relation        String?
@@ -106,9 +147,12 @@ model MlcRecord {
   updated_at                 DateTime            @updatedAt @db.Timestamptz(6)
   patient_visit               PatientVisit        @relation(fields: [patient_visit_id], references: [id], onDelete: Restrict)
   revisions                  MlcRecordRevision[]
+  clinic                     Clinic              @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([patient_visit_id])
   @@index([police_intimated_at])
+  @@index([clinic_id])
+  @@unique([clinic_id, casualty_number])
   @@map("mlc_records")
 }
 
@@ -116,19 +160,23 @@ model MlcRecord {
 /// them — same append-only pattern as VisitEmrRevision.
 model MlcRecordRevision {
   id              String    @id @default(uuid()) @db.Uuid
+  clinic_id       String    @db.Uuid
   mlc_record_id   String    @db.Uuid
   snapshot        String
   changed_by      String
   changed_by_role String
   created_at      DateTime  @default(now()) @db.Timestamptz(6)
   mlc_record      MlcRecord @relation(fields: [mlc_record_id], references: [id], onDelete: Restrict)
+  clinic          Clinic    @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([mlc_record_id])
+  @@index([clinic_id])
   @@map("mlc_record_revisions")
 }
 
 model Doctor {
   id             String         @id @default(uuid()) @db.Uuid
+  clinic_id      String         @db.Uuid
   name           String
   room_number    String
   specialty      String?
@@ -143,13 +191,16 @@ model Doctor {
   appointments   Appointment[]
   users          User[]
   consultation_templates ConsultationTemplate[]
+  clinic         Clinic         @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
+  @@index([clinic_id])
   @@map("doctors")
 }
 
 model User {
   id                    String    @id @default(uuid()) @db.Uuid
-  username              String    @unique
+  clinic_id             String    @db.Uuid
+  username              String
   password_hash         String
   role                  String
   display_name          String?
@@ -161,12 +212,16 @@ model User {
   /// account; cleared once the user sets their own password.
   must_change_password  Boolean   @default(true)
   created_at            DateTime  @default(now()) @db.Timestamptz(6)
+  clinic                Clinic    @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
+  @@index([clinic_id])
+  @@unique([clinic_id, username])
   @@map("users")
 }
 
 model PatientVisit {
   id              String    @id @default(uuid()) @db.Uuid
+  clinic_id       String    @db.Uuid
   patient_id      String?   @db.Uuid
   token_number    Int
   patient_name    String
@@ -193,7 +248,7 @@ model PatientVisit {
   completed_at    DateTime? @db.Timestamptz(6)
   consultation_fee        Float?
   consultation_payment_mode String?
-  consultation_bill_no      String?   @unique
+  consultation_bill_no      String?
   consultation_paid_at      DateTime? @db.Timestamptz(6)
   chief_complaint           String?
   provisional_diagnosis     String?
@@ -235,18 +290,22 @@ model PatientVisit {
   emr_revisions   VisitEmrRevision[]
   mlc_record      MlcRecord?
   lab_tests       VisitLabTest[]
+  clinic          Clinic         @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([status])
   @@index([doctor_id])
   @@index([patient_id])
   @@index([registered_at(sort: Desc)])
   @@index([patient_name])
+  @@index([clinic_id])
+  @@unique([clinic_id, consultation_bill_no])
   @@map("patient_visits")
 }
 
 /// Logs each release/disclosure of patient information for legal traceability.
 model RoiRelease {
   id                    String        @id @default(uuid()) @db.Uuid
+  clinic_id             String        @db.Uuid
   patient_visit_id      String?       @db.Uuid
   patient_id            String?       @db.Uuid
   patient_name          String
@@ -267,10 +326,12 @@ model RoiRelease {
   created_at            DateTime      @default(now()) @db.Timestamptz(6)
   visit                 PatientVisit? @relation(fields: [patient_visit_id], references: [id], onDelete: SetNull)
   patient               Patient?      @relation(fields: [patient_id], references: [id], onDelete: SetNull)
+  clinic                Clinic        @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([created_at(sort: Desc)])
   @@index([patient_visit_id])
   @@index([patient_id])
+  @@index([clinic_id])
   @@map("roi_releases")
 }
 
@@ -279,27 +340,34 @@ model RoiRelease {
 /// (append-only correction history — nothing is ever lost, only superseded).
 model VisitEmrRevision {
   id               String       @id @default(uuid()) @db.Uuid
+  clinic_id        String       @db.Uuid
   patient_visit_id String       @db.Uuid
   snapshot         String
   changed_by       String
   changed_by_role  String
   created_at       DateTime     @default(now()) @db.Timestamptz(6)
   patient_visit    PatientVisit @relation(fields: [patient_visit_id], references: [id], onDelete: Restrict)
+  clinic           Clinic       @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([patient_visit_id])
   @@index([created_at(sort: Desc)])
+  @@index([clinic_id])
   @@map("visit_emr_revisions")
 }
 
 model DailyToken {
-  visit_date DateTime @id @db.Date
+  clinic_id  String   @db.Uuid
+  visit_date DateTime @db.Date
   last_token Int      @default(0)
+  clinic     Clinic   @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
+  @@id([clinic_id, visit_date])
   @@map("daily_tokens")
 }
 
 model Medicine {
   id                 String             @id @default(uuid()) @db.Uuid
+  clinic_id          String             @db.Uuid
   name               String
   brand              String?
   form               String?
@@ -312,14 +380,17 @@ model Medicine {
   stock_batches      StockBatch[]
   write_offs         StockWriteOff[]
   audit_lines        StockAuditLine[]
+  clinic             Clinic             @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([name])
   @@index([brand])
+  @@index([clinic_id])
   @@map("medicines")
 }
 
 model StockBatch {
   id          String          @id @default(uuid()) @db.Uuid
+  clinic_id   String          @db.Uuid
   medicine_id String          @db.Uuid
   batch_no    String
   expiry_date DateTime        @db.Date
@@ -329,14 +400,17 @@ model StockBatch {
   created_at  DateTime        @default(now()) @db.Timestamptz(6)
   medicine    Medicine        @relation(fields: [medicine_id], references: [id], onDelete: Cascade)
   write_offs  StockWriteOff[]
+  clinic      Clinic          @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([medicine_id])
   @@index([expiry_date])
+  @@index([clinic_id])
   @@map("stock_batches")
 }
 
 model StockWriteOff {
   id          String      @id @default(uuid()) @db.Uuid
+  clinic_id   String      @db.Uuid
   medicine_id String      @db.Uuid
   batch_id    String?     @db.Uuid
   batch_no    String
@@ -346,28 +420,34 @@ model StockWriteOff {
   created_at  DateTime    @default(now()) @db.Timestamptz(6)
   medicine    Medicine    @relation(fields: [medicine_id], references: [id], onDelete: Cascade)
   batch       StockBatch? @relation(fields: [batch_id], references: [id], onDelete: SetNull)
+  clinic      Clinic      @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([medicine_id])
   @@index([created_at(sort: Desc)])
+  @@index([clinic_id])
   @@map("stock_write_offs")
 }
 
 model StockAudit {
   id          String           @id @default(uuid()) @db.Uuid
+  clinic_id   String           @db.Uuid
   audit_date  DateTime         @db.Date
   department  String           @default("pharmacy")
   notes       String?
   created_by  String?
   created_at  DateTime         @default(now()) @db.Timestamptz(6)
   lines       StockAuditLine[]
+  clinic      Clinic           @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([audit_date(sort: Desc)])
   @@index([department])
+  @@index([clinic_id])
   @@map("stock_audits")
 }
 
 model StockAuditLine {
   id            String     @id @default(uuid()) @db.Uuid
+  clinic_id     String     @db.Uuid
   audit_id      String     @db.Uuid
   medicine_id   String     @db.Uuid
   medicine_name String
@@ -377,15 +457,18 @@ model StockAuditLine {
   notes         String?
   audit         StockAudit @relation(fields: [audit_id], references: [id], onDelete: Cascade)
   medicine      Medicine   @relation(fields: [medicine_id], references: [id], onDelete: Restrict)
+  clinic        Clinic     @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([audit_id])
   @@index([medicine_id])
+  @@index([clinic_id])
   @@map("stock_audit_lines")
 }
 
 model ConsultationBillCounter {
-  id      String @id @default("default")
-  last_no Int    @default(0)
+  clinic_id String @id @db.Uuid
+  clinic    Clinic @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
+  last_no   Int    @default(0)
 
   @@map("consultation_bill_counter")
 }
@@ -394,14 +477,18 @@ model ConsultationBillCounter {
 /// serializes concurrent billing so two bills can't collide on bill_no.
 /// visit_date is the IST calendar day (see lib/date-range istDateOnly).
 model PharmacyBillCounter {
-  bill_date DateTime @id @db.Date
+  clinic_id String   @db.Uuid
+  bill_date DateTime @db.Date
   last_no   Int      @default(0)
+  clinic    Clinic   @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
+  @@id([clinic_id, bill_date])
   @@map("pharmacy_bill_counter")
 }
 
 model Prescription {
   id                  String             @id @default(uuid()) @db.Uuid
+  clinic_id           String             @db.Uuid
   patient_visit_id    String             @unique @db.Uuid
   doctor_id           String             @db.Uuid
   notes               String?
@@ -413,13 +500,16 @@ model Prescription {
   doctor              Doctor             @relation(fields: [doctor_id], references: [id], onDelete: Restrict)
   items               PrescriptionItem[]
   pharmacy_bill       PharmacyBill?
+  clinic              Clinic             @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([status])
+  @@index([clinic_id])
   @@map("prescriptions")
 }
 
 model PrescriptionItem {
   id               String       @id @default(uuid()) @db.Uuid
+  clinic_id        String       @db.Uuid
   prescription_id  String       @db.Uuid
   medicine_id      String?      @db.Uuid
   medicine_name    String
@@ -439,14 +529,17 @@ model PrescriptionItem {
   void_reason      String?
   prescription     Prescription @relation(fields: [prescription_id], references: [id], onDelete: Cascade)
   medicine         Medicine?    @relation(fields: [medicine_id], references: [id], onDelete: SetNull)
+  clinic           Clinic       @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([prescription_id])
+  @@index([clinic_id])
   @@map("prescription_items")
 }
 
 model PharmacyBill {
   id               String             @id @default(uuid()) @db.Uuid
-  bill_no          String             @unique
+  clinic_id        String             @db.Uuid
+  bill_no          String
   patient_visit_id String             @unique @db.Uuid
   prescription_id  String             @unique @db.Uuid
   payment_mode     String
@@ -467,13 +560,17 @@ model PharmacyBill {
   patient_visit    PatientVisit       @relation(fields: [patient_visit_id], references: [id], onDelete: Restrict)
   prescription     Prescription       @relation(fields: [prescription_id], references: [id], onDelete: Restrict)
   items            PharmacyBillItem[]
+  clinic           Clinic             @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([created_at(sort: Desc)])
+  @@index([clinic_id])
+  @@unique([clinic_id, bill_no])
   @@map("pharmacy_bills")
 }
 
 model PharmacyBillItem {
   id                   String       @id @default(uuid()) @db.Uuid
+  clinic_id            String       @db.Uuid
   bill_id              String       @db.Uuid
   prescription_item_id String?      @db.Uuid
   medicine_name        String
@@ -485,37 +582,59 @@ model PharmacyBillItem {
   gst_amount           Float
   line_total           Float
   bill                 PharmacyBill @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+  clinic               Clinic       @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([bill_id])
+  @@index([clinic_id])
   @@map("pharmacy_bill_items")
 }
 
 model VisitProcedure {
   id               String       @id @default(uuid()) @db.Uuid
+  clinic_id        String       @db.Uuid
   patient_visit_id String       @db.Uuid
   procedure_type   String
   notes            String?
   fee              Float?
   created_at       DateTime     @default(now()) @db.Timestamptz(6)
   patient_visit    PatientVisit @relation(fields: [patient_visit_id], references: [id], onDelete: Cascade)
+  clinic           Clinic       @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([patient_visit_id])
   @@index([procedure_type])
   @@index([created_at(sort: Desc)])
+  @@index([clinic_id])
   @@map("visit_procedures")
 }
 
+/// One row per clinic. Operational settings, branding, and feature toggles
+/// consumed by the (future) Clinic Settings admin page; today only the
+/// operational fields (already existed) and defaults are read.
 model ClinicSettings {
-  id                    String @id @default("default")
-  slot_duration_minutes Int    @default(15)
-  opd_start_hour        Int    @default(9)
-  opd_end_hour          Int    @default(18)
+  clinic_id              String  @id @db.Uuid
+  clinic                 Clinic  @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+
+  slot_duration_minutes  Int     @default(15)
+  opd_start_hour         Int     @default(9)
+  opd_end_hour           Int     @default(18)
+  gst_rate_percent       Decimal @default(12) @db.Decimal(5, 2)
+  bill_number_prefix     String  @default("BILL")
+  mlc_consent_text       String?
+
+  display_name           String
+  logo_url               String?
+  primary_color          String  @default("#0f766e")
+
+  radiology_enabled        Boolean @default(true)
+  mlc_enabled               Boolean @default(true)
+  pharmacy_billing_enabled Boolean @default(true)
 
   @@map("clinic_settings")
 }
 
 model Appointment {
   id               String        @id @default(uuid()) @db.Uuid
+  clinic_id        String        @db.Uuid
   doctor_id        String        @db.Uuid
   patient_id       String?       @db.Uuid
   patient_name     String
@@ -525,7 +644,7 @@ model Appointment {
   duration_minutes Int           @default(15)
   status           String        @default("booked")
   source           String        @default("reception")
-  external_ref     String?       @unique
+  external_ref     String?
   notes            String?
   visit_id         String?       @unique @db.Uuid
   created_at       DateTime      @default(now()) @db.Timestamptz(6)
@@ -533,16 +652,20 @@ model Appointment {
   doctor           Doctor        @relation(fields: [doctor_id], references: [id], onDelete: Restrict)
   patient          Patient?      @relation(fields: [patient_id], references: [id], onDelete: SetNull)
   visit            PatientVisit? @relation(fields: [visit_id], references: [id], onDelete: SetNull)
+  clinic           Clinic        @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([doctor_id, scheduled_at])
   @@index([scheduled_at(sort: Desc)])
   @@index([status])
   @@index([source])
+  @@index([clinic_id])
+  @@unique([clinic_id, external_ref])
   @@map("appointments")
 }
 
 model ConsultationTemplate {
   id                String   @id @default(uuid()) @db.Uuid
+  clinic_id         String   @db.Uuid
   doctor_id         String?  @db.Uuid
   title             String
   chief_complaint   String?
@@ -552,13 +675,16 @@ model ConsultationTemplate {
   sort_order        Int      @default(0)
   created_at        DateTime @default(now()) @db.Timestamptz(6)
   doctor            Doctor?  @relation(fields: [doctor_id], references: [id], onDelete: Cascade)
+  clinic            Clinic   @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([doctor_id])
+  @@index([clinic_id])
   @@map("consultation_templates")
 }
 
 model AuditLog {
   id          String   @id @default(uuid()) @db.Uuid
+  clinic_id   String   @db.Uuid
   user_id     String?  @db.Uuid
   username    String
   role        String
@@ -569,15 +695,18 @@ model AuditLog {
   details     String?
   ip_address  String?
   created_at  DateTime @default(now()) @db.Timestamptz(6)
+  clinic      Clinic   @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([created_at(sort: Desc)])
   @@index([entity_type, entity_id])
   @@index([action])
+  @@index([clinic_id])
   @@map("audit_logs")
 }
 
 model PatientConsent {
   id               String       @id @default(uuid()) @db.Uuid
+  clinic_id        String       @db.Uuid
   patient_visit_id String       @unique @db.Uuid
   patient_id       String?      @db.Uuid
   consent_type     String       @default("general_treatment")
@@ -590,13 +719,16 @@ model PatientConsent {
   created_at       DateTime     @default(now()) @db.Timestamptz(6)
   visit            PatientVisit @relation(fields: [patient_visit_id], references: [id], onDelete: Restrict)
   patient          Patient?     @relation(fields: [patient_id], references: [id], onDelete: SetNull)
+  clinic           Clinic       @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([patient_id])
+  @@index([clinic_id])
   @@map("patient_consents")
 }
 
 model IncidentReport {
   id               String        @id @default(uuid()) @db.Uuid
+  clinic_id        String        @db.Uuid
   patient_visit_id String?       @db.Uuid
   patient_name     String
   category         String
@@ -609,14 +741,17 @@ model IncidentReport {
   created_at       DateTime      @default(now()) @db.Timestamptz(6)
   closed_at        DateTime?     @db.Timestamptz(6)
   visit            PatientVisit? @relation(fields: [patient_visit_id], references: [id], onDelete: SetNull)
+  clinic           Clinic        @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([created_at(sort: Desc)])
   @@index([status])
+  @@index([clinic_id])
   @@map("incident_reports")
 }
 
 model PatientFeedback {
   id               String   @id @default(uuid()) @db.Uuid
+  clinic_id        String   @db.Uuid
   patient_visit_id String?  @db.Uuid
   patient_name     String
   mobile           String?
@@ -627,13 +762,16 @@ model PatientFeedback {
   q5_registration  Int
   comments         String?
   created_at       DateTime @default(now()) @db.Timestamptz(6)
+  clinic           Clinic   @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([created_at(sort: Desc)])
+  @@index([clinic_id])
   @@map("patient_feedback")
 }
 
 model LabTestCatalog {
   id          String         @id @default(uuid()) @db.Uuid
+  clinic_id   String         @db.Uuid
   name        String
   unit        String?
   ref_range   String?
@@ -641,13 +779,16 @@ model LabTestCatalog {
   is_active   Boolean        @default(true)
   created_at  DateTime       @default(now()) @db.Timestamptz(6)
   visit_tests VisitLabTest[]
+  clinic      Clinic         @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([name])
+  @@index([clinic_id])
   @@map("lab_test_catalog")
 }
 
 model VisitLabTest {
   id               String          @id @default(uuid()) @db.Uuid
+  clinic_id        String          @db.Uuid
   patient_visit_id String          @db.Uuid
   catalog_id       String?         @db.Uuid
   test_name        String
@@ -667,14 +808,17 @@ model VisitLabTest {
   sort_order       Int             @default(0)
   patient_visit    PatientVisit    @relation(fields: [patient_visit_id], references: [id], onDelete: Cascade)
   catalog          LabTestCatalog? @relation(fields: [catalog_id], references: [id], onDelete: SetNull)
+  clinic           Clinic          @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([patient_visit_id])
   @@index([status])
+  @@index([clinic_id])
   @@map("visit_lab_tests")
 }
 
 model StaffAttendance {
   id           String    @id @default(uuid()) @db.Uuid
+  clinic_id    String    @db.Uuid
   user_id      String    @db.Uuid
   username     String
   role         String
@@ -682,8 +826,10 @@ model StaffAttendance {
   clock_in     DateTime  @db.Timestamptz(6)
   clock_out    DateTime? @db.Timestamptz(6)
   created_at   DateTime  @default(now()) @db.Timestamptz(6)
+  clinic       Clinic    @relation(fields: [clinic_id], references: [id], onDelete: Restrict)
 
   @@index([user_id])
   @@index([clock_in(sort: Desc)])
+  @@index([clinic_id])
   @@map("staff_attendance")
 }
