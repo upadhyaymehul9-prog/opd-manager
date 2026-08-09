@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { withClinicScope } from "../src/lib/tenant";
 
 const prisma = new PrismaClient();
 
@@ -24,23 +25,25 @@ async function main() {
   const password = process.env.SEED_USER_PASSWORD?.trim() || "Clinic@2026";
   const hash = await bcrypt.hash(password, 12);
 
-  for (const user of DEFAULT_USERS) {
-    await prisma.user.upsert({
-      where: { clinic_id_username: { clinic_id: clinicId, username: user.username } },
-      create: {
-        clinic_id: clinicId,
-        username: user.username,
-        password_hash: hash,
-        role: user.role,
-        display_name: user.display_name,
-        must_change_password: true,
-      },
-      update: {
-        role: user.role,
-        display_name: user.display_name,
-      },
-    });
-  }
+  await withClinicScope(clinicId, async (tx) => {
+    for (const user of DEFAULT_USERS) {
+      await tx.user.upsert({
+        where: { clinic_id_username: { clinic_id: clinicId, username: user.username } },
+        create: {
+          clinic_id: clinicId,
+          username: user.username,
+          password_hash: hash,
+          role: user.role,
+          display_name: user.display_name,
+          must_change_password: true,
+        },
+        update: {
+          role: user.role,
+          display_name: user.display_name,
+        },
+      });
+    }
+  });
 
   console.log(`Seeded clinic login accounts for clinic ${clinicId} (existing passwords left untouched):`);
   for (const user of DEFAULT_USERS) {

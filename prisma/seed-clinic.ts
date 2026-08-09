@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { isValidClinicSlug } from "../src/lib/clinic-slug";
+import { withClinicScope } from "../src/lib/tenant";
 
 const prisma = new PrismaClient();
 
@@ -36,11 +37,17 @@ async function main() {
     },
   });
 
-  await prisma.clinicSettings.create({
-    data: {
-      clinic_id: clinic.id,
-      display_name: name,
-    },
+  await withClinicScope(clinic.id, async (tx) => {
+    await tx.clinicSettings.upsert({
+      where: { clinic_id: clinic.id },
+      create: {
+        clinic_id: clinic.id,
+        display_name: name,
+      },
+      update: {
+        display_name: name,
+      },
+    });
   });
 
   console.log(`Created clinic "${name}" (slug: ${slug})`);

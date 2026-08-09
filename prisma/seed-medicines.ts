@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
+import { withClinicScope } from "../src/lib/tenant";
 
 const prisma = new PrismaClient();
 
@@ -23,32 +24,34 @@ async function main() {
   }
 
   let created = 0;
-  for (const med of MEDICINES) {
-    const existing = await prisma.medicine.findFirst({
-      where: {
-        clinic_id: clinicId,
-        name: { equals: med.name, mode: "insensitive" },
-        brand: med.brand ?? null,
-        form: med.form ?? null,
-        strength: med.strength ?? null,
-      },
-    });
-    if (existing) continue;
+  await withClinicScope(clinicId, async (tx) => {
+    for (const med of MEDICINES) {
+      const existing = await tx.medicine.findFirst({
+        where: {
+          clinic_id: clinicId,
+          name: { equals: med.name, mode: "insensitive" },
+          brand: med.brand ?? null,
+          form: med.form ?? null,
+          strength: med.strength ?? null,
+        },
+      });
+      if (existing) continue;
 
-    await prisma.medicine.create({
-      data: {
-        clinic_id: clinicId,
-        name: med.name,
-        brand: med.brand ?? null,
-        form: med.form ?? null,
-        strength: med.strength ?? null,
-      },
-    });
-    created += 1;
-  }
+      await tx.medicine.create({
+        data: {
+          clinic_id: clinicId,
+          name: med.name,
+          brand: med.brand ?? null,
+          form: med.form ?? null,
+          strength: med.strength ?? null,
+        },
+      });
+      created += 1;
+    }
 
-  const total = await prisma.medicine.count({ where: { clinic_id: clinicId, is_active: true } });
-  console.log(`Seeded ${created} new medicine(s). Catalog has ${total} active items.`);
+    const total = await tx.medicine.count({ where: { clinic_id: clinicId, is_active: true } });
+    console.log(`Seeded ${created} new medicine(s). Catalog has ${total} active items.`);
+  });
 }
 
 main()
