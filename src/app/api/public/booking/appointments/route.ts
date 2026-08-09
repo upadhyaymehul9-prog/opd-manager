@@ -34,6 +34,11 @@ export async function POST(request: Request) {
       );
     }
 
+    // Interim: derive clinicId from doctor's clinic_id.
+    // A later task adds subdomain-based tenant-resolution middleware that will forward
+    // a trusted clinic-id header on every request, including unauthenticated ones.
+    // Once that lands, prefer reading the header over inferring clinicId from the doctor lookup.
+    // Note: this derivation alone does not close the Finding-1 gap in findOrCreatePatient.
     const doctor = await prisma.doctor.findUnique({
       where: { id: doctor_id },
       select: { clinic_id: true },

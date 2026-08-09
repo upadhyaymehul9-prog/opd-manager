@@ -41,6 +41,11 @@ export async function findOrCreatePatient(
   const date_of_birth = input.date_of_birth ?? null;
 
   if (abha_id) {
+    // NOTE: This lookup is not currently clinic-scoped (no clinic_id in WHERE).
+    // It is reachable from clinic-resolved callers (the public booking routes).
+    // A later task wires all Prisma calls through withClinicScope/Postgres RLS,
+    // which will enforce clinic isolation at the database level regardless of app-level filters.
+    // This is a known, tracked gap pending that migration — not silently unsafe forever.
     const byAbha = await tx.patient.findUnique({ where: { abha_id } });
     if (byAbha) {
       const canonicalId = await resolveCanonicalPatientIdTx(tx, byAbha.id);
@@ -64,6 +69,11 @@ export async function findOrCreatePatient(
   }
 
   if (mobile) {
+    // NOTE: This lookup is not currently clinic-scoped (no clinic_id in WHERE).
+    // It is reachable from clinic-resolved callers (the public booking routes).
+    // A later task wires all Prisma calls through withClinicScope/Postgres RLS,
+    // which will enforce clinic isolation at the database level regardless of app-level filters.
+    // This is a known, tracked gap pending that migration — not silently unsafe forever.
     const byMobile = await tx.patient.findFirst({
       where: { mobile, merged_into_patient_id: null },
     });
