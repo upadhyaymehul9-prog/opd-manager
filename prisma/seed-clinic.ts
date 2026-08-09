@@ -22,20 +22,19 @@ async function main() {
     process.exit(1);
   }
 
-  const existing = await prisma.clinic.findUnique({ where: { slug } });
-  if (existing) {
-    console.log(`Clinic "${slug}" already exists (id: ${existing.id}). Skipping.`);
-    console.log(existing.id);
-    return;
-  }
+  let clinic = await prisma.clinic.findUnique({ where: { slug } });
+  let isNew = false;
 
-  const clinic = await prisma.clinic.create({
-    data: {
-      slug,
-      name,
-      status: "active",
-    },
-  });
+  if (!clinic) {
+    clinic = await prisma.clinic.create({
+      data: {
+        slug,
+        name,
+        status: "active",
+      },
+    });
+    isNew = true;
+  }
 
   await withClinicScope(clinic.id, async (tx) => {
     await tx.clinicSettings.upsert({
@@ -50,7 +49,11 @@ async function main() {
     });
   });
 
-  console.log(`Created clinic "${name}" (slug: ${slug})`);
+  if (isNew) {
+    console.log(`Created clinic "${name}" (slug: ${slug})`);
+  } else {
+    console.log(`Clinic "${slug}" already exists (id: ${clinic.id}). ClinicSettings ensured.`);
+  }
   console.log(`CLINIC_ID=${clinic.id}`);
 }
 
