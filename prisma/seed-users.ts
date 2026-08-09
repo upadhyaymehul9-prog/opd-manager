@@ -15,20 +15,20 @@ const DEFAULT_USERS = [
 ] as const;
 
 async function main() {
-  const password =
-    process.env.SEED_USER_PASSWORD?.trim() || "Clinic@2026";
+  const clinicId = process.env.CLINIC_ID;
+  if (!clinicId) {
+    console.error("CLINIC_ID env var is required (see: npm run db:seed-clinic)");
+    process.exit(1);
+  }
 
+  const password = process.env.SEED_USER_PASSWORD?.trim() || "Clinic@2026";
   const hash = await bcrypt.hash(password, 12);
 
-  // On re-run this must never touch password_hash/must_change_password for
-  // an account that already exists -- someone may have already set their
-  // own password, and silently resetting it back to the shared default
-  // would undo that (and re-force a change on an account that doesn't need
-  // one). Only brand-new accounts get the default password.
   for (const user of DEFAULT_USERS) {
     await prisma.user.upsert({
-      where: { username: user.username },
+      where: { clinic_id_username: { clinic_id: clinicId, username: user.username } },
       create: {
+        clinic_id: clinicId,
         username: user.username,
         password_hash: hash,
         role: user.role,
@@ -42,7 +42,7 @@ async function main() {
     });
   }
 
-  console.log("Seeded clinic login accounts (existing passwords left untouched):");
+  console.log(`Seeded clinic login accounts for clinic ${clinicId} (existing passwords left untouched):`);
   for (const user of DEFAULT_USERS) {
     console.log(`  ${user.username} / ${password}  (${user.display_name}) -- only applies if newly created`);
   }

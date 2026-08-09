@@ -16,10 +16,17 @@ const MEDICINES: SeedMedicine[] = JSON.parse(
 );
 
 async function main() {
+  const clinicId = process.env.CLINIC_ID;
+  if (!clinicId) {
+    console.error("CLINIC_ID env var is required (see: npm run db:seed-clinic)");
+    process.exit(1);
+  }
+
   let created = 0;
   for (const med of MEDICINES) {
     const existing = await prisma.medicine.findFirst({
       where: {
+        clinic_id: clinicId,
         name: { equals: med.name, mode: "insensitive" },
         brand: med.brand ?? null,
         form: med.form ?? null,
@@ -30,6 +37,7 @@ async function main() {
 
     await prisma.medicine.create({
       data: {
+        clinic_id: clinicId,
         name: med.name,
         brand: med.brand ?? null,
         form: med.form ?? null,
@@ -39,7 +47,7 @@ async function main() {
     created += 1;
   }
 
-  const total = await prisma.medicine.count({ where: { is_active: true } });
+  const total = await prisma.medicine.count({ where: { clinic_id: clinicId, is_active: true } });
   console.log(`Seeded ${created} new medicine(s). Catalog has ${total} active items.`);
 }
 
