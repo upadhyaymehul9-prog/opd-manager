@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { AppError, errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
+import { withClinicScope } from "@/lib/tenant";
 import {
   AUDIT_ACTIONS,
   diffFields,
@@ -9,7 +11,6 @@ import {
 } from "@/lib/audit";
 import { assertVisitReadyForDischarge } from "@/lib/discharge-gates";
 import { visitInclude } from "@/lib/db-includes";
-import { prisma } from "@/lib/prisma";
 import { serializeVisit } from "@/lib/serialize";
 import {
   assertStatusTransition,
@@ -18,12 +19,14 @@ import {
 import type { PatientStatus, UpdatePatientInput } from "@/lib/types";
 import type { UserRole } from "@/lib/auth-types";
 
-async function loadVisitLite(visitId: string) {
-  return prisma.patientVisit.findUnique({ where: { id: visitId } });
+type Tx = Prisma.TransactionClient;
+
+async function loadVisitLite(tx: Tx, visitId: string) {
+  return tx.patientVisit.findUnique({ where: { id: visitId } });
 }
 
-async function loadDischargeContext(visitId: string) {
-  return prisma.patientVisit.findUnique({
+async function loadDischargeContext(tx: Tx, visitId: string) {
+  return tx.patientVisit.findUnique({
     where: { id: visitId },
     include: {
       prescription: {
@@ -59,176 +62,183 @@ export async function PATCH(
       status = "in_followup";
     }
 
-    // Heavy joins only when discharging — normal status clicks stay fast.
-    const existing =
-      status === "completed"
-        ? await loadDischargeContext(id)
-        : await loadVisitLite(id);
-    if (!existing) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-
     const role = session.role as UserRole;
 
-    if (body.medico_legal !== undefined && !clinicalRolesMayEditVisitMeta(role)) {
-      throw new AppError("Only clinical staff can set medico-legal flag", 403);
-    }
-    if (body.doctor_id && !clinicalRolesMayEditVisitMeta(role)) {
-      throw new AppError("Only doctor/reception can reassign a visit's doctor", 403);
-    }
+    const { existing, visit, overrideEmrGate } = await withClinicScope(
+      session.clinicId,
+      async (tx) => {
+        // Heavy joins only when discharging — normal status clicks stay fast.
+        const existing =
+          status === "completed"
+            ? await loadDischargeContext(tx, id)
+            : await loadVisitLite(tx, id);
+        if (!existing) {
+          throw new AppError("Not found", 404);
+        }
 
-    if (status !== undefined && status !== existing.status) {
-      // Prefer the client-facing edge (return_to_doctor) for ACL; stored value may be in_followup.
-      const edgeTo =
-        body.status === "return_to_doctor"
-          ? ("return_to_doctor" as PatientStatus)
-          : status;
-      assertStatusTransition({
-        from: existing.status as PatientStatus,
-        to: edgeTo,
-        role,
-        allowForce: true,
-      });
-    }
+        if (body.medico_legal !== undefined && !clinicalRolesMayEditVisitMeta(role)) {
+          throw new AppError("Only clinical staff can set medico-legal flag", 403);
+        }
+        if (body.doctor_id && !clinicalRolesMayEditVisitMeta(role)) {
+          throw new AppError("Only doctor/reception can reassign a visit's doctor", 403);
+        }
 
-    const overrideEmrGate =
-      Boolean(body.override_emr_gate) &&
-      (role === "doctor" || role === "admin" || role === "manager");
+        if (status !== undefined && status !== existing.status) {
+          // Prefer the client-facing edge (return_to_doctor) for ACL; stored value may be in_followup.
+          const edgeTo =
+            body.status === "return_to_doctor"
+              ? ("return_to_doctor" as PatientStatus)
+              : status;
+          assertStatusTransition({
+            from: existing.status as PatientStatus,
+            to: edgeTo,
+            role,
+            allowForce: true,
+          });
+        }
 
-    if (status === "completed") {
-      const full = existing as NonNullable<
-        Awaited<ReturnType<typeof loadDischargeContext>>
-      >;
-      assertVisitReadyForDischarge({
-        visit: full,
-        prescriptionItems: full.prescription?.items ?? null,
-        hasPharmacyBill: Boolean(full.pharmacy_bill),
-        hasMlcRecord: Boolean(full.mlc_record),
-        pendingLabTests: full.lab_tests.length,
-        overrideEmrGate,
-      });
-    }
+        const overrideEmrGate =
+          Boolean(body.override_emr_gate) &&
+          (role === "doctor" || role === "admin" || role === "manager");
 
-    const now = new Date();
-    const data: Record<string, unknown> = {
-      ...(status !== undefined && { status }),
-      ...(body.medico_legal !== undefined && { medico_legal: body.medico_legal }),
-      ...(body.room_number !== undefined &&
-        clinicalRolesMayEditVisitMeta(role) && { room_number: body.room_number }),
-      ...(body.lab_eta !== undefined && {
-        lab_eta: body.lab_eta ? new Date(body.lab_eta) : null,
-      }),
-      ...(body.radio_eta !== undefined && {
-        radio_eta: body.radio_eta ? new Date(body.radio_eta) : null,
-      }),
-    };
+        if (status === "completed") {
+          const full = existing as NonNullable<
+            Awaited<ReturnType<typeof loadDischargeContext>>
+          >;
+          assertVisitReadyForDischarge({
+            visit: full,
+            prescriptionItems: full.prescription?.items ?? null,
+            hasPharmacyBill: Boolean(full.pharmacy_bill),
+            hasMlcRecord: Boolean(full.mlc_record),
+            pendingLabTests: full.lab_tests.length,
+            overrideEmrGate,
+          });
+        }
 
-    if (clinicalRolesMayEditVisitMeta(role)) {
-      if (body.patient_name !== undefined) {
-        const name = String(body.patient_name ?? "").trim();
-        if (!name) throw new AppError("Patient name is required", 400);
-        data.patient_name = name;
-      }
-      if (body.age !== undefined) {
-        data.age =
-          body.age != null && Number(body.age) >= 0
-            ? Math.round(Number(body.age))
-            : null;
-      }
-      if (body.mobile !== undefined) {
-        data.mobile = body.mobile?.trim() || null;
-      }
-      if (body.address !== undefined) {
-        data.address = body.address?.trim() || null;
-      }
-      if (body.gender !== undefined) {
-        data.gender = body.gender?.trim() || null;
-      }
-    }
-
-    if (status === "to_lab") data.lab_referred = true;
-    if (status === "to_radiology") data.radio_referred = true;
-    if (status === "completed") data.completed_at = now;
-
-    if (
-      status === "lab_calling" ||
-      status === "at_lab" ||
-      status === "lab_processing" ||
-      status === "lab_ready"
-    ) {
-      if (!existing.lab_started_at) data.lab_started_at = now;
-    }
-    if (status === "lab_ready") data.lab_ready_at = now;
-
-    if (
-      status === "radio_calling" ||
-      status === "at_radiology" ||
-      status === "radio_processing" ||
-      status === "radio_ready"
-    ) {
-      if (!existing.radio_started_at) data.radio_started_at = now;
-    }
-    if (status === "radio_ready") data.radio_ready_at = now;
-
-    if (body.doctor_id && body.doctor_id !== existing.doctor_id) {
-      const newDoctor = await prisma.doctor.findUnique({
-        where: { id: body.doctor_id },
-        select: { room_number: true },
-      });
-      if (!newDoctor) {
-        throw new AppError("Doctor not found", 404);
-      }
-      data.doctor_id = body.doctor_id;
-      data.room_number = newDoctor.room_number;
-      const earlyDoctorStatuses = [
-        "registered",
-        "calling",
-        "in_consultation",
-        "in_followup",
-        "return_to_doctor",
-      ];
-      if (earlyDoctorStatuses.includes(existing.status)) {
-        data.status = "registered";
-      }
-      await prisma.prescription.updateMany({
-        where: { patient_visit_id: id },
-        data: { doctor_id: body.doctor_id },
-      });
-    }
-
-    // Keep the permanent patient file in sync when visit demographics change.
-    if (
-      existing.patient_id &&
-      clinicalRolesMayEditVisitMeta(role) &&
-      (body.patient_name !== undefined ||
-        body.mobile !== undefined ||
-        body.address !== undefined ||
-        body.gender !== undefined)
-    ) {
-      await prisma.patient.update({
-        where: { id: existing.patient_id },
-        data: {
-          ...(body.patient_name !== undefined && {
-            name: String(body.patient_name).trim(),
+        const now = new Date();
+        const data: Record<string, unknown> = {
+          ...(status !== undefined && { status }),
+          ...(body.medico_legal !== undefined && { medico_legal: body.medico_legal }),
+          ...(body.room_number !== undefined &&
+            clinicalRolesMayEditVisitMeta(role) && { room_number: body.room_number }),
+          ...(body.lab_eta !== undefined && {
+            lab_eta: body.lab_eta ? new Date(body.lab_eta) : null,
           }),
-          ...(body.mobile !== undefined && {
-            mobile: body.mobile?.trim() || null,
+          ...(body.radio_eta !== undefined && {
+            radio_eta: body.radio_eta ? new Date(body.radio_eta) : null,
           }),
-          ...(body.address !== undefined && {
-            address: body.address?.trim() || null,
-          }),
-          ...(body.gender !== undefined && {
-            gender: body.gender?.trim() || null,
-          }),
-        },
-      });
-    }
+        };
 
-    const visit = await prisma.patientVisit.update({
-      where: { id },
-      data,
-      include: visitInclude,
-    });
+        if (clinicalRolesMayEditVisitMeta(role)) {
+          if (body.patient_name !== undefined) {
+            const name = String(body.patient_name ?? "").trim();
+            if (!name) throw new AppError("Patient name is required", 400);
+            data.patient_name = name;
+          }
+          if (body.age !== undefined) {
+            data.age =
+              body.age != null && Number(body.age) >= 0
+                ? Math.round(Number(body.age))
+                : null;
+          }
+          if (body.mobile !== undefined) {
+            data.mobile = body.mobile?.trim() || null;
+          }
+          if (body.address !== undefined) {
+            data.address = body.address?.trim() || null;
+          }
+          if (body.gender !== undefined) {
+            data.gender = body.gender?.trim() || null;
+          }
+        }
+
+        if (status === "to_lab") data.lab_referred = true;
+        if (status === "to_radiology") data.radio_referred = true;
+        if (status === "completed") data.completed_at = now;
+
+        if (
+          status === "lab_calling" ||
+          status === "at_lab" ||
+          status === "lab_processing" ||
+          status === "lab_ready"
+        ) {
+          if (!existing.lab_started_at) data.lab_started_at = now;
+        }
+        if (status === "lab_ready") data.lab_ready_at = now;
+
+        if (
+          status === "radio_calling" ||
+          status === "at_radiology" ||
+          status === "radio_processing" ||
+          status === "radio_ready"
+        ) {
+          if (!existing.radio_started_at) data.radio_started_at = now;
+        }
+        if (status === "radio_ready") data.radio_ready_at = now;
+
+        if (body.doctor_id && body.doctor_id !== existing.doctor_id) {
+          const newDoctor = await tx.doctor.findUnique({
+            where: { id: body.doctor_id },
+            select: { room_number: true },
+          });
+          if (!newDoctor) {
+            throw new AppError("Doctor not found", 404);
+          }
+          data.doctor_id = body.doctor_id;
+          data.room_number = newDoctor.room_number;
+          const earlyDoctorStatuses = [
+            "registered",
+            "calling",
+            "in_consultation",
+            "in_followup",
+            "return_to_doctor",
+          ];
+          if (earlyDoctorStatuses.includes(existing.status)) {
+            data.status = "registered";
+          }
+          await tx.prescription.updateMany({
+            where: { patient_visit_id: id },
+            data: { doctor_id: body.doctor_id },
+          });
+        }
+
+        // Keep the permanent patient file in sync when visit demographics change.
+        if (
+          existing.patient_id &&
+          clinicalRolesMayEditVisitMeta(role) &&
+          (body.patient_name !== undefined ||
+            body.mobile !== undefined ||
+            body.address !== undefined ||
+            body.gender !== undefined)
+        ) {
+          await tx.patient.update({
+            where: { id: existing.patient_id },
+            data: {
+              ...(body.patient_name !== undefined && {
+                name: String(body.patient_name).trim(),
+              }),
+              ...(body.mobile !== undefined && {
+                mobile: body.mobile?.trim() || null,
+              }),
+              ...(body.address !== undefined && {
+                address: body.address?.trim() || null,
+              }),
+              ...(body.gender !== undefined && {
+                gender: body.gender?.trim() || null,
+              }),
+            },
+          });
+        }
+
+        const visit = await tx.patientVisit.update({
+          where: { id },
+          data,
+          include: visitInclude,
+        });
+
+        return { existing, visit, overrideEmrGate };
+      },
+    );
 
     const diff = diffFields(
       existing as unknown as Record<string, unknown>,
@@ -276,12 +286,15 @@ export async function GET(
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const { id } = await params;
-    const visit = await prisma.patientVisit.findUnique({
-      where: { id },
-      include: visitInclude,
-    });
+    const visit = await withClinicScope(session.clinicId, (tx) =>
+      tx.patientVisit.findUnique({
+        where: { id },
+        include: visitInclude,
+      }),
+    );
 
     if (!visit) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -311,51 +324,52 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    const existing = await prisma.patientVisit.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        patient_name: true,
-        token_number: true,
-        status: true,
-        pharmacy_bill: { select: { id: true } },
-        consent: { select: { id: true } },
-        mlc_record: true,
-        prescription: {
-          select: {
-            id: true,
-            doctor_id: true,
-            notes: true,
-            status: true,
-            sent_to_pharmacy_at: true,
-            created_at: true,
-            pharmacy_bill: { select: { id: true } },
-            items: true,
+
+    await withClinicScope(session.clinicId, async (tx) => {
+      const existing = await tx.patientVisit.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          patient_name: true,
+          token_number: true,
+          status: true,
+          pharmacy_bill: { select: { id: true } },
+          consent: { select: { id: true } },
+          mlc_record: true,
+          prescription: {
+            select: {
+              id: true,
+              doctor_id: true,
+              notes: true,
+              status: true,
+              sent_to_pharmacy_at: true,
+              created_at: true,
+              pharmacy_bill: { select: { id: true } },
+              items: true,
+            },
           },
+          procedures: true,
+          lab_tests: true,
+          emr_revisions: { select: { id: true, snapshot: true, changed_by: true, created_at: true } },
         },
-        procedures: true,
-        lab_tests: true,
-        emr_revisions: { select: { id: true, snapshot: true, changed_by: true, created_at: true } },
-      },
-    });
+      });
 
-    if (!existing) {
-      return NextResponse.json({ error: "Visit not found" }, { status: 404 });
-    }
+      if (!existing) {
+        throw new AppError("Visit not found", 404);
+      }
 
-    if (existing.pharmacy_bill || existing.prescription?.pharmacy_bill) {
-      throw new AppError(
-        "Cannot delete visit with a pharmacy bill — voiding financial records is not allowed",
-        409,
-      );
-    }
+      if (existing.pharmacy_bill || existing.prescription?.pharmacy_bill) {
+        throw new AppError(
+          "Cannot delete visit with a pharmacy bill — voiding financial records is not allowed",
+          409,
+        );
+      }
 
-    // Nothing here is silently discarded: MLC, EMR history, lab tests, and
-    // the prescription are all snapshotted into the append-only audit log
-    // in the SAME transaction as the delete (via logAuditTx), so either both
-    // the archive and the delete succeed, or neither does — a failed audit
-    // write can no longer leave data destroyed with no trace.
-    await prisma.$transaction(async (tx) => {
+      // Nothing here is silently discarded: MLC, EMR history, lab tests, and
+      // the prescription are all snapshotted into the append-only audit log
+      // in the SAME transaction as the delete (via logAuditTx), so either both
+      // the archive and the delete succeed, or neither does — a failed audit
+      // write can no longer leave data destroyed with no trace.
       if (existing.mlc_record) {
         await tx.mlcRecordRevision.deleteMany({
           where: { mlc_record_id: existing.mlc_record.id },

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { AppError, errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
 import { computePrescriptionStatus } from "@/lib/prescription-status";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 import { serializePrescription } from "@/lib/serialize";
 import type { PrescriptionItemInput } from "@/lib/prescription-types";
 
@@ -16,11 +16,13 @@ const prescriptionInclude = {
 const EDITABLE_RX_STATUSES = ["draft", "sent_to_pharmacy", "partially_dispensed"];
 
 function itemData(
+  clinicId: string,
   prescriptionId: string,
   item: PrescriptionItemInput,
   index: number,
 ) {
   return {
+    clinic_id: clinicId,
     prescription_id: prescriptionId,
     medicine_id: item.medicine_id || null,
     medicine_name: item.medicine_name.trim(),
@@ -41,6 +43,10 @@ function itemData(
 
 export async function GET(request: Request) {
   try {
+    const guard = await requireApi(request);
+    if (guard.response) return guard.response;
+    const { session } = guard;
+
     const { searchParams } = new URL(request.url);
     const visitId = searchParams.get("visit_id")?.trim();
 
@@ -51,10 +57,12 @@ export async function GET(request: Request) {
       );
     }
 
-    const prescription = await prisma.prescription.findUnique({
-      where: { patient_visit_id: visitId },
-      include: prescriptionInclude,
-    });
+    const prescription = await withClinicScope(session.clinicId, (tx) =>
+      tx.prescription.findUnique({
+        where: { patient_visit_id: visitId },
+        include: prescriptionInclude,
+      }),
+    );
 
     if (!prescription) {
       return NextResponse.json(null);
@@ -94,22 +102,20 @@ export async function POST(request: Request) {
       );
     }
 
-    const existing = await prisma.prescription.findUnique({
-      where: { patient_visit_id },
-      include: prescriptionInclude,
-    });
+    const prescription = await withClinicScope(session.clinicId, async (tx) => {
+      const existing = await tx.prescription.findUnique({
+        where: { patient_visit_id },
+        include: prescriptionInclude,
+      });
 
-    if (existing && !EDITABLE_RX_STATUSES.includes(existing.status)) {
-      return NextResponse.json(
-        { error: "Prescription is closed — all medicines dispensed" },
-        { status: 400 },
-      );
-    }
+      if (existing && !EDITABLE_RX_STATUSES.includes(existing.status)) {
+        throw new AppError("Prescription is closed — all medicines dispensed");
+      }
 
-    const prescription = await prisma.$transaction(async (tx) => {
       const rx = await tx.prescription.upsert({
         where: { patient_visit_id },
         create: {
+          clinic_id: session.clinicId,
           patient_visit_id,
           doctor_id,
           notes: notes?.trim() || null,
@@ -163,16 +169,16 @@ export async function POST(request: Request) {
             if (cur) {
               await tx.prescriptionItem.update({
                 where: { id: item.id },
-                data: itemData(rx.id, item, order),
+                data: itemData(session.clinicId, rx.id, item, order),
               });
             } else {
               await tx.prescriptionItem.create({
-                data: itemData(rx.id, item, order),
+                data: itemData(session.clinicId, rx.id, item, order),
               });
             }
           } else {
             await tx.prescriptionItem.create({
-              data: itemData(rx.id, item, order),
+              data: itemData(session.clinicId, rx.id, item, order),
             });
           }
           order += 1;
@@ -195,7 +201,7 @@ export async function POST(request: Request) {
 
         for (const [index, item] of items.entries()) {
           await tx.prescriptionItem.create({
-            data: itemData(rx.id, item, index),
+            data: itemData(session.clinicId, rx.id, item, index),
           });
         }
       }

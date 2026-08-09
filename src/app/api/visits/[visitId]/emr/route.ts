@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-error";
 import { requireApi } from "@/lib/api-guard";
-import { prisma } from "@/lib/prisma";
+import { withClinicScope } from "@/lib/tenant";
 import { serializeVisitEmr, visitEmrSelect } from "@/lib/emr";
 import { findIcd10ByCode } from "@/lib/icd10";
 import { AUDIT_ACTIONS, diffFields, logAudit } from "@/lib/audit";
@@ -18,12 +18,15 @@ export async function GET(
   try {
     const guard = await requireApi(request);
     if (guard.response) return guard.response;
+    const { session } = guard;
 
     const { visitId } = await params;
-    const visit = await prisma.patientVisit.findUnique({
-      where: { id: visitId },
-      select: visitEmrSelect,
-    });
+    const visit = await withClinicScope(session.clinicId, (tx) =>
+      tx.patientVisit.findUnique({
+        where: { id: visitId },
+        select: visitEmrSelect,
+      }),
+    );
 
     if (!visit) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -47,134 +50,129 @@ export async function PATCH(
     const { visitId } = await params;
     const body = (await request.json()) as UpdateVisitEmrInput;
 
-    const existing = await prisma.patientVisit.findUnique({
-      where: { id: visitId },
-      select: { ...visitEmrSelect, medico_legal: true, status: true },
-    });
+    const outcome = await withClinicScope(session.clinicId, async (tx) => {
+      const existing = await tx.patientVisit.findUnique({
+        where: { id: visitId },
+        select: { ...visitEmrSelect, medico_legal: true, status: true },
+      });
 
-    if (!existing) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-
-    // A completed/discharged visit's signed record is final. Only
-    // admin/manager can amend it afterwards (e.g. to correct an error),
-    // and doing so re-stamps the signature below so the change is traceable.
-    if (existing.status === "completed" && session?.role !== "admin" && session?.role !== "manager") {
-      return NextResponse.json(
-        { error: "Visit is completed — ask a manager/admin to amend a signed record" },
-        { status: 403 },
-      );
-    }
-
-    const visitData: Record<string, unknown> = {};
-
-    if (body.chief_complaint !== undefined) {
-      visitData.chief_complaint = trimOrNull(body.chief_complaint);
-    }
-    if (body.provisional_diagnosis !== undefined) {
-      visitData.provisional_diagnosis = trimOrNull(body.provisional_diagnosis);
-    }
-    if (body.final_diagnosis !== undefined) {
-      const finalDx = trimOrNull(body.final_diagnosis);
-      visitData.final_diagnosis = finalDx;
-      visitData.diagnosis = finalDx;
-    }
-    if (body.icd_code !== undefined) {
-      const rawCode = trimOrNull(body.icd_code);
-      if (rawCode === null) {
-        visitData.icd_code = null;
-        visitData.icd_description = null;
-      } else {
-        const entry = findIcd10ByCode(rawCode);
-        if (!entry) {
-          return NextResponse.json(
-            { error: `Unknown ICD-10 code: ${rawCode}` },
-            { status: 400 },
-          );
-        }
-        visitData.icd_code = entry.code;
-        visitData.icd_description = entry.description;
+      if (!existing) {
+        return { kind: "not_found" as const };
       }
-    }
-    if (body.diagnosis !== undefined && body.final_diagnosis === undefined) {
-      const dx = trimOrNull(body.diagnosis);
-      visitData.diagnosis = dx;
-      visitData.final_diagnosis = dx;
-    }
-    if (body.examination_notes !== undefined) {
-      visitData.examination_notes = trimOrNull(body.examination_notes);
-    }
-    if (body.advice !== undefined) visitData.advice = trimOrNull(body.advice);
-    if (body.lifestyle_advice !== undefined) {
-      visitData.lifestyle_advice = trimOrNull(body.lifestyle_advice);
-    }
-    if (body.investigations_ordered !== undefined) {
-      visitData.investigations_ordered = trimOrNull(body.investigations_ordered);
-    }
-    if (body.follow_up_instructions !== undefined) {
-      visitData.follow_up_instructions = trimOrNull(body.follow_up_instructions);
-    }
-    if (body.referral_notes !== undefined) {
-      visitData.referral_notes = trimOrNull(body.referral_notes);
-    }
-    if (body.follow_up_date !== undefined) {
-      visitData.follow_up_date = body.follow_up_date
-        ? new Date(body.follow_up_date)
-        : null;
-    }
-    if (body.mlc_details !== undefined) {
-      visitData.mlc_details = body.mlc_details?.trim() || null;
-      if (body.mlc_details?.trim()) visitData.medico_legal = true;
-    }
-    if (body.vitals_bp !== undefined) visitData.vitals_bp = trimOrNull(body.vitals_bp);
-    if (body.vitals_pulse !== undefined) {
-      visitData.vitals_pulse =
-        body.vitals_pulse != null && body.vitals_pulse > 0
-          ? Math.round(body.vitals_pulse)
-          : null;
-    }
-    if (body.vitals_temp !== undefined) {
-      visitData.vitals_temp =
-        body.vitals_temp != null && body.vitals_temp > 0 ? body.vitals_temp : null;
-    }
-    if (body.vitals_weight !== undefined) {
-      visitData.vitals_weight =
-        body.vitals_weight != null && body.vitals_weight > 0
-          ? body.vitals_weight
-          : null;
-    }
-    if (body.vitals_height_cm !== undefined) {
-      visitData.vitals_height_cm =
-        body.vitals_height_cm != null && body.vitals_height_cm > 0
-          ? body.vitals_height_cm
-          : null;
-    }
-    if (body.vitals_spo2 !== undefined) {
-      visitData.vitals_spo2 =
-        body.vitals_spo2 != null && body.vitals_spo2 > 0
-          ? Math.min(100, Math.round(body.vitals_spo2))
-          : null;
-    }
-    if (body.vitals_rbs !== undefined) {
-      visitData.vitals_rbs =
-        body.vitals_rbs != null && body.vitals_rbs > 0 ? body.vitals_rbs : null;
-    }
 
-    const hasClinicalChanges = Object.keys(visitData).length > 0;
+      // A completed/discharged visit's signed record is final. Only
+      // admin/manager can amend it afterwards (e.g. to correct an error),
+      // and doing so re-stamps the signature below so the change is traceable.
+      if (existing.status === "completed" && session?.role !== "admin" && session?.role !== "manager") {
+        return { kind: "forbidden" as const };
+      }
 
-    if (session && hasClinicalChanges) {
-      visitData.signed_at = new Date();
-      visitData.signed_by = session.displayName || session.username;
-      visitData.signed_by_role = session.role;
-    }
+      const visitData: Record<string, unknown> = {};
 
-    const result = await prisma.$transaction(async (tx) => {
+      if (body.chief_complaint !== undefined) {
+        visitData.chief_complaint = trimOrNull(body.chief_complaint);
+      }
+      if (body.provisional_diagnosis !== undefined) {
+        visitData.provisional_diagnosis = trimOrNull(body.provisional_diagnosis);
+      }
+      if (body.final_diagnosis !== undefined) {
+        const finalDx = trimOrNull(body.final_diagnosis);
+        visitData.final_diagnosis = finalDx;
+        visitData.diagnosis = finalDx;
+      }
+      if (body.icd_code !== undefined) {
+        const rawCode = trimOrNull(body.icd_code);
+        if (rawCode === null) {
+          visitData.icd_code = null;
+          visitData.icd_description = null;
+        } else {
+          const entry = findIcd10ByCode(rawCode);
+          if (!entry) {
+            return { kind: "bad_icd" as const, code: rawCode };
+          }
+          visitData.icd_code = entry.code;
+          visitData.icd_description = entry.description;
+        }
+      }
+      if (body.diagnosis !== undefined && body.final_diagnosis === undefined) {
+        const dx = trimOrNull(body.diagnosis);
+        visitData.diagnosis = dx;
+        visitData.final_diagnosis = dx;
+      }
+      if (body.examination_notes !== undefined) {
+        visitData.examination_notes = trimOrNull(body.examination_notes);
+      }
+      if (body.advice !== undefined) visitData.advice = trimOrNull(body.advice);
+      if (body.lifestyle_advice !== undefined) {
+        visitData.lifestyle_advice = trimOrNull(body.lifestyle_advice);
+      }
+      if (body.investigations_ordered !== undefined) {
+        visitData.investigations_ordered = trimOrNull(body.investigations_ordered);
+      }
+      if (body.follow_up_instructions !== undefined) {
+        visitData.follow_up_instructions = trimOrNull(body.follow_up_instructions);
+      }
+      if (body.referral_notes !== undefined) {
+        visitData.referral_notes = trimOrNull(body.referral_notes);
+      }
+      if (body.follow_up_date !== undefined) {
+        visitData.follow_up_date = body.follow_up_date
+          ? new Date(body.follow_up_date)
+          : null;
+      }
+      if (body.mlc_details !== undefined) {
+        visitData.mlc_details = body.mlc_details?.trim() || null;
+        if (body.mlc_details?.trim()) visitData.medico_legal = true;
+      }
+      if (body.vitals_bp !== undefined) visitData.vitals_bp = trimOrNull(body.vitals_bp);
+      if (body.vitals_pulse !== undefined) {
+        visitData.vitals_pulse =
+          body.vitals_pulse != null && body.vitals_pulse > 0
+            ? Math.round(body.vitals_pulse)
+            : null;
+      }
+      if (body.vitals_temp !== undefined) {
+        visitData.vitals_temp =
+          body.vitals_temp != null && body.vitals_temp > 0 ? body.vitals_temp : null;
+      }
+      if (body.vitals_weight !== undefined) {
+        visitData.vitals_weight =
+          body.vitals_weight != null && body.vitals_weight > 0
+            ? body.vitals_weight
+            : null;
+      }
+      if (body.vitals_height_cm !== undefined) {
+        visitData.vitals_height_cm =
+          body.vitals_height_cm != null && body.vitals_height_cm > 0
+            ? body.vitals_height_cm
+            : null;
+      }
+      if (body.vitals_spo2 !== undefined) {
+        visitData.vitals_spo2 =
+          body.vitals_spo2 != null && body.vitals_spo2 > 0
+            ? Math.min(100, Math.round(body.vitals_spo2))
+            : null;
+      }
+      if (body.vitals_rbs !== undefined) {
+        visitData.vitals_rbs =
+          body.vitals_rbs != null && body.vitals_rbs > 0 ? body.vitals_rbs : null;
+      }
+
+      const hasClinicalChanges = Object.keys(visitData).length > 0;
+
+      if (session && hasClinicalChanges) {
+        visitData.signed_at = new Date();
+        visitData.signed_by = session.displayName || session.username;
+        visitData.signed_by_role = session.role;
+      }
+
       // Snapshot the clinical fields as they stood before this edit so the
       // prior version is retained forever — corrections append, they never
       // overwrite history.
       if (hasClinicalChanges) {
         await tx.visitEmrRevision.create({
           data: {
+            clinic_id: session.clinicId,
             patient_visit_id: visitId,
             snapshot: JSON.stringify(serializeVisitEmr(existing)),
             changed_by: session?.displayName || session?.username || "unknown",
@@ -200,12 +198,32 @@ export async function PATCH(
         });
       }
 
-      return tx.patientVisit.update({
+      const result = await tx.patientVisit.update({
         where: { id: visitId },
         data: visitData,
         select: visitEmrSelect,
       });
+
+      return { kind: "ok" as const, existing, result };
     });
+
+    if (outcome.kind === "not_found") {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    if (outcome.kind === "forbidden") {
+      return NextResponse.json(
+        { error: "Visit is completed — ask a manager/admin to amend a signed record" },
+        { status: 403 },
+      );
+    }
+    if (outcome.kind === "bad_icd") {
+      return NextResponse.json(
+        { error: `Unknown ICD-10 code: ${outcome.code}` },
+        { status: 400 },
+      );
+    }
+
+    const { existing, result } = outcome;
 
     const diff = diffFields(existing, result, [
       "chief_complaint",
