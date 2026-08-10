@@ -68,6 +68,21 @@ function isPublicFeedbackSubmit(pathname: string, method: string) {
   return pathname === "/api/feedback" && method === "POST";
 }
 
+// A session is host-scoped (cookies don't cross subdomains), so this is not
+// a cross-tenant data leak -- but without this check, a user holding a valid
+// session for a since-suspended clinic could keep using that session while
+// visiting a different, active clinic's subdomain: the suspension check
+// above only inspects the clinic being *visited*, never the session's own
+// clinic, so downstream handlers would still trust session.clinicId and
+// serve that user's own (nominally suspended) clinic's data. `clinicId` is
+// null on the base domain, where no reconciliation is meaningful.
+export function clinicSessionMismatch(
+  clinicId: string | null,
+  sessionClinicId: string,
+): boolean {
+  return clinicId !== null && sessionClinicId !== clinicId;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -108,6 +123,15 @@ export async function proxy(request: NextRequest) {
     }
     if (pathname === "/") {
       return nextWithClinic(request, clinicId);
+    }
+    const login = new URL("/login", request.url);
+    login.searchParams.set("next", pathname);
+    return NextResponse.redirect(login);
+  }
+
+  if (clinicSessionMismatch(clinicId, session.clinicId)) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const login = new URL("/login", request.url);
     login.searchParams.set("next", pathname);
