@@ -62,7 +62,7 @@ model Patient {
   address        String?
   allergies      String?
   blood_group    String?
-  abha_id        String?        @unique
+  abha_id        String?
   gender         String?
   emergency_contact String?
   date_of_birth  DateTime?      @db.Date
@@ -94,6 +94,7 @@ model Patient {
   @@index([merged_into_patient_id])
   @@index([clinic_id])
   @@unique([clinic_id, patient_number])
+  @@unique([clinic_id, abha_id])
   @@map("patients")
 }
 

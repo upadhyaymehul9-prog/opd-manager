@@ -41,12 +41,14 @@ export async function findOrCreatePatient(
   const date_of_birth = input.date_of_birth ?? null;
 
   if (abha_id) {
-    // This lookup has no clinic_id in its WHERE clause, but every caller now
-    // runs inside withClinicScope (Task 9), so Postgres RLS (tenant_isolation
-    // policy, enable_rls migration) restricts it to the current clinic at the
-    // database level regardless of the app-level filter. The gap tracked here
-    // pending that migration is closed.
-    const byAbha = await tx.patient.findUnique({ where: { abha_id } });
+    // abha_id is scoped per clinic (@@unique([clinic_id, abha_id])) -- the
+    // same ABHA ID may exist at a different clinic as an independent patient
+    // record. RLS (tenant_isolation policy, enable_rls migration) also
+    // restricts this to the current clinic at the database level regardless
+    // of the app-level filter, since every caller runs inside withClinicScope.
+    const byAbha = await tx.patient.findUnique({
+      where: { clinic_id_abha_id: { clinic_id: clinicId, abha_id } },
+    });
     if (byAbha) {
       const canonicalId = await resolveCanonicalPatientIdTx(tx, byAbha.id);
       const patient =
