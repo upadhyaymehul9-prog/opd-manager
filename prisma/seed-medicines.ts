@@ -23,9 +23,12 @@ async function main() {
     process.exit(1);
   }
 
+  // One withClinicScope transaction per medicine, not one transaction for
+  // the whole ~140-item catalog -- Prisma's default interactive-transaction
+  // timeout (5s) is easily exceeded by that many sequential round trips.
   let created = 0;
-  await withClinicScope(clinicId, async (tx) => {
-    for (const med of MEDICINES) {
+  for (const med of MEDICINES) {
+    const wasCreated = await withClinicScope(clinicId, async (tx) => {
       const existing = await tx.medicine.findFirst({
         where: {
           clinic_id: clinicId,
@@ -35,7 +38,7 @@ async function main() {
           strength: med.strength ?? null,
         },
       });
-      if (existing) continue;
+      if (existing) return false;
 
       await tx.medicine.create({
         data: {
@@ -46,12 +49,15 @@ async function main() {
           strength: med.strength ?? null,
         },
       });
-      created += 1;
-    }
+      return true;
+    });
+    if (wasCreated) created += 1;
+  }
 
-    const total = await tx.medicine.count({ where: { clinic_id: clinicId, is_active: true } });
-    console.log(`Seeded ${created} new medicine(s). Catalog has ${total} active items.`);
-  });
+  const total = await withClinicScope(clinicId, (tx) =>
+    tx.medicine.count({ where: { clinic_id: clinicId, is_active: true } }),
+  );
+  console.log(`Seeded ${created} new medicine(s). Catalog has ${total} active items.`);
 }
 
 main()
