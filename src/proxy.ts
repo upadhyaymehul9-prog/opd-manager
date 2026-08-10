@@ -67,7 +67,7 @@ function isPublicFeedbackSubmit(pathname: string, method: string) {
   return pathname === "/api/feedback" && method === "POST";
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const host = request.headers.get("host") ?? "";
@@ -131,7 +131,7 @@ export async function middleware(request: NextRequest) {
   return nextWithClinic(request, clinicId);
 }
 
-export const config = {
+export const proxyConfig = {
   matcher: ["/((?!.*\\..*).*)"],
   runtime: "nodejs",
 };

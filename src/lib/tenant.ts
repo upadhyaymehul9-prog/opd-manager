@@ -24,10 +24,20 @@ export async function withClinicScope<T>(
   if (!isValidClinicId(clinicId)) {
     throw new Error(`withClinicScope: invalid clinicId "${clinicId}"`);
   }
-  return prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(
-      `SET LOCAL app.clinic_id = '${clinicId}'`,
-    );
-    return fn(tx);
-  });
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRawUnsafe(
+        `SET LOCAL app.clinic_id = '${clinicId}'`,
+      );
+      return fn(tx);
+    },
+    // Prisma's default interactive-transaction timeout (5s) is too tight
+    // for handlers that do several sequential round trips (e.g. patient
+    // registration: token counter, patient lookup/create, visit, consent,
+    // audit log) over a real network connection to Neon -- confirmed by a
+    // live 500 ("Transaction not found... old closed transaction") on
+    // exactly this kind of multi-step handler. 20s gives real handlers
+    // headroom without masking a truly hung query.
+    { timeout: 20_000, maxWait: 10_000 },
+  );
 }
