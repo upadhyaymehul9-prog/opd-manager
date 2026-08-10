@@ -29,23 +29,69 @@ Reception (registered)
 
 Consoles and the TV screen refresh every 3 seconds — fast enough for clinic use.
 
-## Free cloud setup (one-time, ~15 min)
+## Multi-tenant setup (one-time, ~15 min)
+
+This app is multi-tenant: every clinic's data is isolated by Postgres Row
+Level Security (RLS), scoped by `clinic_id`. RLS only takes effect if **both**
+of the following are done, in order — skipping either produces a
+fully-functional-looking app with **zero data isolation**:
+
+1. The `enable_rls` migration is actually applied (via `prisma migrate
+   deploy`, never `prisma db push`, which skips migration history entirely).
+2. The app's `DATABASE_URL` connects as the `app_user` Postgres role, not
+   Neon's default owner role (see step 3 below) — Neon's default role has
+   `BYPASSRLS`, which makes the RLS policies silently decorative.
 
 ### 1. Neon (database)
 
 1. Create a free account at [neon.tech](https://neon.tech)
-2. **New project** → copy the **connection string** (PostgreSQL)
-3. Use the pooled connection string if offered (better for Vercel)
+2. **New project** → copy the **connection string** (PostgreSQL) and the
+   **direct** (unpooled) connection string
+3. Use the pooled connection string for `DATABASE_URL` and the direct one for
+   `DIRECT_URL` (Prisma needs a direct connection to run migrations)
 
-### 2. Local development
+### 2. Required environment variables
+
+Create `.env.local` (there is no example file to copy — set these directly):
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | Pooled Postgres connection string, used as `app_user` (step 3) once provisioned |
+| `DIRECT_URL` | Unpooled/direct Postgres connection string, used for migrations and role provisioning (owner role) |
+| `SESSION_SECRET` | Long random string for signing session cookies |
+| `NEXT_PUBLIC_BASE_DOMAIN` | Root domain clinics are served under, e.g. `localhost` for local dev or `opdmanager.com` in production |
+| `CLINIC_ID` | Set only when running seed/maintenance scripts (`db:seed`, `db:seed-users`, `db:seed-medicines`, `db:reset-doctors`); comes from `db:seed-clinic`'s output |
+| `SEED_USER_PASSWORD` | Optional — overrides the default seeded staff password (`Clinic@2026`) |
+
+### 3. Apply migrations and provision `app_user`
 
 ```bash
-cp .env.local.example .env.local
-# Paste your Neon DATABASE_URL
-
 npm install
-npm run db:push    # create tables
-npm run db:seed    # add sample doctors
+npx prisma migrate deploy   # applies schema AND the enable_rls policies
+```
+
+Then, connected as the privileged owner role (via `DIRECT_URL`, e.g. through
+the Neon SQL console or `psql "$DIRECT_URL" -f prisma/sql/provision-app-user.sql`
+after filling in a real password), run `prisma/sql/provision-app-user.sql`
+once per database. This creates the `NOBYPASSRLS` `app_user` role the RLS
+design depends on. Do this once per environment (dev, each Neon branch,
+staging, production) — it is a manual, human-run step, not part of
+`migrate deploy`. After it's run, point `DATABASE_URL` at a connection string
+that authenticates as `app_user`.
+
+### 4. Seed a clinic and staff logins
+
+Every other seed script requires a clinic to already exist and `CLINIC_ID` to
+be set — `db:seed-clinic` must run first:
+
+```bash
+npm run db:seed-clinic -- --slug=demo --name="Demo Clinic"
+# copy the printed CLINIC_ID, then:
+export CLINIC_ID=<the-printed-id>   # or set CLINIC_ID in .env.local
+
+npm run db:seed          # sample doctors
+npm run db:seed-users    # staff logins (admin/manager/reception/...)
+npm run db:seed-medicines  # medicine catalog
 npm run dev
 ```
 
@@ -55,25 +101,26 @@ Each clinic is served from its own subdomain, e.g. `<slug>.<NEXT_PUBLIC_BASE_DOM
 Set `NEXT_PUBLIC_BASE_DOMAIN=localhost` in `.env.local` for local dev and visit
 clinics at `http://<slug>.localhost:3000` (e.g. `http://demo.localhost:3000`).
 
-### 3. Deploy to Vercel (free)
+### 5. Deploy to Vercel (free)
 
 1. Push this repo to GitHub
 2. Import project at [vercel.com/new](https://vercel.com/new)
-3. Add `DATABASE_URL` and `NEXT_PUBLIC_BASE_DOMAIN` (your production root domain, e.g. `opdmanager.com`) in Vercel **Settings → Environment Variables**
+3. Add `DATABASE_URL`, `DIRECT_URL`, `SESSION_SECRET`, and
+   `NEXT_PUBLIC_BASE_DOMAIN` (your production root domain, e.g.
+   `opdmanager.com`) in Vercel **Settings → Environment Variables**
 4. Deploy
 
-After deploy, run once locally against production DB (or use Neon SQL console):
-
-```bash
-npm run db:push
-npm run db:seed
-```
+Before the first deploy is usable, run steps 3 and 4 above once against the
+production database (`npx prisma migrate deploy`, provision `app_user`, then
+`db:seed-clinic` + the other seed scripts) — production environment
+provisioning itself (creating the Neon project, setting Vercel env vars) is a
+manual step owned by whoever operates that environment.
 
 Use your Vercel URL on every clinic PC/tablet/TV:
 
-- Reception PC → `https://your-app.vercel.app/reception`
-- Dr. Sharma tablet → `https://your-app.vercel.app/doctor`
-- Waiting room TV → `https://your-app.vercel.app/tv` (press F11 full screen)
+- Reception PC → `https://<slug>.opdmanager.com/reception`
+- Dr. Sharma tablet → `https://<slug>.opdmanager.com/doctor`
+- Waiting room TV → `https://<slug>.opdmanager.com/tv` (press F11 full screen)
 
 ## Staff login (ID + password)
 
@@ -81,7 +128,8 @@ Each hospital gets role-based logins — reception, doctor, lab, etc. cannot ope
 
 ### Create logins
 
-After `db:push`, run:
+After migrations are applied and a clinic exists (see setup steps 3-4 above,
+`CLINIC_ID` set), run:
 
 ```bash
 npm run db:seed-users
@@ -122,7 +170,7 @@ npm run db:seed-medicines   # common medicine catalog for autocomplete
 Track inventory by batch and expiry. Stock deducts automatically when medicines are dispensed.
 
 ```bash
-npm run db:push    # after pull — adds stock_batches table
+npx prisma migrate deploy    # after pull — adds stock_batches table + RLS policy
 ```
 
 **Stock** tab → view levels · **admin/manager/pharmacy** can add new medicines · batch no & expiry **required** when receiving stock  
