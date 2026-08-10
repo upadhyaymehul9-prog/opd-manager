@@ -37,13 +37,16 @@ export async function GET(request: Request) {
           ),
         ];
 
+        const medicines = await tx.medicine.findMany({
+          where: { id: { in: stockedMedicineIds } },
+        });
+        const medicineById = new Map(medicines.map((m) => [m.id, m]));
+
         const lowStock: { medicine: string; available: number }[] = [];
         const depleted: { medicine: string }[] = [];
 
         for (const medicineId of stockedMedicineIds) {
-          const medicine = await tx.medicine.findUnique({
-            where: { id: medicineId },
-          });
+          const medicine = medicineById.get(medicineId);
           if (!medicine) continue;
 
           const usable = batches.filter(

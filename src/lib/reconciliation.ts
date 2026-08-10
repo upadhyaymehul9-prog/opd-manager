@@ -1,6 +1,8 @@
+import type { Prisma } from "@prisma/client";
 import { addDays, dateStrIST, startOfDay } from "@/lib/date-range";
 import { PAYMENT_MODES } from "@/lib/billing-types";
-import { prisma } from "@/lib/prisma";
+
+type Tx = Prisma.TransactionClient;
 
 export type ModeTotal = {
   mode: string;
@@ -60,13 +62,16 @@ function sumByMode(
   }));
 }
 
-export async function buildReconciliation(date: Date): Promise<ReconciliationReport> {
+export async function buildReconciliation(
+  tx: Tx,
+  date: Date,
+): Promise<ReconciliationReport> {
   const dayStart = startOfDay(date);
   const dayEnd = addDays(dayStart, 1);
   const dateStr = dateStrIST(dayStart);
 
   const [consultationVisits, pharmacyBills] = await Promise.all([
-    prisma.patientVisit.findMany({
+    tx.patientVisit.findMany({
       where: {
         consultation_paid_at: { gte: dayStart, lt: dayEnd },
         consultation_fee: { not: null, gt: 0 },
@@ -81,7 +86,7 @@ export async function buildReconciliation(date: Date): Promise<ReconciliationRep
         consultation_paid_at: true,
       },
     }),
-    prisma.pharmacyBill.findMany({
+    tx.pharmacyBill.findMany({
       where: { created_at: { gte: dayStart, lt: dayEnd }, voided_at: null },
       orderBy: { created_at: "asc" },
       include: {

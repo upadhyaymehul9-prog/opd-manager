@@ -51,11 +51,15 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
+Each clinic is served from its own subdomain, e.g. `<slug>.<NEXT_PUBLIC_BASE_DOMAIN>`.
+Set `NEXT_PUBLIC_BASE_DOMAIN=localhost` in `.env.local` for local dev and visit
+clinics at `http://<slug>.localhost:3000` (e.g. `http://demo.localhost:3000`).
+
 ### 3. Deploy to Vercel (free)
 
 1. Push this repo to GitHub
 2. Import project at [vercel.com/new](https://vercel.com/new)
-3. Add `DATABASE_URL` in Vercel **Settings → Environment Variables**
+3. Add `DATABASE_URL` and `NEXT_PUBLIC_BASE_DOMAIN` (your production root domain, e.g. `opdmanager.com`) in Vercel **Settings → Environment Variables**
 4. Deploy
 
 After deploy, run once locally against production DB (or use Neon SQL console):

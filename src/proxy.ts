@@ -53,6 +53,7 @@ async function resolveClinicId(host: string): Promise<{ id: string; status: stri
 
 function nextWithClinic(request: NextRequest, clinicId: string | null) {
   const headers = new Headers(request.headers);
+  headers.delete("x-clinic-id");
   if (clinicId) headers.set("x-clinic-id", clinicId);
   return NextResponse.next({ request: { headers } });
 }

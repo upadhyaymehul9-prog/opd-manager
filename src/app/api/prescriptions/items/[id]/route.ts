@@ -34,6 +34,8 @@ async function runSerializable<T>(
         },
         {
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          timeout: 20_000,
+          maxWait: 10_000,
         },
       );
     } catch (e) {
