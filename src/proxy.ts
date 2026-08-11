@@ -12,21 +12,28 @@ const PUBLIC_PATHS = ["/login", "/api/auth/login", "/feedback"];
 
 const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "localhost";
 
+// Temporary bridge for running without a real custom domain (e.g. the bare
+// opd-manager.vercel.app, which can't host wildcard subdomains — Vercel only
+// supports wildcard/custom-domain routing for domains you actually own).
+// When set, a request with no subdomain is treated as this clinic's
+// subdomain instead of the "no clinic" base-domain case. Remove this env
+// var (and this fallback) once a real domain with subdomain routing exists.
+const DEFAULT_CLINIC_SLUG = process.env.DEFAULT_CLINIC_SLUG || null;
+
 type CachedClinic = { id: string; status: string; expiresAt: number };
 const clinicCache = new Map<string, CachedClinic>();
 const CLINIC_CACHE_TTL_MS = 60_000;
 
-function extractSlug(host: string): string | null {
+export function extractSlug(host: string): string | null {
   const hostname = host.split(":")[0];
-  if (hostname === BASE_DOMAIN || hostname === `www.${BASE_DOMAIN}`) return null;
+  if (hostname === BASE_DOMAIN || hostname === `www.${BASE_DOMAIN}`) {
+    return DEFAULT_CLINIC_SLUG;
+  }
   if (!hostname.endsWith(`.${BASE_DOMAIN}`)) return null;
   return hostname.slice(0, -(`.${BASE_DOMAIN}`.length));
 }
 
-async function resolveClinicId(host: string): Promise<{ id: string; status: string } | null> {
-  const slug = extractSlug(host);
-  if (!slug) return null;
-
+async function resolveClinicId(slug: string): Promise<{ id: string; status: string } | null> {
   // A reserved word can never be claimed by a real clinic — treat it exactly
   // like "not found in the DB" so a reserved subdomain and a genuinely
   // unregistered one are indistinguishable to the caller, at every path.
@@ -98,7 +105,7 @@ export async function proxy(request: NextRequest) {
 
   let clinicId: string | null = null;
   if (slug) {
-    const clinic = await resolveClinicId(host);
+    const clinic = await resolveClinicId(slug);
     if (!clinic || clinic.status === "suspended") {
       return NextResponse.json({ error: "Unknown clinic" }, { status: 404 });
     }
