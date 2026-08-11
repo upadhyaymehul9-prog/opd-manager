@@ -163,7 +163,18 @@ export async function proxy(request: NextRequest) {
   return nextWithClinic(request, clinicId);
 }
 
-export const proxyConfig = {
-  matcher: ["/((?!.*\\..*).*)"],
-  runtime: "nodejs",
+// MUST be named `config` -- Next.js reads this export by name. A differently
+// named export (e.g. `proxyConfig`) is silently ignored, which drops the
+// matcher entirely: Proxy then runs on *every* request including
+// /_next/static/*, where the base-domain guard below 404s them and every
+// asset additionally triggers a clinic DB lookup. That shipped once and
+// took the styling and client JS down in production.
+export const config = {
+  // Exclude Next's own asset routes explicitly rather than relying on a
+  // "path contains a dot" heuristic, so extensionless static chunks can
+  // never be swallowed by the proxy either.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // No `runtime` key: Next 16 rejects route segment config in the Proxy file
+  // ("Proxy always runs on Node.js runtime"), which is why the old Edge
+  // 1MB-bundle workaround is no longer needed here.
 };

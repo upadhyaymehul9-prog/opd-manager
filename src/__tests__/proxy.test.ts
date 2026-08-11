@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clinicSessionMismatch, extractSlug } from "@/proxy";
+import { clinicSessionMismatch, extractSlug, config } from "@/proxy";
 
 const CLINIC_A = "11111111-1111-1111-1111-111111111111";
 const CLINIC_B = "22222222-2222-2222-2222-222222222222";
@@ -20,6 +20,36 @@ describe("clinicSessionMismatch — Finding 4 regression", () => {
 
   it("is a no-op on the base domain, where clinicId is null", () => {
     expect(clinicSessionMismatch(null, CLINIC_A)).toBe(false);
+  });
+});
+
+describe("proxy config export — static asset regression", () => {
+  // Shipping this export under any other name (it was `proxyConfig` once)
+  // makes Next silently ignore it, dropping the matcher so Proxy runs on
+  // /_next/static/* and 404s every CSS/JS chunk in production.
+  it("is exported as `config`, the name Next.js actually reads", () => {
+    expect(config).toBeDefined();
+    expect(Array.isArray(config.matcher)).toBe(true);
+  });
+
+  it("excludes Next's static asset routes from the matcher", () => {
+    // Next anchors matcher patterns against the whole pathname.
+    const pattern = new RegExp(`^${config.matcher[0]}$`);
+    expect(pattern.test("/_next/static/chunks/abc123.css")).toBe(false);
+    expect(pattern.test("/_next/image")).toBe(false);
+    expect(pattern.test("/favicon.ico")).toBe(false);
+  });
+
+  it("still matches real app routes", () => {
+    // Next anchors matcher patterns against the whole pathname.
+    const pattern = new RegExp(`^${config.matcher[0]}$`);
+    expect(pattern.test("/manager")).toBe(true);
+    expect(pattern.test("/api/patients")).toBe(true);
+    expect(pattern.test("/login")).toBe(true);
+  });
+
+  it("declares no route segment config — Next 16 rejects it in Proxy", () => {
+    expect("runtime" in config).toBe(false);
   });
 });
 
