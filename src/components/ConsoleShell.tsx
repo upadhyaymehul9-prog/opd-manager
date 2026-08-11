@@ -11,7 +11,7 @@ type NavItem = { href: string; label: string };
 type NavGroup = { label: string; items: NavItem[] };
 
 const ADMIN_GROUPS: NavGroup[] = [
-  { label: "Overview", items: [{ href: "/manager", label: "OPD Manager" }] },
+  { label: "Overview", items: [{ href: "/manager", label: "Clinic Manager" }] },
   {
     label: "Clinical",
     items: [
@@ -112,7 +112,7 @@ function SidebarContent({
     <div className="flex h-full flex-col">
       <div className="border-b border-slate-800 px-4 py-4">
         <Link href="/" className="text-base font-bold tracking-tight text-white">
-          OPD Manager
+          Clinic Manager
         </Link>
       </div>
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">

@@ -25,7 +25,7 @@ export function PharmacyBillReceipt({
         </div>
       )}
       <div className="text-center">
-        <p className="text-lg font-bold text-slate-900">OPD Manager — Pharmacy</p>
+        <p className="text-lg font-bold text-slate-900">Clinic Manager — Pharmacy</p>
         <p className="text-sm text-slate-600">Tax invoice / receipt</p>
       </div>
 

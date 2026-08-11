@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "OPD Manager — Clinic Patient Flow",
+  title: "Clinic Manager — Clinic Patient Flow",
   description:
     "Outpatient department manager — reception to doctor to lab to pharmacy",
 };

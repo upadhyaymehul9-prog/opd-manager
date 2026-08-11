@@ -59,7 +59,7 @@ const DEPARTMENT_CONSOLES = [
 const ADMIN_CONSOLES = [
   {
     href: "/manager",
-    title: "OPD Manager",
+    title: "Clinic Manager",
     desc: "Full clinic overview — every patient from entry to exit",
     color: "border-slate-300 hover:border-slate-500 bg-slate-50",
     username: "manager",
@@ -138,7 +138,7 @@ export default async function Home() {
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900">
         <div className="mx-auto max-w-5xl px-6 py-16">
           <header className="mb-12 text-center text-white">
-            <h1 className="text-4xl font-bold tracking-tight">OPD Manager</h1>
+            <h1 className="text-4xl font-bold tracking-tight">Clinic Manager</h1>
             <p className="mx-auto mt-3 max-w-2xl text-lg text-slate-300">
               Signed in as {session.displayName || session.username}
             </p>
@@ -165,7 +165,7 @@ export default async function Home() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900">
       <div className="mx-auto max-w-6xl px-6 py-12">
         <header className="mb-10 text-center text-white">
-          <h1 className="text-4xl font-bold tracking-tight">OPD Manager</h1>
+          <h1 className="text-4xl font-bold tracking-tight">Clinic Manager</h1>
           <p className="mx-auto mt-3 max-w-2xl text-lg text-slate-300">
             Guide every patient from reception to exit — pick your department
             below and sign in.

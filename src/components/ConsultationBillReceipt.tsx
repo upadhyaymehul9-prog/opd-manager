@@ -12,7 +12,7 @@ export function ConsultationBillReceipt({ visit }: { visit: PatientVisit }) {
     <div className="consultation-bill-print rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="text-center">
         <h2 className="text-xl font-bold text-slate-900">Consultation Bill</h2>
-        <p className="text-sm text-slate-600">OPD Manager Clinic</p>
+        <p className="text-sm text-slate-600">Clinic Manager</p>
       </div>
       <dl className="mt-4 space-y-2 text-sm">
         <div className="flex justify-between">

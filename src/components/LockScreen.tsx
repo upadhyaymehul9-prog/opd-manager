@@ -72,7 +72,7 @@ export function LockScreen({
       <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-800 p-8 shadow-2xl">
         <div className="mb-6 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-            OPD Manager
+            Clinic Manager
           </p>
           <h2 className="mt-1 text-xl font-bold text-white">Session locked</h2>
           <p className="mt-3 text-sm text-slate-300">{displayName}</p>

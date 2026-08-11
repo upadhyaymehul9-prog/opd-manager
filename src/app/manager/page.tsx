@@ -80,7 +80,7 @@ export default function ManagerPage() {
 
   return (
     <ConsoleShell
-      title="OPD Manager"
+      title="Clinic Manager"
       subtitle="Live view of every patient currently in the clinic, by stage"
       current="/manager"
     >

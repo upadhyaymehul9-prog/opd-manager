@@ -70,7 +70,7 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 px-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
-        <h1 className="text-2xl font-bold text-slate-900">OPD Manager</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Clinic Manager</h1>
         <p className="mt-2 text-slate-600">Sign in with your clinic ID and password</p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">

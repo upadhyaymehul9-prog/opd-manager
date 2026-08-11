@@ -54,7 +54,7 @@ export default function TVDisplayPage() {
       <div className="min-w-0 flex-1">
         <header className="border-b border-slate-300 bg-white px-6 py-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h1 className="text-2xl font-bold">OPD Manager — TV Display</h1>
+            <h1 className="text-2xl font-bold">Clinic Manager — TV Display</h1>
             <LiveClock />
           </div>
         </header>

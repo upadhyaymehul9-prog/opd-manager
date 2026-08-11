@@ -296,7 +296,7 @@ export default function RecordCompletenessPage() {
 
       <p className="mt-4 text-xs text-slate-500">
         <Link href="/manager" className="text-indigo-700 hover:underline">
-          ← OPD Manager
+          ← Clinic Manager
         </Link>
         {" · "}
         <Link href="/nabh" className="text-indigo-700 hover:underline">
