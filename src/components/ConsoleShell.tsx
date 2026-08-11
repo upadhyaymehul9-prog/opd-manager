@@ -146,6 +146,11 @@ function SidebarContent({
       </nav>
       {session && (
         <div className="border-t border-slate-800 px-4 py-3">
+          {session.clinicName && (
+            <p className="truncate text-xs font-medium uppercase tracking-wide text-slate-500">
+              {session.clinicName}
+            </p>
+          )}
           <p className="truncate text-sm font-medium text-white">
             {session.displayName || session.username}
           </p>

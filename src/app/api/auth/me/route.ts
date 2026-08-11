@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE, rolesForNav, verifySessionToken } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -10,6 +11,11 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const clinic = await prisma.clinic.findUnique({
+    where: { id: session.clinicId },
+    select: { name: true },
+  });
+
   return NextResponse.json({
     username: session.username,
     role: session.role,
@@ -17,5 +23,6 @@ export async function GET() {
     doctorId: session.doctorId,
     navPaths: rolesForNav(session.role),
     mustChangePassword: session.mustChangePassword,
+    clinicName: clinic?.name ?? null,
   });
 }

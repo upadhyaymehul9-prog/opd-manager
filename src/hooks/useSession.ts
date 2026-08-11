@@ -10,6 +10,7 @@ type SessionInfo = {
   doctorId: string | null;
   navPaths: string[];
   mustChangePassword: boolean;
+  clinicName: string | null;
 };
 
 export function useSession() {
