@@ -1,0 +1,38 @@
+name: Relock
+
+# Temporary, manually-triggered helper. package-lock.json is written on
+# Windows, where npm never resolves the Linux-only @emnapi packages that
+# back the wasm32 fallbacks -- so `npm ci` on the Linux runner fails with
+# EUSAGE ("Missing: @emnapi/runtime ... from lock file"). Regenerate the
+# lockfile on Linux and publish it as an artifact to commit back.
+# Delete this workflow once the lockfile is fixed.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  relock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Pin npm to match CI
+        run: npm install -g npm@11
+
+      - name: Regenerate package-lock.json on Linux
+        run: |
+          rm -f package-lock.json
+          npm install --package-lock-only --ignore-scripts
+          node -e "const l=require('./package-lock.json');for(const k of ['node_modules/@emnapi/runtime','node_modules/@emnapi/core']){const v=l.packages[k];console.log(k, v?('present '+v.version):'ABSENT');}console.log('packages:',Object.keys(l.packages).length)"
+
+      - name: Verify npm ci accepts the new lockfile
+        run: npm ci --ignore-scripts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-lock
+          path: package-lock.json
