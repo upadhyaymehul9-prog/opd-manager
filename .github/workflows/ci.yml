@@ -26,39 +26,17 @@ jobs:
           # Node 20 is deprecated on GitHub runners; vitest 4 wants
           # ^20.19 || >=22.12 and Next 16 targets 22+.
           node-version: 22
-          # `cache: npm` deliberately omitted while diagnosing: a poisoned
-          # restored cache makes `npm ci` fail consistently and fast, which
-          # matches the observed symptom.
+          cache: npm
 
-      # package-lock.json is written locally by npm 11; the npm 10 that ships
-      # with Node 22 can reject a lockfile a newer npm produced, which fails
-      # `npm ci` in seconds via its sync check.
+      # package-lock.json is written by npm 11 locally. The npm 10 bundled
+      # with Node 22 computes a different required tree and fails `npm ci`
+      # with EUSAGE ("Missing: @emnapi/runtime ... from lock file"), which is
+      # what kept this job red. Match the version that writes the lockfile.
       - name: Pin npm to the version that writes the lockfile
         run: npm install -g npm@11
 
-      # TEMPORARY DIAGNOSTIC: `npm ci` has failed here for days and the raw
-      # log needs auth to read, so mirror the failure into the job summary,
-      # which renders on the run's public page. Revert to a plain
-      # `npm ci --ignore-scripts` once the cause is known.
       - name: Install dependencies
-        run: |
-          set +e
-          echo "node: $(node -v)   npm: $(npm -v)" | tee -a "$GITHUB_STEP_SUMMARY"
-          npm ci --ignore-scripts > npm-ci.log 2>&1
-          code=$?
-          {
-            echo ""
-            echo "## npm ci exit code: $code"
-            echo ""
-            echo '```'
-            tail -n 80 npm-ci.log
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          tail -n 80 npm-ci.log
-          exit $code
-
-      - name: Generate Prisma Client
-        run: npx prisma generate
+        run: npm ci
 
       - name: Unit tests
         run: npm test
