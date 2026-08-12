@@ -30,6 +30,12 @@ jobs:
           # restored cache makes `npm ci` fail consistently and fast, which
           # matches the observed symptom.
 
+      # package-lock.json is written locally by npm 11; the npm 10 that ships
+      # with Node 22 can reject a lockfile a newer npm produced, which fails
+      # `npm ci` in seconds via its sync check.
+      - name: Pin npm to the version that writes the lockfile
+        run: npm install -g npm@11
+
       # TEMPORARY DIAGNOSTIC: `npm ci` has failed here for days and the raw
       # log needs auth to read, so mirror the failure into the job summary,
       # which renders on the run's public page. Revert to a plain
