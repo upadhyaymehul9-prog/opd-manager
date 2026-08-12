@@ -28,12 +28,26 @@ jobs:
           node-version: 22
           cache: npm
 
-      # --ignore-scripts keeps the `postinstall: prisma generate` hook from
-      # running inside `npm ci`. That hook failing is indistinguishable from
-      # a dependency-resolution failure in the logs -- both just surface as
-      # "Install dependencies: exit code 1" -- so it gets its own step below.
+      # TEMPORARY DIAGNOSTIC: `npm ci` has failed here for days and the raw
+      # log needs auth to read, so mirror the failure into the job summary,
+      # which renders on the run's public page. Revert to a plain
+      # `npm ci --ignore-scripts` once the cause is known.
       - name: Install dependencies
-        run: npm ci --ignore-scripts
+        run: |
+          set +e
+          echo "node: $(node -v)   npm: $(npm -v)" | tee -a "$GITHUB_STEP_SUMMARY"
+          npm ci --ignore-scripts > npm-ci.log 2>&1
+          code=$?
+          {
+            echo ""
+            echo "## npm ci exit code: $code"
+            echo ""
+            echo '```'
+            tail -n 80 npm-ci.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          tail -n 80 npm-ci.log
+          exit $code
 
       - name: Generate Prisma Client
         run: npx prisma generate
