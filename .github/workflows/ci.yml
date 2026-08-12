@@ -26,7 +26,9 @@ jobs:
           # Node 20 is deprecated on GitHub runners; vitest 4 wants
           # ^20.19 || >=22.12 and Next 16 targets 22+.
           node-version: 22
-          cache: npm
+          # `cache: npm` deliberately omitted while diagnosing: a poisoned
+          # restored cache makes `npm ci` fail consistently and fast, which
+          # matches the observed symptom.
 
       # TEMPORARY DIAGNOSTIC: `npm ci` has failed here for days and the raw
       # log needs auth to read, so mirror the failure into the job summary,
