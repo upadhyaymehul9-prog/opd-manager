@@ -28,10 +28,14 @@ jobs:
           node-version: 22
           cache: npm
 
-      # package-lock.json is written by npm 11 locally. The npm 10 bundled
-      # with Node 22 computes a different required tree and fails `npm ci`
-      # with EUSAGE ("Missing: @emnapi/runtime ... from lock file"), which is
-      # what kept this job red. Match the version that writes the lockfile.
+      # Root cause of the long-standing red CI: package-lock.json was written
+      # on Windows, where npm never resolves the Linux-only @emnapi packages
+      # that back optional wasm32 fallbacks -- so `npm ci` on this Linux
+      # runner failed with EUSAGE ("Missing: @emnapi/runtime ... from lock
+      # file"). Fixed by regenerating the lockfile on Linux (see the one-off
+      # .github/workflows/relock.yml, now removed). Pinning npm 11 here too,
+      # matching the version that wrote it, so the two stay in sync going
+      # forward.
       - name: Pin npm to the version that writes the lockfile
         run: npm install -g npm@11
 
